@@ -135,10 +135,13 @@ Hoje o guard cobre auth/guest; **roles em `meta` + enforcement no guard são obr
 ## Auth e API
 
 - Token: `localStorage` `sorria.auth.token` / `sorria.auth.user`.
+- Clínica ativa: `localStorage` `sorria.activeClinicId`; Axios injeta header `X-Clinic-Id` em [`api/client.ts`](src/api/client.ts).
+- Store Pinia `clinics` + switcher no `AppShellLayout` (admin). Funcionário fica na própria `user.clinic_id`.
 - Axios em `api/client.ts` injeta `Authorization: Bearer …`.
 - Login: `POST /v1/auth/login` com body `{ user, password }` (campo **`user`**, não `username`).
 - Base URL: `VITE_API_BASE_URL` (default `/api`); proxy Vite `/api` → `localhost:8000`.
 - Erros: `toApiError` / `ApiError` (mensagens PT quando vierem da API).
+- WhatsApp da clínica: view `/whatsapp` → `/v1/crm/connection/*`.
 
 ## Convenções
 

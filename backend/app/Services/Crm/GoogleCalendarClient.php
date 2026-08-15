@@ -2,6 +2,8 @@
 
 namespace App\Services\Crm;
 
+use App\Models\Clinic;
+use App\Support\ClinicContext;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -11,20 +13,65 @@ class GoogleCalendarClient
 
     private const API_BASE = 'https://www.googleapis.com/calendar/v3';
 
+    public function __construct(private ClinicContext $clinicContext) {}
+
+    private ?Clinic $clinic = null;
+
+    public function forClinic(Clinic $clinic): self
+    {
+        $clone = clone $this;
+        $clone->clinic = $clinic;
+
+        return $clone;
+    }
+
     public function configured(): bool
     {
-        $cfg = config('services.google_calendar', []);
-
-        return filled($cfg['client_id'] ?? null)
-            && filled($cfg['client_secret'] ?? null)
-            && filled($cfg['refresh_token'] ?? null);
+        return filled($this->clientId())
+            && filled($this->clientSecret())
+            && filled($this->refreshToken());
     }
 
     public function calendarId(): string
     {
-        $id = trim((string) config('services.google_calendar.calendar_id', 'primary'));
+        $id = trim((string) ($this->resolveClinic()?->google_calendar_id ?? ''));
 
         return $id !== '' ? $id : 'primary';
+    }
+
+    public function timezone(): string
+    {
+        $clinic = $this->resolveClinic();
+
+        return (string) ($clinic?->google_calendar_timezone
+            ?: config('services.google_calendar.timezone', config('app.timezone')));
+    }
+
+    public function slotMinutes(): int
+    {
+        $clinic = $this->resolveClinic();
+        $value = $clinic?->google_calendar_slot_minutes
+            ?? config('services.google_calendar.slot_minutes', 60);
+
+        return max(5, (int) $value);
+    }
+
+    public function businessHoursStart(): int
+    {
+        $clinic = $this->resolveClinic();
+        $value = $clinic?->google_calendar_business_start
+            ?? config('services.google_calendar.business_hours_start', 9);
+
+        return (int) $value;
+    }
+
+    public function businessHoursEnd(): int
+    {
+        $clinic = $this->resolveClinic();
+        $value = $clinic?->google_calendar_business_end
+            ?? config('services.google_calendar.business_hours_end', 18);
+
+        return (int) $value;
     }
 
     /**
@@ -34,7 +81,7 @@ class GoogleCalendarClient
     public function createEvent(array $payload): array
     {
         if (! $this->configured()) {
-            throw new RuntimeException('Google Calendar não configurado. Defina GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e GOOGLE_CALENDAR_REFRESH_TOKEN.');
+            throw new RuntimeException('Google Calendar não configurado. Defina GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e o refresh token da clínica.');
         }
 
         $allDay = (bool) ($payload['allDay'] ?? false);
@@ -176,7 +223,6 @@ class GoogleCalendarClient
             ->timeout(30)
             ->delete(self::API_BASE.'/calendars/'.$calendarId.'/events/'.rawurlencode($eventId));
 
-        // 404/410: já removido — trata como sucesso.
         if ($response->failed() && ! in_array($response->status(), [404, 410], true)) {
             $detail = $response->json('error.message')
                 ?? $response->json('error_description')
@@ -186,8 +232,6 @@ class GoogleCalendarClient
     }
 
     /**
-     * FreeBusy: retorna apenas intervalos ocupados (sem título/descrição de eventos).
-     *
      * @return list<array{start: string, end: string}>
      */
     public function freeBusy(string $timeMinIso, string $timeMaxIso): array
@@ -203,7 +247,7 @@ class GoogleCalendarClient
             ->post(self::API_BASE.'/freeBusy', [
                 'timeMin' => $this->dateTimeValue($timeMinIso, false)['dateTime'],
                 'timeMax' => $this->dateTimeValue($timeMaxIso, false)['dateTime'],
-                'timeZone' => (string) config('services.google_calendar.timezone', 'America/Sao_Paulo'),
+                'timeZone' => $this->timezone(),
                 'items' => [
                     ['id' => $this->calendarId()],
                 ],
@@ -219,7 +263,6 @@ class GoogleCalendarClient
         $calId = $this->calendarId();
         $busy = $response->json("calendars.{$calId}.busy");
         if (! is_array($busy)) {
-            // Fallback: primeiro calendário retornado.
             $calendars = $response->json('calendars');
             $busy = [];
             if (is_array($calendars)) {
@@ -248,14 +291,44 @@ class GoogleCalendarClient
         return $out;
     }
 
+    private function resolveClinic(): ?Clinic
+    {
+        return $this->clinic ?? $this->clinicContext->clinic();
+    }
+
+    private function clientId(): ?string
+    {
+        $value = config('services.google_calendar.client_id');
+
+        return filled($value) ? (string) $value : null;
+    }
+
+    private function clientSecret(): ?string
+    {
+        $value = config('services.google_calendar.client_secret');
+
+        return filled($value) ? (string) $value : null;
+    }
+
+    /**
+     * Sem fallback para o .env: o token define em qual agenda o evento é criado,
+     * então clínica sem token própria conta como não configurada — caso contrário
+     * ela gravaria na agenda da clínica que estiver no .env.
+     */
+    private function refreshToken(): ?string
+    {
+        $token = $this->resolveClinic()?->google_calendar_refresh_token;
+
+        return filled($token) ? (string) $token : null;
+    }
+
     private function accessToken(): string
     {
-        $cfg = config('services.google_calendar', []);
         $response = Http::asForm()->timeout(30)->post(self::TOKEN_URL, [
             'grant_type' => 'refresh_token',
-            'client_id' => $cfg['client_id'],
-            'client_secret' => $cfg['client_secret'],
-            'refresh_token' => $cfg['refresh_token'],
+            'client_id' => $this->clientId(),
+            'client_secret' => $this->clientSecret(),
+            'refresh_token' => $this->refreshToken(),
         ]);
 
         if ($response->failed() || ! filled($response->json('access_token'))) {

@@ -2,6 +2,7 @@
 
 namespace App\Models\Crm;
 
+use App\Models\Concerns\BelongsToClinic;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -9,7 +10,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Agent extends Model
 {
+    use BelongsToClinic;
+
     protected $fillable = [
+        'clinic_id',
         'user_id',
         'name',
         'system_prompt',
@@ -45,6 +49,14 @@ class Agent extends Model
     {
         return static::query()
             ->forUser($user->id)
+            ->active()
+            ->first();
+    }
+
+    public static function activeForClinic(int $clinicId): ?self
+    {
+        return static::withoutGlobalScopes()
+            ->where('clinic_id', $clinicId)
             ->active()
             ->first();
     }

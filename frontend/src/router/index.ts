@@ -60,7 +60,7 @@ const router = createRouter({
         {
           path: 'whatsapp',
           name: 'whatsapp',
-          component: () => import('@/views/PlaceholderView.vue'),
+          component: () => import('@/views/WhatsappView.vue'),
           meta: {
             requiresAuth: true,
             roles: bothRoles,

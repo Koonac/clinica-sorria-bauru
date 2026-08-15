@@ -2,18 +2,22 @@
 
 namespace App\Models\Crm;
 
+use App\Models\Concerns\BelongsToClinic;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PipelineStage extends Model
 {
+    use BelongsToClinic;
+
     public const KINDS = ['lead', 'deal'];
 
     /** Status analítico exclusivo do estágio. */
     public const STATUSES = ['open', 'in_progress', 'won', 'lost'];
 
     protected $fillable = [
+        'clinic_id',
         'kind',
         'slug',
         'name',

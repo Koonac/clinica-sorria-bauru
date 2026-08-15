@@ -50,14 +50,14 @@ class ListarHorariosDisponiveisTool implements AgentTool
             throw new RuntimeException('Google Calendar não configurado.');
         }
 
-        $tz = (string) config('services.google_calendar.timezone', config('app.timezone'));
+        $tz = $this->calendar->timezone();
         Carbon::setLocale('pt_BR');
         $dias = max(1, min(7, (int) ($arguments['dias'] ?? 1)));
-        $slotMinutes = (int) ($arguments['duracao_minutos'] ?? config('services.google_calendar.slot_minutes', 60));
+        $slotMinutes = (int) ($arguments['duracao_minutos'] ?? $this->calendar->slotMinutes());
         $slotMinutes = max(15, min(180, $slotMinutes));
 
-        $horaInicio = (int) config('services.google_calendar.business_hours_start', 9);
-        $horaFim = (int) config('services.google_calendar.business_hours_end', 18);
+        $horaInicio = $this->calendar->businessHoursStart();
+        $horaFim = $this->calendar->businessHoursEnd();
         if ($horaFim <= $horaInicio) {
             $horaInicio = 9;
             $horaFim = 18;

@@ -116,7 +116,9 @@ backend/
 - Auth: Sanctum Bearer (`Authorization: Bearer {token}`). Login: `POST /api/v1/auth/login`.
 - Admin de usuários: middleware `role:admin` em `/api/v1/users`.
 - Webhooks WhatsApp **públicos** (sem Sanctum):  
-  `POST /api/v1/crm/whatsapp/webhooks/{notifications,messages}` — auth por `?token=` = `users.whatsapp_webhook_token`.
+  `POST /api/v1/crm/whatsapp/webhooks/{notifications,messages}` — auth por `?token=` = `connections.webhook_token`.
+- Contexto multi-clínica: header `X-Clinic-Id` (middleware `clinic`) nas rotas CRM/finance autenticadas. Funcionário usa `users.clinic_id`; admin pode trocar.
+- Sessão WhatsApp da clínica: `/api/v1/crm/connection/*` (1:1 com `clinics`).
 - Respostas: `{ "data": ... }` (listas paginadas = paginator Laravel). Validação: `422` com `{ message, errors }`.
 - Mensagens de erro/validação em **português**.
 
@@ -125,7 +127,7 @@ backend/
 | Domínio | Entrada | Services / peças-chave |
 |---------|---------|-------------------------|
 | CRM | `/api/v1/crm/*` | `ConvertLead`, `MoveLead`, models Lead/Deal/Contact… |
-| WhatsApp | webhooks + `WhatsappController` | `WhatsappApiClient`, `ProcessInboundWhatsappMessage`, `WhatsappLeadResolver` |
+| WhatsApp | webhooks + `ConnectionController` / chats | `WhatsappApiClient`, `ProcessInboundWhatsappMessage`, `WhatsappLeadResolver` |
 | Agent IA | queue após inbound | `WhatsappAgentRunner`, `OpenRouterAgentClient`, tools (agendar, mover, responder…) |
 | Google Calendar | tools do agent | `GoogleCalendarClient` + env `GOOGLE_*` |
 | Campanhas | `/crm/whatsapp/campaigns` | `RunWhatsappCampaignJob`, `ParseCampaignCsv`, `RenderCampaignMessage` |

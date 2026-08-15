@@ -2,13 +2,16 @@
 
 namespace App\Jobs\Crm;
 
+use App\Models\Clinic;
 use App\Models\Crm\Agent;
+use App\Models\Crm\Connection;
 use App\Models\Crm\Lead;
 use App\Models\Crm\PipelineStage;
 use App\Models\User;
 use App\Services\Crm\Agent\AgentContext;
 use App\Services\Crm\Agent\WhatsappAgentRunner;
 use App\Services\Crm\WhatsappChatHistory;
+use App\Support\ClinicContext;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -23,28 +26,35 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
     public int $uniqueFor = 120;
 
     public function __construct(
-        public int $userId,
+        public int $connectionId,
         public string $chatKey,
     ) {}
 
     public function uniqueId(): string
     {
-        return 'whatsapp-ai:'.$this->userId.':'.$this->chatKey;
+        return 'whatsapp-ai:'.$this->connectionId.':'.$this->chatKey;
     }
 
-    public function handle(WhatsappAgentRunner $runner, WhatsappChatHistory $history): void
+    public function handle(WhatsappAgentRunner $runner, WhatsappChatHistory $history, ClinicContext $clinicContext): void
     {
-        $user = User::query()->find($this->userId);
-        if (! $user) {
+        $connection = Connection::withoutGlobalScopes()->find($this->connectionId);
+        if (! $connection) {
             return;
         }
 
-        $agent = Agent::activeFor($user);
+        $clinic = Clinic::query()->find($connection->clinic_id);
+        if (! $clinic) {
+            return;
+        }
+
+        $clinicContext->set($clinic);
+
+        $agent = Agent::activeForClinic((int) $connection->clinic_id);
         if (! $agent || ! $agent->canActivate()) {
             return;
         }
 
-        if ($user->whatsapp_status !== 'connected' || ! filled($user->whatsapp_session_id)) {
+        if ($connection->status !== 'connected' || ! filled($connection->session_id)) {
             return;
         }
 
@@ -55,7 +65,7 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
             return;
         }
 
-        $latest = $history->latestInbound($user->id, $leadId, $jid);
+        $latest = $history->latestInbound($connection->id, $leadId, $jid);
         if (! $latest) {
             return;
         }
@@ -82,6 +92,14 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
             return;
         }
 
+        $user = $connection->created_by
+            ? User::query()->find($connection->created_by)
+            : ($agent->user_id ? User::query()->find($agent->user_id) : null);
+
+        if (! $user) {
+            return;
+        }
+
         $stages = PipelineStage::ofKind('lead')
             ->where('active', true)
             ->orderBy('position')
@@ -95,10 +113,11 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
 
         $context = new AgentContext(
             user: $user,
+            connection: $connection,
             agent: $agent,
             chatKey: $this->chatKey,
             jid: $jid,
-            sessionId: (string) $user->whatsapp_session_id,
+            sessionId: (string) $connection->session_id,
             lead: $lead,
             deal: $latest->deal_id ? $latest->deal()->first() : null,
             leadStages: $stages,
@@ -109,7 +128,7 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
         } catch (Throwable $e) {
             Cache::forget($idempotencyKey);
             Log::error('Falha no WhatsApp agent.', [
-                'user_id' => $user->id,
+                'connection_id' => $connection->id,
                 'agent_id' => $agent->id,
                 'chat_key' => $this->chatKey,
                 'error' => $e->getMessage(),

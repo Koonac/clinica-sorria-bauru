@@ -3,7 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
-use App\Models\Crm\PipelineStage;
+use App\Models\Crm\Connection;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -25,13 +25,6 @@ class User extends Authenticatable
         self::ROLE_FUNCIONARIO,
     ];
 
-    public const WHATSAPP_STATUSES = [
-        'disconnected',
-        'connecting',
-        'connected',
-        'error',
-    ];
-
     /**
      * The attributes that are mass assignable.
      *
@@ -43,15 +36,7 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
-        'whatsapp_api_username',
-        'whatsapp_api_password',
-        'whatsapp_session_id',
-        'whatsapp_webhook_token',
-        'whatsapp_status',
-        'whatsapp_is_business',
-        'whatsapp_phone',
-        'whatsapp_qr',
-        'whatsapp_default_lead_stage_id',
+        'clinic_id',
     ];
 
     /**
@@ -62,29 +47,24 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
-        'whatsapp_api_password',
-        'whatsapp_webhook_token',
-        'whatsapp_qr',
     ];
 
     /**
      * Get the attributes that should be cast.
      *
-     * @return array<string, string>
+     * @return array<string, mixed>
      */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'whatsapp_api_password' => 'encrypted',
-            'whatsapp_is_business' => 'boolean',
         ];
     }
 
-    public function hasWhatsappCredentials(): bool
+    public function clinic(): BelongsTo
     {
-        return filled($this->whatsapp_api_username) && filled($this->whatsapp_api_password);
+        return $this->belongsTo(Clinic::class);
     }
 
     public function isAdmin(): bool
@@ -103,7 +83,7 @@ class User extends Authenticatable
     }
 
     /**
-     * @return array{id: int, name: string, username: string, email: string, role: string}
+     * @return array{id: int, name: string, username: string, email: string, role: string, clinic_id: int|null}
      */
     public function toAuthArray(): array
     {
@@ -113,11 +93,7 @@ class User extends Authenticatable
             'username' => $this->username,
             'email' => $this->email,
             'role' => $this->role,
+            'clinic_id' => $this->clinic_id,
         ];
-    }
-
-    public function whatsappDefaultLeadStage(): BelongsTo
-    {
-        return $this->belongsTo(PipelineStage::class, 'whatsapp_default_lead_stage_id');
     }
 }

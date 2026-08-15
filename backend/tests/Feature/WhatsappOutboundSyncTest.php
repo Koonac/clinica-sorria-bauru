@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Jobs\Crm\ProcessWhatsappAiReplyJob;
 use App\Models\Crm\Activity;
 use App\Models\Crm\Agent;
+use App\Models\Crm\Connection;
 use App\Models\Crm\Lead;
 use App\Models\Crm\WhatsappMessage;
 use App\Models\User;
@@ -28,15 +29,12 @@ class WhatsappOutboundSyncTest extends TestCase
         ]);
     }
 
-    private function userConectado(): User
+    /**
+     * @return array{0: User, 1: Connection}
+     */
+    private function userConectado(): array
     {
-        return User::factory()->create([
-            'whatsapp_status' => 'connected',
-            'whatsapp_session_id' => 'sess-1',
-            'whatsapp_api_username' => 'u',
-            'whatsapp_api_password' => 'p',
-            'whatsapp_webhook_token' => 'webhook-token-test-'.uniqid(),
-        ]);
+        return $this->userWithWhatsappConnection();
     }
 
     private function leadComWhatsapp(User $user): Lead
@@ -54,7 +52,7 @@ class WhatsappOutboundSyncTest extends TestCase
     {
         Queue::fake();
 
-        $user = $this->userConectado();
+        [$user, $connection] = $this->userConectado();
         Agent::create([
             'user_id' => $user->id,
             'name' => 'Bot',
@@ -65,7 +63,7 @@ class WhatsappOutboundSyncTest extends TestCase
         $lead = $this->leadComWhatsapp($user);
 
         $response = $this->postJson(
-            '/api/v1/crm/whatsapp/webhooks/messages?token='.$user->whatsapp_webhook_token,
+            '/api/v1/crm/whatsapp/webhooks/messages?token='.$connection->webhook_token,
             [
                 'event' => 'message',
                 'session_id' => 'sess-1',
@@ -88,7 +86,7 @@ class WhatsappOutboundSyncTest extends TestCase
         $response->assertOk()->assertJson(['success' => true]);
 
         $this->assertDatabaseHas('whatsapp_messages', [
-            'user_id' => $user->id,
+            'connection_id' => $connection->id,
             'direction' => 'outbound',
             'body' => 'Oi, te respondo pelo celular',
             'message_id' => 'true_5511999990000@c.us_ABC123',
@@ -107,7 +105,7 @@ class WhatsappOutboundSyncTest extends TestCase
 
     public function test_webhook_from_me_duplicado_nao_recria_mensagem_nem_activity(): void
     {
-        $user = $this->userConectado();
+        [$user, $connection] = $this->userConectado();
         $lead = $this->leadComWhatsapp($user);
         $payload = [
             'event' => 'message',
@@ -127,7 +125,7 @@ class WhatsappOutboundSyncTest extends TestCase
             ],
         ];
 
-        $url = '/api/v1/crm/whatsapp/webhooks/messages?token='.$user->whatsapp_webhook_token;
+        $url = '/api/v1/crm/whatsapp/webhooks/messages?token='.$connection->webhook_token;
 
         $this->postJson($url, $payload)->assertOk();
         $this->postJson($url, $payload)->assertOk();
@@ -157,7 +155,7 @@ class WhatsappOutboundSyncTest extends TestCase
             ], 200),
         ]);
 
-        $user = $this->userConectado();
+        [$user, $connection] = $this->userConectado();
         Agent::create([
             'user_id' => $user->id,
             'name' => 'Bot',
@@ -176,7 +174,7 @@ class WhatsappOutboundSyncTest extends TestCase
         ])->assertCreated();
 
         $this->assertDatabaseHas('whatsapp_messages', [
-            'user_id' => $user->id,
+            'connection_id' => $connection->id,
             'direction' => 'outbound',
             'body' => 'Resposta humana pela plataforma',
             'lead_id' => $lead->id,
@@ -200,11 +198,10 @@ class WhatsappOutboundSyncTest extends TestCase
             ], 200),
         ]);
 
-        $user = $this->userConectado();
+        [$user, $connection] = $this->userConectado();
         $lead = $this->leadComWhatsapp($user);
         Sanctum::actingAs($user);
 
-        // 1x1 PNG
         $png = base64_encode(
             hex2bin('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082')
         );
@@ -228,7 +225,7 @@ class WhatsappOutboundSyncTest extends TestCase
         });
 
         $this->assertDatabaseHas('whatsapp_messages', [
-            'user_id' => $user->id,
+            'connection_id' => $connection->id,
             'direction' => 'outbound',
             'body' => 'Segue a foto',
             'type' => 'image',
@@ -240,7 +237,7 @@ class WhatsappOutboundSyncTest extends TestCase
 
     public function test_send_rejeita_media_nao_imagem(): void
     {
-        $user = $this->userConectado();
+        [$user] = $this->userConectado();
         Sanctum::actingAs($user);
 
         $this->postJson('/api/v1/crm/whatsapp/send', [
@@ -255,10 +252,12 @@ class WhatsappOutboundSyncTest extends TestCase
 
     public function test_webhook_from_me_soft_dedupe_mesmo_corpo_nao_pausa(): void
     {
-        $user = $this->userConectado();
+        [$user, $connection] = $this->userConectado();
         $lead = $this->leadComWhatsapp($user);
 
         WhatsappMessage::create([
+            'clinic_id' => $connection->clinic_id,
+            'connection_id' => $connection->id,
             'user_id' => $user->id,
             'session_id' => 'sess-1',
             'whatsapp_jid' => '5511999990000@c.us',
@@ -273,7 +272,7 @@ class WhatsappOutboundSyncTest extends TestCase
         ]);
 
         $this->postJson(
-            '/api/v1/crm/whatsapp/webhooks/messages?token='.$user->whatsapp_webhook_token,
+            '/api/v1/crm/whatsapp/webhooks/messages?token='.$connection->webhook_token,
             [
                 'event' => 'message',
                 'session_id' => 'sess-1',

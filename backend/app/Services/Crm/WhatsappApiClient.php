@@ -2,14 +2,14 @@
 
 namespace App\Services\Crm;
 
-use App\Models\User;
+use App\Models\Crm\Connection;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 class WhatsappApiClient
 {
-    public function __construct(private User $user) {}
+    public function __construct(private Connection $connection) {}
 
     /**
      * @return array<string, mixed>
@@ -117,8 +117,8 @@ class WhatsappApiClient
      */
     private function request(string $method, string $path, array $body = []): array
     {
-        if (! $this->user->hasWhatsappCredentials()) {
-            throw new RuntimeException('Credenciais da WhatsApp API não configuradas para este usuário.');
+        if (! $this->connection->hasCredentials()) {
+            throw new RuntimeException('Credenciais da WhatsApp API não configuradas para esta conexão.');
         }
 
         $base = (string) config('services.whatsapp.url');
@@ -127,8 +127,8 @@ class WhatsappApiClient
         }
 
         $pending = Http::withBasicAuth(
-            (string) $this->user->whatsapp_api_username,
-            (string) $this->user->whatsapp_api_password,
+            (string) $this->connection->api_username,
+            (string) $this->connection->api_password,
         )
             ->acceptJson()
             ->timeout(60);

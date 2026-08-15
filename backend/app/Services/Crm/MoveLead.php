@@ -3,9 +3,9 @@
 namespace App\Services\Crm;
 
 use App\Models\Crm\Activity;
+use App\Models\Crm\Connection;
 use App\Models\Crm\Lead;
 use App\Models\Crm\PipelineStage;
-use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -79,11 +79,11 @@ class MoveLead
             ];
         });
 
-        if ($resultado['stage_mudou'] && $userId) {
-            $actor = User::find($userId);
-            if ($actor) {
+        if ($resultado['stage_mudou']) {
+            $connection = $this->connectionForLead($resultado['lead']);
+            if ($connection) {
                 $this->labelSync->moveCardLabels(
-                    $actor,
+                    $connection,
                     $resultado['lead']->whatsapp_jid,
                     $resultado['origem'],
                     $resultado['destino'],
@@ -92,5 +92,17 @@ class MoveLead
         }
 
         return $resultado['lead'];
+    }
+
+    private function connectionForLead(Lead $lead): ?Connection
+    {
+        $clinicId = $lead->clinic_id;
+        if (! $clinicId) {
+            return null;
+        }
+
+        return Connection::withoutGlobalScopes()
+            ->where('clinic_id', $clinicId)
+            ->first();
     }
 }

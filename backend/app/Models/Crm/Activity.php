@@ -2,15 +2,19 @@
 
 namespace App\Models\Crm;
 
+use App\Models\Concerns\BelongsToClinic;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Activity extends Model
 {
+    use BelongsToClinic;
+
     public const TYPES = ['note', 'call', 'whatsapp', 'email', 'task', 'stage_change'];
 
     protected $fillable = [
+        'clinic_id',
         'type',
         'subject',
         'body',

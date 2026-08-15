@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Crm;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\StorePipelineStageRequest;
 use App\Http\Requests\Crm\UpdatePipelineStageRequest;
+use App\Models\Crm\Connection;
 use App\Models\Crm\PipelineStage;
 use App\Services\Crm\SyncWhatsappLabels;
 use Illuminate\Http\JsonResponse;
@@ -60,8 +61,9 @@ class PipelineStageController extends Controller
             'active' => true,
         ], $flags));
 
-        if ($request->user()) {
-            $this->labelSync->ensureStageLabel($request->user(), $stage);
+        $connection = Connection::query()->first();
+        if ($connection) {
+            $this->labelSync->ensureStageLabel($connection, $stage);
         }
 
         return response()->json(['data' => $stage], 201);
@@ -92,8 +94,11 @@ class PipelineStageController extends Controller
         $pipelineStage->update($data);
         $fresh = $pipelineStage->fresh();
 
-        if ($request->user() && isset($data['name']) && (string) $data['name'] !== (string) $nomeAnterior) {
-            $this->labelSync->ensureStageLabel($request->user(), $fresh);
+        if (isset($data['name']) && (string) $data['name'] !== (string) $nomeAnterior) {
+            $connection = Connection::query()->first();
+            if ($connection) {
+                $this->labelSync->ensureStageLabel($connection, $fresh);
+            }
         }
 
         return response()->json(['data' => $fresh]);

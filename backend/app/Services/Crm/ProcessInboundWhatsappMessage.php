@@ -2,14 +2,19 @@
 
 namespace App\Services\Crm;
 
+use App\Models\Clinic;
+use App\Models\Crm\Connection;
 use App\Models\Crm\WhatsappMessage;
-use App\Models\User;
+use App\Support\ClinicContext;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
 
 class ProcessInboundWhatsappMessage
 {
-    public function __construct(private WhatsappLeadResolver $leadResolver) {}
+    public function __construct(
+        private WhatsappLeadResolver $leadResolver,
+        private ClinicContext $clinicContext,
+    ) {}
 
     /**
      * Persiste mensagem de webhook já filtrada (chat direto).
@@ -17,8 +22,16 @@ class ProcessInboundWhatsappMessage
      *
      * @param  array<string, mixed>  $payload
      */
-    public function handle(User $user, string $sessionId, array $payload): ?WhatsappMessage
+    public function handle(Connection $connection, string $sessionId, array $payload): ?WhatsappMessage
     {
+        $clinic = $connection->relationLoaded('clinic')
+            ? $connection->clinic
+            : Clinic::query()->find($connection->clinic_id);
+
+        if ($clinic) {
+            $this->clinicContext->set($clinic);
+        }
+
         $jid = trim((string) ($payload['jid'] ?? ''));
         if ($jid === '') {
             return null;
@@ -33,8 +46,6 @@ class ProcessInboundWhatsappMessage
 
         $waTs = null;
         if (isset($payload['timestamp']) && is_numeric($payload['timestamp'])) {
-            // Unix epoch é UTC; converter para o TZ do app evita gravar o
-            // relógio UTC como se fosse horário local (ex.: +3h em SP).
             $waTs = Carbon::createFromTimestampUTC((int) $payload['timestamp'])
                 ->timezone(config('app.timezone'));
         }
@@ -49,8 +60,6 @@ class ProcessInboundWhatsappMessage
             }
         }
 
-        // Outbound: dedupe frouxo por corpo/jid mesmo com message_id diferente
-        // (eco do message_create vs gravação do CRM/agent).
         if ($direction === 'outbound' || ! $messageId) {
             $soft = $this->findSoftDuplicate($sessionId, $jid, $payload, $body, $waTs, $direction);
             if ($soft) {
@@ -62,7 +71,7 @@ class ProcessInboundWhatsappMessage
             }
         }
 
-        $resolved = $this->leadResolver->resolve($user, [
+        $resolved = $this->leadResolver->resolve($connection, [
             'jid' => $jid,
             'phone_number' => $payload['phone_number'] ?? null,
             'contact_name' => $payload['contact_name'] ?? null,
@@ -83,7 +92,9 @@ class ProcessInboundWhatsappMessage
 
         try {
             return WhatsappMessage::create([
-                'user_id' => $user->id,
+                'clinic_id' => $connection->clinic_id,
+                'connection_id' => $connection->id,
+                'user_id' => $connection->created_by,
                 'session_id' => $sessionId,
                 'whatsapp_jid' => $jid,
                 'whatsapp_lid' => filled($payload['lid'] ?? null) ? (string) $payload['lid'] : null,
@@ -134,8 +145,6 @@ class ProcessInboundWhatsappMessage
     }
 
     /**
-     * Fallback quando message_id falta (ou outbound eco da API): evita duplicar em janela curta.
-     *
      * @param  array<string, mixed>  $payload
      */
     private function findSoftDuplicate(
@@ -180,19 +189,5 @@ class ProcessInboundWhatsappMessage
         }
 
         return $query->latest('id')->first();
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function isSoftDuplicate(
-        string $sessionId,
-        string $jid,
-        array $payload,
-        ?string $body,
-        ?Carbon $waTs,
-        string $direction,
-    ): bool {
-        return $this->findSoftDuplicate($sessionId, $jid, $payload, $body, $waTs, $direction) !== null;
     }
 }

@@ -5,20 +5,21 @@ namespace App\Http\Controllers\Api\Crm;
 use App\Events\Crm\WhatsappInboundMessageReceived;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\SendWhatsappMessageRequest;
-use App\Http\Requests\Crm\UpdateWhatsappCredentialsRequest;
-use App\Http\Requests\Crm\UpdateWhatsappSettingsRequest;
+use App\Models\Clinic;
+use App\Models\Crm\Connection;
 use App\Models\Crm\WhatsappMessage;
 use App\Models\User;
 use App\Services\Crm\PauseWhatsappAgentForLead;
 use App\Services\Crm\SyncWhatsappLabels;
+use App\Services\Crm\UpsertClinicConnection;
 use App\Services\Crm\WhatsappApiClient;
+use App\Services\Crm\WhatsappChatHistory;
 use App\Services\Crm\WhatsappLeadResolver;
+use App\Support\ClinicContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use RuntimeException;
-use Throwable;
 
 class WhatsappController extends Controller
 {
@@ -26,201 +27,17 @@ class WhatsappController extends Controller
         private WhatsappLeadResolver $leadResolver,
         private SyncWhatsappLabels $labelSync,
         private PauseWhatsappAgentForLead $pauseAgent,
+        private ClinicContext $clinicContext,
+        private UpsertClinicConnection $upsertConnection,
     ) {}
-
-    public function show(Request $request): JsonResponse
-    {
-        /** @var User $user */
-        $user = $request->user();
-
-        return response()->json(['data' => $this->publicState($user)]);
-    }
-
-    public function updateCredentials(UpdateWhatsappCredentialsRequest $request): JsonResponse
-    {
-        /** @var User $user */
-        $user = $request->user();
-        $user->update($request->validated());
-
-        return response()->json(['data' => $this->publicState($user->fresh())]);
-    }
-
-    public function updateSettings(UpdateWhatsappSettingsRequest $request): JsonResponse
-    {
-        /** @var User $user */
-        $user = $request->user();
-        $user->whatsapp_default_lead_stage_id = $request->validated('default_lead_stage_id');
-        $user->save();
-
-        return response()->json(['data' => $this->publicState($user->fresh())]);
-    }
-
-    public function connect(Request $request): JsonResponse
-    {
-        /** @var User $user */
-        $user = $request->user();
-
-        if (! $user->hasWhatsappCredentials()) {
-            return response()->json([
-                'message' => 'Configure usuário e senha da WhatsApp API antes de conectar.',
-            ], 422);
-        }
-
-        if (! filled($user->whatsapp_session_id)) {
-            $user->whatsapp_session_id = (string) Str::uuid();
-        }
-        if (! filled($user->whatsapp_webhook_token)) {
-            $user->whatsapp_webhook_token = Str::random(64);
-        }
-
-        $token = $user->whatsapp_webhook_token;
-        $base = rtrim((string) config('app.url'), '/');
-        $notificationsUrl = "{$base}/api/v1/crm/whatsapp/webhooks/notifications?token={$token}";
-        $messagesUrl = "{$base}/api/v1/crm/whatsapp/webhooks/messages?token={$token}";
-
-        $client = new WhatsappApiClient($user);
-
-        try {
-            if (in_array($user->whatsapp_status, ['connecting', 'connected', 'error'], true)) {
-                try {
-                    $client->disconnect($user->whatsapp_session_id);
-                } catch (Throwable) {
-                    // Sessão pode já estar morta na API.
-                }
-            }
-
-            $client->connect($user->whatsapp_session_id, $notificationsUrl, $messagesUrl);
-        } catch (RuntimeException $e) {
-            $user->whatsapp_status = 'error';
-            $user->save();
-
-            return response()->json([
-                'message' => $e->getMessage(),
-            ], $e->getCode() >= 400 && $e->getCode() < 600 ? $e->getCode() : 502);
-        }
-
-        $user->whatsapp_status = 'connecting';
-        $user->whatsapp_qr = null;
-        $user->save();
-
-        return response()->json([
-            'data' => $this->publicState($user),
-            'message' => 'Conexão iniciada. Escaneie o QR Code.',
-        ], 201);
-    }
-
-    public function qrcode(Request $request): JsonResponse
-    {
-        /** @var User $user */
-        $user = $request->user();
-
-        if (filled($user->whatsapp_qr)) {
-            return response()->json([
-                'data' => [
-                    'session_id' => $user->whatsapp_session_id,
-                    'qr' => $user->whatsapp_qr,
-                    'source' => 'local',
-                ],
-            ]);
-        }
-
-        if (! filled($user->whatsapp_session_id) || ! $user->hasWhatsappCredentials()) {
-            return response()->json(['message' => 'Nenhuma sessão WhatsApp ativa.'], 404);
-        }
-
-        try {
-            $result = (new WhatsappApiClient($user))->qrcode($user->whatsapp_session_id);
-        } catch (RuntimeException $e) {
-            return response()->json([
-                'message' => $e->getMessage(),
-            ], $e->getCode() === 404 ? 404 : 502);
-        }
-
-        $qr = $result['qrImage'] ?? $result['qr'] ?? null;
-        if (is_string($qr) && $qr !== '') {
-            $user->whatsapp_qr = $qr;
-            $user->save();
-        }
-
-        return response()->json([
-            'data' => [
-                'session_id' => $user->whatsapp_session_id,
-                'qr' => $qr,
-                'source' => 'api',
-            ],
-        ]);
-    }
-
-    public function status(Request $request): JsonResponse
-    {
-        /** @var User $user */
-        $user = $request->user();
-
-        if (filled($user->whatsapp_session_id) && $user->hasWhatsappCredentials()) {
-            try {
-                $remote = (new WhatsappApiClient($user))->status($user->whatsapp_session_id);
-                $remoteStatus = $remote['status'] ?? null;
-                if (is_string($remoteStatus) && in_array($remoteStatus, User::WHATSAPP_STATUSES, true)) {
-                    $eraBusiness = (bool) $user->whatsapp_is_business;
-                    $user->whatsapp_status = $remoteStatus;
-                    if ($remoteStatus === 'connected') {
-                        $user->whatsapp_qr = null;
-                        $info = $remote['info'] ?? null;
-                        if (is_array($info) && isset($info['wid']['user'])) {
-                            $user->whatsapp_phone = (string) $info['wid']['user'];
-                        }
-                        if (array_key_exists('isBusiness', $remote)) {
-                            $user->whatsapp_is_business = (bool) $remote['isBusiness'];
-                        }
-                    } else {
-                        $user->whatsapp_is_business = false;
-                    }
-                    $user->save();
-
-                    if (! $eraBusiness && $user->whatsapp_is_business) {
-                        $this->labelSync->ensurePipelineLabels($user->fresh());
-                    }
-                }
-            } catch (Throwable) {
-                // Mantém status local se a API estiver indisponível.
-            }
-        }
-
-        return response()->json(['data' => $this->publicState($user->fresh())]);
-    }
-
-    public function disconnect(Request $request): JsonResponse
-    {
-        /** @var User $user */
-        $user = $request->user();
-
-        if (filled($user->whatsapp_session_id) && $user->hasWhatsappCredentials()) {
-            try {
-                (new WhatsappApiClient($user))->disconnect($user->whatsapp_session_id);
-            } catch (Throwable) {
-                // Segue limpando o estado local mesmo se a API falhar.
-            }
-        }
-
-        $user->forceFill([
-            'whatsapp_status' => 'disconnected',
-            'whatsapp_is_business' => false,
-            'whatsapp_qr' => null,
-            'whatsapp_phone' => null,
-        ])->save();
-
-        return response()->json([
-            'data' => $this->publicState($user),
-            'message' => 'WhatsApp desconectado.',
-        ]);
-    }
 
     public function send(SendWhatsappMessageRequest $request): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
+        $connection = $this->upsertConnection->handle([], $user->id);
 
-        if ($user->whatsapp_status !== 'connected' || ! filled($user->whatsapp_session_id)) {
+        if ($connection->status !== 'connected' || ! filled($connection->session_id)) {
             return response()->json(['message' => 'WhatsApp não está conectado.'], 422);
         }
 
@@ -245,7 +62,6 @@ class WhatsappController extends Controller
                 'data' => $rawData,
                 'filename' => $filename,
             ];
-            // Não persistir base64 gigante no CRM.
             $mediaStored = [
                 'mimetype' => $mimetype,
                 'filename' => $filename,
@@ -254,17 +70,17 @@ class WhatsappController extends Controller
         }
 
         $jid = str_contains($to, '@') ? $to : preg_replace('/\D+/', '', $to).'@c.us';
-        $phone = $this->phoneFromJidOrTo($jid, $to);
+        $phone = $this->phoneFromJidOrTo($jid, $to, $connection->id);
 
-        $resolved = $this->leadResolver->resolve($user, [
+        $resolved = $this->leadResolver->resolve($connection, [
             'jid' => $this->preferPhoneJid($jid, $phone),
             'phone_number' => $phone,
             'contact_name' => $contactName,
-        ]);
+        ], $user);
 
         try {
-            $result = (new WhatsappApiClient($user))->send(
-                $user->whatsapp_session_id,
+            $result = (new WhatsappApiClient($connection))->send(
+                (string) $connection->session_id,
                 $jid,
                 $message,
                 $mediaPayload,
@@ -283,8 +99,10 @@ class WhatsappController extends Controller
         unset($raw['media']);
 
         $record = WhatsappMessage::create([
+            'clinic_id' => $connection->clinic_id,
+            'connection_id' => $connection->id,
             'user_id' => $user->id,
-            'session_id' => $user->whatsapp_session_id,
+            'session_id' => $connection->session_id,
             'whatsapp_jid' => $storedJid,
             'whatsapp_lid' => $storedLid,
             'phone_number' => $phone,
@@ -302,7 +120,6 @@ class WhatsappController extends Controller
             'wa_timestamp' => now(),
         ]);
 
-        // Resposta humana pela plataforma — pausa o agent neste lead.
         if ($resolved['lead']) {
             $this->pauseAgent->handle(
                 $resolved['lead'],
@@ -324,11 +141,10 @@ class WhatsappController extends Controller
 
     public function chats(Request $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $request->user();
+        $connection = $this->upsertConnection->handle([], $request->user()?->id);
         $search = trim((string) $request->query('search', ''));
 
-        $bindings = [$user->id];
+        $bindings = [$connection->id];
         $searchSql = '';
         if ($search !== '') {
             $like = '%'.mb_strtolower($search).'%';
@@ -344,7 +160,6 @@ class WhatsappController extends Controller
             $bindings[] = $like;
         }
 
-        // Une @c.us e @lid do mesmo contato: chave = telefone real, senão LID, senão JID.
         $rows = DB::select(
             "SELECT * FROM (
                 SELECT DISTINCT ON (conversation_key)
@@ -373,7 +188,7 @@ class WhatsappController extends Controller
                             )
                         END AS conversation_key
                     FROM whatsapp_messages
-                    WHERE user_id = ?
+                    WHERE connection_id = ?
                       AND whatsapp_jid IS NOT NULL
                       AND whatsapp_jid <> ''
                 ) keyed
@@ -398,7 +213,7 @@ class WhatsappController extends Controller
         $phoneJidByLid = [];
         if ($lidKeys !== []) {
             $mapped = WhatsappMessage::query()
-                ->where('user_id', $user->id)
+                ->where('connection_id', $connection->id)
                 ->whereIn('whatsapp_lid', $lidKeys)
                 ->where(function ($q) {
                     $q->where('whatsapp_jid', 'like', '%@c.us')
@@ -465,10 +280,9 @@ class WhatsappController extends Controller
         return response()->json(['data' => $data]);
     }
 
-    public function messages(Request $request): JsonResponse
+    public function messages(Request $request, WhatsappChatHistory $history): JsonResponse
     {
-        /** @var User $user */
-        $user = $request->user();
+        $connection = $this->upsertConnection->handle([], $request->user()?->id);
 
         $leadId = $request->query('lead_id');
         $dealId = $request->query('deal_id');
@@ -480,10 +294,10 @@ class WhatsappController extends Controller
             ], 422);
         }
 
-        $relatedJids = $jid !== '' ? app(\App\Services\Crm\WhatsappChatHistory::class)->relatedJids($user->id, $jid) : [];
+        $relatedJids = $jid !== '' ? $history->relatedJids($connection->id, $jid) : [];
 
         $query = WhatsappMessage::query()
-            ->where('user_id', $user->id)
+            ->where('connection_id', $connection->id)
             ->where(function ($q) use ($leadId, $dealId, $jid, $relatedJids) {
                 if ($leadId) {
                     $q->orWhere('lead_id', (int) $leadId);
@@ -510,28 +324,30 @@ class WhatsappController extends Controller
 
     public function notificationsWebhook(Request $request): JsonResponse
     {
-        $user = $this->userFromWebhookToken($request);
-        if (! $user) {
+        $connection = $this->connectionFromWebhookToken($request);
+        if (! $connection) {
             return response()->json(['message' => 'Token inválido.'], 401);
         }
+
+        $this->bindClinicFromConnection($connection);
 
         $event = (string) $request->input('event', '');
         $data = $request->input('data');
 
         match ($event) {
-            'qr_code' => $this->handleQrCode($user, is_array($data) ? $data : []),
-            'authenticated' => $user->forceFill([
-                'whatsapp_qr' => null,
-                'whatsapp_status' => 'connecting',
+            'qr_code' => $this->handleQrCode($connection, is_array($data) ? $data : []),
+            'authenticated' => $connection->forceFill([
+                'qr' => null,
+                'status' => 'connecting',
             ])->save(),
-            'ready' => $this->handleReady($user, is_array($data) ? $data : []),
-            'disconnected' => $user->forceFill([
-                'whatsapp_status' => 'disconnected',
-                'whatsapp_is_business' => false,
-                'whatsapp_qr' => null,
+            'ready' => $this->handleReady($connection, is_array($data) ? $data : []),
+            'disconnected' => $connection->forceFill([
+                'status' => 'disconnected',
+                'is_business' => false,
+                'qr' => null,
             ])->save(),
-            'error' => $user->forceFill([
-                'whatsapp_status' => 'error',
+            'error' => $connection->forceFill([
+                'status' => 'error',
             ])->save(),
             default => null,
         };
@@ -541,10 +357,12 @@ class WhatsappController extends Controller
 
     public function messagesWebhook(Request $request): JsonResponse
     {
-        $user = $this->userFromWebhookToken($request);
-        if (! $user) {
+        $connection = $this->connectionFromWebhookToken($request);
+        if (! $connection) {
             return response()->json(['message' => 'Token inválido.'], 401);
         }
+
+        $this->bindClinicFromConnection($connection);
 
         if ((string) $request->input('event') !== 'message') {
             return response()->json(['success' => true, 'ignored' => true]);
@@ -568,7 +386,6 @@ class WhatsappController extends Controller
             return response()->json(['message' => 'jid obrigatório.'], 422);
         }
 
-        // Só chats diretos (@c.us / @s.whatsapp.net / @lid)
         $jidServer = strtolower((string) (str_contains($jid, '@') ? explode('@', $jid, 2)[1] : ''));
         if (in_array($jidServer, ['g.us', 'broadcast', 'newsletter'], true)) {
             return response()->json(['success' => true, 'ignored' => $jidServer]);
@@ -577,89 +394,85 @@ class WhatsappController extends Controller
             return response()->json(['success' => true, 'ignored' => 'non_direct']);
         }
 
-        $sessionId = (string) ($request->input('session_id') ?: $user->whatsapp_session_id);
+        $sessionId = (string) ($request->input('session_id') ?: $connection->session_id);
 
-        WhatsappInboundMessageReceived::dispatch($user, $sessionId, $data);
+        WhatsappInboundMessageReceived::dispatch($connection, $sessionId, $data);
 
         return response()->json(['success' => true]);
     }
 
-    private function handleReady(User $user, array $data): void
+    private function handleReady(Connection $connection, array $data): void
     {
         $isBusiness = (bool) ($data['isBusiness'] ?? false);
 
-        $user->forceFill([
-            'whatsapp_status' => 'connected',
-            'whatsapp_qr' => null,
-            'whatsapp_phone' => $data['phone_number'] ?? $user->whatsapp_phone,
-            'whatsapp_is_business' => $isBusiness,
+        $connection->forceFill([
+            'status' => 'connected',
+            'qr' => null,
+            'phone' => $data['phone_number'] ?? $connection->phone,
+            'is_business' => $isBusiness,
         ])->save();
 
         if ($isBusiness) {
-            $this->labelSync->ensurePipelineLabels($user->fresh());
+            $this->labelSync->ensurePipelineLabels($connection->fresh());
         }
     }
 
-    private function handleQrCode(User $user, array $data): void
+    private function handleQrCode(Connection $connection, array $data): void
     {
         $qr = $data['qr'] ?? null;
         if (! is_string($qr) || $qr === '') {
             return;
         }
 
-        $user->forceFill([
-            'whatsapp_qr' => $qr,
-            'whatsapp_status' => 'connecting',
+        $connection->forceFill([
+            'qr' => $qr,
+            'status' => 'connecting',
         ])->save();
     }
 
-    private function userFromWebhookToken(Request $request): ?User
+    private function connectionFromWebhookToken(Request $request): ?Connection
     {
         $token = (string) $request->query('token', '');
         if ($token === '') {
             return null;
         }
 
-        $user = User::query()->where('whatsapp_webhook_token', $token)->first();
-        if (! $user) {
+        $connection = Connection::withoutGlobalScopes()
+            ->where('webhook_token', $token)
+            ->first();
+
+        if (! $connection) {
             return null;
         }
 
-        // hash_equals contra timing; token já filtrado pelo where.
-        if (! hash_equals((string) $user->whatsapp_webhook_token, $token)) {
+        if (! hash_equals((string) $connection->webhook_token, $token)) {
             return null;
         }
 
-        return $user;
+        return $connection;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function publicState(User $user): array
+    private function bindClinicFromConnection(Connection $connection): void
     {
-        return [
-            'has_credentials' => $user->hasWhatsappCredentials(),
-            'whatsapp_api_username' => $user->whatsapp_api_username,
-            'session_id' => $user->whatsapp_session_id,
-            'status' => $user->whatsapp_status ?? 'disconnected',
-            'is_business' => (bool) $user->whatsapp_is_business,
-            'phone' => $user->whatsapp_phone,
-            'has_qr' => filled($user->whatsapp_qr),
-            'default_lead_stage_id' => $user->whatsapp_default_lead_stage_id,
-        ];
+        $clinic = $connection->relationLoaded('clinic')
+            ? $connection->clinic
+            : Clinic::query()->find($connection->clinic_id);
+
+        if ($clinic) {
+            $this->clinicContext->set($clinic);
+        }
     }
 
-    private function phoneFromJidOrTo(string $jid, string $to): ?string
+    private function phoneFromJidOrTo(string $jid, string $to, int $connectionId): ?string
     {
         $local = str_contains($jid, '@') ? explode('@', $jid, 2)[0] : $to;
         $server = str_contains($jid, '@') ? strtolower(explode('@', $jid, 2)[1]) : '';
         $digits = preg_replace('/\D+/', '', $local) ?: null;
 
-        // LID não é telefone — tenta recuperar de mensagens anteriores.
         if ($server === 'lid') {
             if ($digits) {
                 $known = WhatsappMessage::query()
+                    ->where('connection_id', $connectionId)
                     ->where(function ($q) use ($jid, $digits) {
                         $q->where('whatsapp_lid', $jid)
                             ->orWhere('whatsapp_jid', $jid)
@@ -717,87 +530,5 @@ class WhatsappController extends Controller
         }
 
         return [$jid, $lid];
-    }
-
-    /**
-     * JIDs/@lid relacionados ao mesmo chat (inbound @c.us + outbound @lid).
-     *
-     * @return list<string>
-     */
-    private function relatedJidsForChat(int $userId, string $jid): array
-    {
-        $related = [$jid];
-        $phone = null;
-
-        if (str_ends_with($jid, '@lid')) {
-            $related[] = $jid;
-            $rows = WhatsappMessage::query()
-                ->where('user_id', $userId)
-                ->where(function ($q) use ($jid) {
-                    $q->where('whatsapp_lid', $jid)->orWhere('whatsapp_jid', $jid);
-                })
-                ->get(['whatsapp_jid', 'whatsapp_lid', 'phone_number']);
-            foreach ($rows as $row) {
-                if ($row->whatsapp_jid) {
-                    $related[] = $row->whatsapp_jid;
-                }
-                if ($row->whatsapp_lid) {
-                    $related[] = $row->whatsapp_lid;
-                }
-                if ($row->phone_number) {
-                    $phone = preg_replace('/\D+/', '', (string) $row->phone_number) ?: $phone;
-                }
-            }
-        } else {
-            $rows = WhatsappMessage::query()
-                ->where('user_id', $userId)
-                ->where('whatsapp_jid', $jid)
-                ->get(['whatsapp_lid', 'phone_number']);
-            foreach ($rows as $row) {
-                if ($row->whatsapp_lid) {
-                    $related[] = $row->whatsapp_lid;
-                }
-                if ($row->phone_number) {
-                    $phone = preg_replace('/\D+/', '', (string) $row->phone_number) ?: $phone;
-                }
-            }
-
-            $lids = array_values(array_filter($related, static fn ($v) => str_ends_with((string) $v, '@lid')));
-            if ($lids !== []) {
-                $extra = WhatsappMessage::query()
-                    ->where('user_id', $userId)
-                    ->where(function ($q) use ($lids) {
-                        $q->whereIn('whatsapp_jid', $lids)->orWhereIn('whatsapp_lid', $lids);
-                    })
-                    ->get(['whatsapp_jid', 'whatsapp_lid']);
-                foreach ($extra as $row) {
-                    if ($row->whatsapp_jid) {
-                        $related[] = $row->whatsapp_jid;
-                    }
-                    if ($row->whatsapp_lid) {
-                        $related[] = $row->whatsapp_lid;
-                    }
-                }
-            }
-        }
-
-        if ($phone && strlen($phone) >= 10) {
-            $related[] = $phone.'@c.us';
-            $related[] = $phone.'@s.whatsapp.net';
-            $byPhone = WhatsappMessage::query()
-                ->where('user_id', $userId)
-                ->where('phone_number', $phone)
-                ->get(['whatsapp_jid', 'whatsapp_lid']);
-            foreach ($byPhone as $row) {
-                if ($row->whatsapp_jid) {
-                    $related[] = $row->whatsapp_jid;
-                }
-                if ($row->whatsapp_lid) {
-                    $related[] = $row->whatsapp_lid;
-                }
-            }
-        }
-
-        return array_values(array_unique(array_filter($related)));
     }
 }

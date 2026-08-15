@@ -3,12 +3,12 @@
 namespace App\Services\Crm;
 
 use App\Models\Crm\Activity;
+use App\Models\Crm\Connection;
 use App\Models\Crm\Contact;
 use App\Models\Crm\Deal;
 use App\Models\Crm\Lead;
 use App\Models\Crm\Organization;
 use App\Models\Crm\PipelineStage;
-use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -99,19 +99,29 @@ class ConvertLead
             return $deal->load(['contact', 'organization', 'stage', 'source']);
         });
 
-        if ($userId) {
-            $actor = User::find($userId);
-            if ($actor) {
-                $this->labelSync->moveCardLabels(
-                    $actor,
-                    $jid,
-                    $origemLeadStage,
-                    $deal->stage,
-                );
-            }
+        $connection = $this->connectionForLead($lead);
+        if ($connection) {
+            $this->labelSync->moveCardLabels(
+                $connection,
+                $jid,
+                $origemLeadStage,
+                $deal->stage,
+            );
         }
 
         return $deal;
+    }
+
+    private function connectionForLead(Lead $lead): ?Connection
+    {
+        $clinicId = $lead->clinic_id;
+        if (! $clinicId) {
+            return null;
+        }
+
+        return Connection::withoutGlobalScopes()
+            ->where('clinic_id', $clinicId)
+            ->first();
     }
 
     private function resolveContact(Lead $lead): Contact

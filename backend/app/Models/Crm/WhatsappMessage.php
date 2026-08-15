@@ -2,15 +2,20 @@
 
 namespace App\Models\Crm;
 
+use App\Models\Concerns\BelongsToClinic;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WhatsappMessage extends Model
 {
+    use BelongsToClinic;
+
     public const DIRECTIONS = ['inbound', 'outbound'];
 
     protected $fillable = [
+        'clinic_id',
+        'connection_id',
         'user_id',
         'session_id',
         'whatsapp_jid',
@@ -40,6 +45,11 @@ class WhatsappMessage extends Model
             'raw' => 'array',
             'wa_timestamp' => 'datetime',
         ];
+    }
+
+    public function connection(): BelongsTo
+    {
+        return $this->belongsTo(Connection::class);
     }
 
     public function user(): BelongsTo

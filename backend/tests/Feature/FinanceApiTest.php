@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Finance\FinancialAccount;
 use App\Models\Finance\FinancialEntry;
 use App\Models\User;
+use Database\Seeders\ClinicSeeder;
 use Database\Seeders\FinanceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -17,6 +18,7 @@ class FinanceApiTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->seed(ClinicSeeder::class);
         $this->seed(FinanceSeeder::class);
     }
 

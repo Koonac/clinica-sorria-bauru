@@ -10,6 +10,7 @@ use App\Models\Crm\Agent;
 use App\Models\Crm\Lead;
 use App\Models\Crm\PipelineStage;
 use App\Models\Crm\Task;
+use App\Models\Crm\Connection;
 use App\Models\Crm\WhatsappMessage;
 use App\Models\User;
 use App\Services\Crm\Agent\WhatsappAgentRunner;
@@ -33,19 +34,20 @@ class WhatsappAgentJobTest extends TestCase
             'services.whatsapp.url' => 'http://whatsapp.test',
             'services.google_calendar.client_id' => 'cid',
             'services.google_calendar.client_secret' => 'csecret',
-            'services.google_calendar.refresh_token' => 'rtoken',
-            'services.google_calendar.calendar_id' => 'primary',
         ]);
+
+        $this->defaultClinic()->forceFill([
+            'google_calendar_refresh_token' => 'rtoken',
+            'google_calendar_id' => 'primary',
+        ])->save();
     }
 
-    private function userConectado(): User
+    /**
+     * @return array{0: User, 1: Connection}
+     */
+    private function userConectado(): array
     {
-        return User::factory()->create([
-            'whatsapp_status' => 'connected',
-            'whatsapp_session_id' => 'sess-1',
-            'whatsapp_api_username' => 'u',
-            'whatsapp_api_password' => 'p',
-        ]);
+        return $this->userWithWhatsappConnection();
     }
 
     private function agentAtivo(User $user, array $extra = []): Agent
@@ -59,9 +61,11 @@ class WhatsappAgentJobTest extends TestCase
         ], $extra));
     }
 
-    private function inbound(User $user, Lead $lead, string $body = 'Oi'): WhatsappMessage
+    private function inbound(User $user, Connection $connection, Lead $lead, string $body = 'Oi'): WhatsappMessage
     {
         return WhatsappMessage::create([
+            'clinic_id' => $connection->clinic_id,
+            'connection_id' => $connection->id,
             'user_id' => $user->id,
             'session_id' => 'sess-1',
             'whatsapp_jid' => '5511999990000@c.us',
@@ -77,12 +81,17 @@ class WhatsappAgentJobTest extends TestCase
         ]);
     }
 
+    private function runAiJob(ProcessWhatsappAiReplyJob $job): void
+    {
+        $this->app->call([$job, 'handle']);
+    }
+
     public function test_listener_nao_despacha_sem_agent_ativo(): void
     {
         Queue::fake();
-        $user = $this->userConectado();
+        [$user, $connection] = $this->userConectado();
         $lead = Lead::create(['title' => 'L', 'name' => 'Ana', 'owner_id' => $user->id]);
-        $msg = $this->inbound($user, $lead);
+        $msg = $this->inbound($user, $connection, $lead);
 
         (new DispatchWhatsappAiReplyJob)->handle(new WhatsappMessageStored($msg));
 
@@ -92,15 +101,15 @@ class WhatsappAgentJobTest extends TestCase
     public function test_listener_despacha_com_delay_quando_ha_agent_ativo(): void
     {
         Queue::fake();
-        $user = $this->userConectado();
+        [$user, $connection] = $this->userConectado();
         $this->agentAtivo($user, ['debounce_seconds' => 7]);
         $lead = Lead::create(['title' => 'L', 'name' => 'Ana', 'owner_id' => $user->id]);
-        $msg = $this->inbound($user, $lead);
+        $msg = $this->inbound($user, $connection, $lead);
 
         (new DispatchWhatsappAiReplyJob)->handle(new WhatsappMessageStored($msg));
 
-        Queue::assertPushed(ProcessWhatsappAiReplyJob::class, function (ProcessWhatsappAiReplyJob $job) use ($user, $lead) {
-            return $job->userId === $user->id
+        Queue::assertPushed(ProcessWhatsappAiReplyJob::class, function (ProcessWhatsappAiReplyJob $job) use ($connection, $lead) {
+            return $job->connectionId === $connection->id
                 && $job->chatKey === 'lead:'.$lead->id
                 && $job->delay !== null;
         });
@@ -109,7 +118,7 @@ class WhatsappAgentJobTest extends TestCase
     public function test_listener_nao_despacha_se_lead_pausado(): void
     {
         Queue::fake();
-        $user = $this->userConectado();
+        [$user, $connection] = $this->userConectado();
         $this->agentAtivo($user);
         $lead = Lead::create([
             'title' => 'L',
@@ -117,7 +126,7 @@ class WhatsappAgentJobTest extends TestCase
             'owner_id' => $user->id,
             'whatsapp_agent_paused_at' => now(),
         ]);
-        $msg = $this->inbound($user, $lead);
+        $msg = $this->inbound($user, $connection, $lead);
 
         (new DispatchWhatsappAiReplyJob)->handle(new WhatsappMessageStored($msg));
 
@@ -150,7 +159,7 @@ class WhatsappAgentJobTest extends TestCase
             ], 200),
         ]);
 
-        $user = $this->userConectado();
+        [$user, $connection] = $this->userConectado();
         $this->agentAtivo($user);
         $lead = Lead::create([
             'title' => 'L',
@@ -159,10 +168,10 @@ class WhatsappAgentJobTest extends TestCase
             'whatsapp_jid' => '5511999990000@c.us',
             'owner_id' => $user->id,
         ]);
-        $this->inbound($user, $lead, 'Quero saber mais');
+        $this->inbound($user, $connection, $lead, 'Quero saber mais');
 
-        $job = new ProcessWhatsappAiReplyJob($user->id, 'lead:'.$lead->id);
-        $job->handle(app(WhatsappAgentRunner::class), app(\App\Services\Crm\WhatsappChatHistory::class));
+        $job = new ProcessWhatsappAiReplyJob($connection->id, 'lead:'.$lead->id);
+        $this->runAiJob($job);
 
         $this->assertDatabaseHas('whatsapp_messages', [
             'user_id' => $user->id,
@@ -216,7 +225,7 @@ class WhatsappAgentJobTest extends TestCase
             return Http::response(['success' => true], 200);
         });
 
-        $user = $this->userConectado();
+        [$user, $connection] = $this->userConectado();
         $this->agentAtivo($user);
         $lead = Lead::create([
             'title' => 'L',
@@ -226,10 +235,10 @@ class WhatsappAgentJobTest extends TestCase
             'owner_id' => $user->id,
             'stage_id' => PipelineStage::ofKind('lead')->orderBy('position')->value('id'),
         ]);
-        $this->inbound($user, $lead, 'Quero falar com alguém');
+        $this->inbound($user, $connection, $lead, 'Quero falar com alguém');
 
-        $job = new ProcessWhatsappAiReplyJob($user->id, 'lead:'.$lead->id);
-        $job->handle(app(WhatsappAgentRunner::class), app(\App\Services\Crm\WhatsappChatHistory::class));
+        $job = new ProcessWhatsappAiReplyJob($connection->id, 'lead:'.$lead->id);
+        $this->runAiJob($job);
 
         $lead->refresh();
         $this->assertSame((int) $stage->id, (int) $lead->stage_id);
@@ -276,7 +285,7 @@ class WhatsappAgentJobTest extends TestCase
             ], 200),
         ]);
 
-        $user = $this->userConectado();
+        [$user, $connection] = $this->userConectado();
         $this->agentAtivo($user);
         $lead = Lead::create([
             'title' => 'L',
@@ -284,10 +293,10 @@ class WhatsappAgentJobTest extends TestCase
             'mobile' => '5511999990000',
             'owner_id' => $user->id,
         ]);
-        $this->inbound($user, $lead, 'Quero agendar amanhã às 14h');
+        $this->inbound($user, $connection, $lead, 'Quero agendar amanhã às 14h');
 
-        $job = new ProcessWhatsappAiReplyJob($user->id, 'lead:'.$lead->id);
-        $job->handle(app(WhatsappAgentRunner::class), app(\App\Services\Crm\WhatsappChatHistory::class));
+        $job = new ProcessWhatsappAiReplyJob($connection->id, 'lead:'.$lead->id);
+        $this->runAiJob($job);
 
         $task = Task::query()->where('lead_id', $lead->id)->first();
         $this->assertNotNull($task);
@@ -310,7 +319,7 @@ class WhatsappAgentJobTest extends TestCase
             'whatsapp.test/*' => Http::response(['success' => true], 200),
         ]);
 
-        $user = $this->userConectado();
+        [$user, $connection] = $this->userConectado();
         $this->agentAtivo($user);
         $lead = Lead::create([
             'title' => 'L',
@@ -319,10 +328,10 @@ class WhatsappAgentJobTest extends TestCase
             'whatsapp_jid' => '5511999990000@c.us',
             'owner_id' => $user->id,
         ]);
-        $this->inbound($user, $lead, 'Oi');
+        $this->inbound($user, $connection, $lead, 'Oi');
 
-        $job = new ProcessWhatsappAiReplyJob($user->id, 'lead:'.$lead->id);
-        $job->handle(app(WhatsappAgentRunner::class), app(\App\Services\Crm\WhatsappChatHistory::class));
+        $job = new ProcessWhatsappAiReplyJob($connection->id, 'lead:'.$lead->id);
+        $this->runAiJob($job);
 
         $this->assertDatabaseMissing('whatsapp_messages', [
             'user_id' => $user->id,
@@ -351,7 +360,7 @@ class WhatsappAgentJobTest extends TestCase
             ], 200),
         ]);
 
-        $user = $this->userConectado();
+        [$user, $connection] = $this->userConectado();
         $this->agentAtivo($user);
         $lead = Lead::create([
             'title' => 'L',
@@ -360,10 +369,10 @@ class WhatsappAgentJobTest extends TestCase
             'whatsapp_jid' => '5511999990000@c.us',
             'owner_id' => $user->id,
         ]);
-        $this->inbound($user, $lead, 'Confirma?');
+        $this->inbound($user, $connection, $lead, 'Confirma?');
 
-        $job = new ProcessWhatsappAiReplyJob($user->id, 'lead:'.$lead->id);
-        $job->handle(app(WhatsappAgentRunner::class), app(\App\Services\Crm\WhatsappChatHistory::class));
+        $job = new ProcessWhatsappAiReplyJob($connection->id, 'lead:'.$lead->id);
+        $this->runAiJob($job);
 
         $this->assertDatabaseHas('whatsapp_messages', [
             'user_id' => $user->id,
@@ -437,7 +446,7 @@ class WhatsappAgentJobTest extends TestCase
             ], 200);
         });
 
-        $user = $this->userConectado();
+        [$user, $connection] = $this->userConectado();
         $agent = $this->agentAtivo($user);
         $lead = Lead::create([
             'title' => 'L',
@@ -465,10 +474,10 @@ class WhatsappAgentJobTest extends TestCase
             ],
         ]);
 
-        $this->inbound($user, $lead, 'Pode ser às 15h em vez das 14h');
+        $this->inbound($user, $connection, $lead, 'Pode ser às 15h em vez das 14h');
 
-        $job = new ProcessWhatsappAiReplyJob($user->id, 'lead:'.$lead->id);
-        $job->handle(app(WhatsappAgentRunner::class), app(\App\Services\Crm\WhatsappChatHistory::class));
+        $job = new ProcessWhatsappAiReplyJob($connection->id, 'lead:'.$lead->id);
+        $this->runAiJob($job);
 
         $this->assertNotNull($oldTask->fresh()->done_at);
         $nova = Task::query()
@@ -575,7 +584,7 @@ class WhatsappAgentJobTest extends TestCase
             ], 200);
         });
 
-        $user = $this->userConectado();
+        [$user, $connection] = $this->userConectado();
         $this->agentAtivo($user);
         $lead = Lead::create([
             'title' => 'L',
@@ -584,10 +593,10 @@ class WhatsappAgentJobTest extends TestCase
             'whatsapp_jid' => '5511999990000@c.us',
             'owner_id' => $user->id,
         ]);
-        $this->inbound($user, $lead, 'Quais horários você tem?');
+        $this->inbound($user, $connection, $lead, 'Quais horários você tem?');
 
-        $job = new ProcessWhatsappAiReplyJob($user->id, 'lead:'.$lead->id);
-        $job->handle(app(WhatsappAgentRunner::class), app(\App\Services\Crm\WhatsappChatHistory::class));
+        $job = new ProcessWhatsappAiReplyJob($connection->id, 'lead:'.$lead->id);
+        $this->runAiJob($job);
 
         Http::assertSent(fn ($request) => str_contains($request->url(), 'freeBusy'));
 
@@ -601,7 +610,7 @@ class WhatsappAgentJobTest extends TestCase
     public function test_job_noop_quando_lead_pausado(): void
     {
         Http::fake();
-        $user = $this->userConectado();
+        [$user, $connection] = $this->userConectado();
         $this->agentAtivo($user);
         $lead = Lead::create([
             'title' => 'L',
@@ -609,10 +618,10 @@ class WhatsappAgentJobTest extends TestCase
             'owner_id' => $user->id,
             'whatsapp_agent_paused_at' => now(),
         ]);
-        $this->inbound($user, $lead);
+        $this->inbound($user, $connection, $lead);
 
-        $job = new ProcessWhatsappAiReplyJob($user->id, 'lead:'.$lead->id);
-        $job->handle(app(WhatsappAgentRunner::class), app(\App\Services\Crm\WhatsappChatHistory::class));
+        $job = new ProcessWhatsappAiReplyJob($connection->id, 'lead:'.$lead->id);
+        $this->runAiJob($job);
 
         Http::assertNothingSent();
     }

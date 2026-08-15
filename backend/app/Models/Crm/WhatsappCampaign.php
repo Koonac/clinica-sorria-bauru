@@ -2,6 +2,7 @@
 
 namespace App\Models\Crm;
 
+use App\Models\Concerns\BelongsToClinic;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WhatsappCampaign extends Model
 {
+    use BelongsToClinic;
+
     public const STATUSES = [
         'draft',
         'queued',
@@ -28,6 +31,7 @@ class WhatsappCampaign extends Model
     ];
 
     protected $fillable = [
+        'clinic_id',
         'user_id',
         'name',
         'status',

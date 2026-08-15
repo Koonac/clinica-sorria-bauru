@@ -2,14 +2,29 @@
 
 namespace Database\Seeders;
 
+use App\Models\Clinic;
 use App\Models\Crm\PipelineStage;
 use App\Models\Crm\Source;
+use App\Support\ClinicContext;
 use Illuminate\Database\Seeder;
 
 class CrmSeeder extends Seeder
 {
     public function run(): void
     {
+        $clinic = Clinic::query()->where('slug', 'sorria-bauru')->first()
+            ?? Clinic::query()->orderBy('id')->first();
+
+        if (! $clinic) {
+            $clinic = Clinic::query()->create([
+                'name' => 'Clínica Sorria Bauru',
+                'slug' => 'sorria-bauru',
+                'is_active' => true,
+            ]);
+        }
+
+        app(ClinicContext::class)->set($clinic);
+
         $sources = [
             ['slug' => 'whatsapp', 'name' => 'WhatsApp'],
             ['slug' => 'instagram', 'name' => 'Instagram'],
@@ -38,8 +53,8 @@ class CrmSeeder extends Seeder
             $status = $stage['status'];
             unset($stage['status']);
             PipelineStage::updateOrCreate(
-                ['kind' => 'deal', 'slug' => $stage['slug']],
-                array_merge($stage, ['kind' => 'deal'], PipelineStage::flagsFor($status)),
+                ['clinic_id' => $clinic->id, 'kind' => 'deal', 'slug' => $stage['slug']],
+                array_merge($stage, ['clinic_id' => $clinic->id, 'kind' => 'deal'], PipelineStage::flagsFor($status)),
             );
         }
 
@@ -54,8 +69,8 @@ class CrmSeeder extends Seeder
             $status = $stage['status'];
             unset($stage['status']);
             PipelineStage::updateOrCreate(
-                ['kind' => 'lead', 'slug' => $stage['slug']],
-                array_merge($stage, ['kind' => 'lead'], PipelineStage::flagsFor($status)),
+                ['clinic_id' => $clinic->id, 'kind' => 'lead', 'slug' => $stage['slug']],
+                array_merge($stage, ['clinic_id' => $clinic->id, 'kind' => 'lead'], PipelineStage::flagsFor($status)),
             );
         }
     }

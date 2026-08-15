@@ -19,6 +19,8 @@ class UpdateUserRequest extends FormRequest
         /** @var User $user */
         $user = $this->route('user');
 
+        $role = $this->input('role', $user->role);
+
         return [
             'name' => ['sometimes', 'string', 'max:190'],
             'username' => [
@@ -36,6 +38,12 @@ class UpdateUserRequest extends FormRequest
             ],
             'password' => ['sometimes', 'string', Password::defaults()],
             'role' => ['sometimes', Rule::in(User::ROLES)],
+            'clinic_id' => [
+                Rule::requiredIf(fn () => $role === User::ROLE_FUNCIONARIO),
+                'nullable',
+                'integer',
+                'exists:clinics,id',
+            ],
         ];
     }
 }

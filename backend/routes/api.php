@@ -4,11 +4,11 @@ use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\UserController;
 use App\Http\Controllers\Api\Crm\ActivityController;
 use App\Http\Controllers\Api\Crm\AgentController;
+use App\Http\Controllers\Api\Crm\ClinicController;
 use App\Http\Controllers\Api\Crm\ClinicaController;
+use App\Http\Controllers\Api\Crm\ConnectionController;
 use App\Http\Controllers\Api\Crm\ContactController;
 use App\Http\Controllers\Api\Crm\DealController;
-use App\Http\Controllers\Api\Crm\FaixaPrecoController;
-use App\Http\Controllers\Api\Crm\ImovelController;
 use App\Http\Controllers\Api\Crm\LeadController;
 use App\Http\Controllers\Api\Crm\OrganizationController;
 use App\Http\Controllers\Api\Crm\PipelineController;
@@ -43,12 +43,19 @@ Route::prefix('v1/users')->middleware(['auth:sanctum', 'role:admin'])->group(fun
     Route::delete('{user}', [UserController::class, 'destroy']);
 });
 
+Route::prefix('v1/clinics')->middleware(['auth:sanctum'])->group(function () {
+    Route::get('/', [ClinicController::class, 'index']);
+    Route::post('/', [ClinicController::class, 'store'])->middleware('role:admin');
+    Route::get('{clinic}', [ClinicController::class, 'show']);
+    Route::patch('{clinic}', [ClinicController::class, 'update'])->middleware('role:admin');
+});
+
 Route::prefix('v1/crm')->group(function () {
     Route::post('whatsapp/webhooks/notifications', [WhatsappController::class, 'notificationsWebhook']);
     Route::post('whatsapp/webhooks/messages', [WhatsappController::class, 'messagesWebhook']);
 });
 
-Route::prefix('v1/crm')->middleware('auth:sanctum')->group(function () {
+Route::prefix('v1/crm')->middleware(['auth:sanctum', 'clinic'])->group(function () {
     Route::get('leads', [LeadController::class, 'index']);
     Route::post('leads', [LeadController::class, 'store']);
     Route::get('leads/{lead}', [LeadController::class, 'show']);
@@ -81,12 +88,6 @@ Route::prefix('v1/crm')->middleware('auth:sanctum')->group(function () {
     Route::delete('pipeline-stages/{pipelineStage}', [PipelineStageController::class, 'destroy']);
     Route::get('sources', [SourceController::class, 'index']);
 
-    Route::get('imoveis', [ImovelController::class, 'index']);
-    Route::get('imoveis/{imovel}', [ImovelController::class, 'show']);
-
-    Route::get('faixas-precos', [FaixaPrecoController::class, 'index']);
-    Route::get('faixas-precos/{faixa}', [FaixaPrecoController::class, 'show']);
-
     Route::get('clinicas', [ClinicaController::class, 'index']);
     Route::get('clinicas/{clinica}', [ClinicaController::class, 'show']);
 
@@ -104,13 +105,14 @@ Route::prefix('v1/crm')->middleware('auth:sanctum')->group(function () {
     Route::get('organizations', [OrganizationController::class, 'index']);
     Route::post('organizations', [OrganizationController::class, 'store']);
 
-    Route::get('whatsapp', [WhatsappController::class, 'show']);
-    Route::put('whatsapp/credentials', [WhatsappController::class, 'updateCredentials']);
-    Route::put('whatsapp/settings', [WhatsappController::class, 'updateSettings']);
-    Route::post('whatsapp/connect', [WhatsappController::class, 'connect']);
-    Route::get('whatsapp/qrcode', [WhatsappController::class, 'qrcode']);
-    Route::get('whatsapp/status', [WhatsappController::class, 'status']);
-    Route::delete('whatsapp/disconnect', [WhatsappController::class, 'disconnect']);
+    Route::get('connection', [ConnectionController::class, 'show']);
+    Route::put('connection/credentials', [ConnectionController::class, 'updateCredentials']);
+    Route::put('connection/settings', [ConnectionController::class, 'updateSettings']);
+    Route::post('connection/connect', [ConnectionController::class, 'connect']);
+    Route::get('connection/qrcode', [ConnectionController::class, 'qrcode']);
+    Route::get('connection/status', [ConnectionController::class, 'status']);
+    Route::delete('connection/disconnect', [ConnectionController::class, 'disconnect']);
+
     Route::get('whatsapp/chats', [WhatsappController::class, 'chats']);
     Route::get('whatsapp/messages', [WhatsappController::class, 'messages']);
     Route::post('whatsapp/send', [WhatsappController::class, 'send']);
@@ -130,7 +132,7 @@ Route::prefix('v1/crm')->middleware('auth:sanctum')->group(function () {
     Route::post('campaigns/{campaign}/cancel', [WhatsappCampaignController::class, 'cancel']);
 });
 
-Route::prefix('v1/finance')->middleware('auth:sanctum')->group(function () {
+Route::prefix('v1/finance')->middleware(['auth:sanctum', 'clinic'])->group(function () {
     Route::get('accounts', [FinancialAccountController::class, 'index']);
     Route::post('accounts', [FinancialAccountController::class, 'store']);
     Route::patch('accounts/{account}', [FinancialAccountController::class, 'update']);

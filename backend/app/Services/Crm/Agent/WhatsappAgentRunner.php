@@ -98,7 +98,7 @@ class WhatsappAgentRunner
     private function buildMessages(AgentContext $context): array
     {
         $history = $this->history->messages(
-            $context->user->id,
+            $context->connection->id,
             $context->lead?->id,
             $context->jid,
             self::HISTORY_LIMIT,
@@ -171,9 +171,6 @@ Regras de operação (obrigatórias):
 - Use as tools para agir; não invente stage_id fora da lista abaixo.
 - Antes de oferecer horários ao lead, chame listar_horarios_disponiveis e ofereça só o que ela retornar (sem inventar).
 - Nunca cite nome, título ou descrição de outros compromissos da agenda — só horários livres.
-- Para sugerir imóveis, chame consultar_imoveis e use apenas o retorno (não invente código, preço, bairro ou fotos).
-- Ao descrever um imóvel, você pode mencionar o link das imagens retornadas; não invente URLs.
-- Para preços/estimativas (móveis, proteção veicular, energia solar etc.), chame consultar_faixas_precos com os parâmetros coletados e use só as faixas retornadas — deixe claro que é estimativa, não orçamento fechado.
 - Antes de confirmar procedimentos, médicos ou convênios de clínicas, chame consultar_clinicas e use apenas o retorno.
 - Para marcar ou remarcar horário, use criar_agendamento (por padrão cancela o agendamento anterior deste lead).
 - Só use manter_anteriores=true se o lead quiser DOIS horários ao mesmo tempo.

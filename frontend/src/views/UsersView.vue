@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { ApiError } from '@/api/client'
+import { listClinics, type Clinic } from '@/api/clinics'
 import { deleteUser, listUsers } from '@/api/users'
 import Button from '@/components/Buttons/Button.vue'
 import PageView from '@/components/Layout/PageView.vue'
@@ -11,6 +12,7 @@ import { useAuthStore, type AuthUser } from '@/stores/auth'
 const auth = useAuthStore()
 
 const users = ref<AuthUser[]>([])
+const clinics = ref<Clinic[]>([])
 const loading = ref(false)
 const listError = ref('')
 const search = ref('')
@@ -21,6 +23,14 @@ const deleteLoading = ref(false)
 const deleteError = ref('')
 const flash = ref('')
 
+const clinicNameById = computed(() => {
+  const map = new Map<number, string>()
+  for (const clinic of clinics.value) {
+    map.set(clinic.id, clinic.name)
+  }
+  return map
+})
+
 const totalLabel = computed(() => {
   const n = users.value.length
   return n === 1 ? '1 usuário' : `${n} usuários`
@@ -28,6 +38,11 @@ const totalLabel = computed(() => {
 
 function roleLabel(role: AuthUser['role']) {
   return role === 'admin' ? 'Administrador' : 'Funcionário'
+}
+
+function clinicLabel(clinicId: number | null) {
+  if (clinicId == null) return '—'
+  return clinicNameById.value.get(clinicId) ?? `#${clinicId}`
 }
 
 function openCreate() {
@@ -113,7 +128,14 @@ async function confirmDelete() {
 
 onMounted(() => {
   document.addEventListener('keydown', onDeleteKeydown)
-  void loadUsers()
+  void (async () => {
+    try {
+      clinics.value = await listClinics()
+    } catch {
+      clinics.value = []
+    }
+    await loadUsers()
+  })()
 })
 
 onUnmounted(() => {
@@ -189,6 +211,7 @@ onUnmounted(() => {
             <th class="px-4 py-3 font-medium">Usuário</th>
             <th class="px-4 py-3 font-medium">E-mail</th>
             <th class="px-4 py-3 font-medium">Perfil</th>
+            <th class="px-4 py-3 font-medium">Clínica</th>
             <th class="px-4 py-3 font-medium text-right">Ações</th>
           </tr>
         </thead>
@@ -212,6 +235,9 @@ onUnmounted(() => {
               >
                 {{ roleLabel(user.role) }}
               </span>
+            </td>
+            <td class="px-4 py-3 text-brand-ink/80">
+              {{ clinicLabel(user.clinic_id) }}
             </td>
             <td class="px-4 py-3">
               <div class="flex items-center justify-end gap-1.5">

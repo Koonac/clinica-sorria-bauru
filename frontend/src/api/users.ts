@@ -7,6 +7,7 @@ export type CreateUserPayload = {
   email: string
   password: string
   role: AuthUser['role']
+  clinic_id?: number | null
 }
 
 export type UpdateUserPayload = {
@@ -15,6 +16,7 @@ export type UpdateUserPayload = {
   email?: string
   password?: string
   role?: AuthUser['role']
+  clinic_id?: number | null
 }
 
 type UserResponse = {

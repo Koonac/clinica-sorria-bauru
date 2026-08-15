@@ -8,6 +8,7 @@ export type AuthUser = {
   username: string
   email: string
   role: 'admin' | 'funcionario'
+  clinic_id: number | null
 }
 
 type LoginResponse = {
@@ -22,7 +23,12 @@ const USER_KEY = 'sorria.auth.user'
 function loadStoredUser(): AuthUser | null {
   try {
     const raw = localStorage.getItem(USER_KEY)
-    return raw ? (JSON.parse(raw) as AuthUser) : null
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as AuthUser
+    return {
+      ...parsed,
+      clinic_id: parsed.clinic_id ?? null,
+    }
   } catch {
     return null
   }
@@ -55,7 +61,10 @@ export const useAuthStore = defineStore('auth', () => {
         user: username,
         password,
       })
-      persist(data.token, data.user)
+      persist(data.token, {
+        ...data.user,
+        clinic_id: data.user.clinic_id ?? null,
+      })
       return data.user
     } catch (error) {
       throw toApiError(error)

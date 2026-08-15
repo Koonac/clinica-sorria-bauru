@@ -2,6 +2,7 @@
 
 namespace App\Models\Crm;
 
+use App\Models\Concerns\BelongsToClinic;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +11,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Deal extends Model
 {
+    use BelongsToClinic;
+
     protected $fillable = [
+        'clinic_id',
         'title',
         'lead_id',
         'contact_id',

@@ -4,8 +4,10 @@ namespace App\Listeners\Crm;
 
 use App\Events\Crm\WhatsappMessageStored;
 use App\Jobs\Crm\ProcessWhatsappAiReplyJob;
+use App\Models\Clinic;
 use App\Models\Crm\Agent;
 use App\Models\Crm\Lead;
+use App\Support\ClinicContext;
 
 class DispatchWhatsappAiReplyJob
 {
@@ -16,12 +18,20 @@ class DispatchWhatsappAiReplyJob
             return;
         }
 
-        $user = $message->user ?? $message->user()->first();
-        if (! $user) {
+        $connectionId = $message->connection_id;
+        $clinicId = $message->clinic_id;
+        if (! $connectionId || ! $clinicId) {
             return;
         }
 
-        $agent = Agent::activeFor($user);
+        $clinic = Clinic::query()->find($clinicId);
+        if (! $clinic) {
+            return;
+        }
+
+        app(ClinicContext::class)->set($clinic);
+
+        $agent = Agent::activeForClinic((int) $clinicId);
         if (! $agent || ! $agent->canActivate()) {
             return;
         }
@@ -46,7 +56,7 @@ class DispatchWhatsappAiReplyJob
 
         $debounce = max(3, min(60, (int) $agent->debounce_seconds));
 
-        ProcessWhatsappAiReplyJob::dispatch($user->id, $chatKey)
+        ProcessWhatsappAiReplyJob::dispatch((int) $connectionId, $chatKey)
             ->delay(now()->addSeconds($debounce));
     }
 }

@@ -2,12 +2,14 @@
 
 namespace App\Jobs\Crm;
 
+use App\Models\Clinic;
+use App\Models\Crm\Connection;
 use App\Models\Crm\WhatsappCampaign;
 use App\Models\Crm\WhatsappCampaignRecipient;
 use App\Models\Crm\WhatsappMessage;
-use App\Models\User;
 use App\Services\Crm\RenderCampaignMessage;
 use App\Services\Crm\WhatsappApiClient;
+use App\Support\ClinicContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -23,16 +25,34 @@ class RunWhatsappCampaignJob implements ShouldQueue
 
     public function __construct(public int $campaignId) {}
 
-    public function handle(RenderCampaignMessage $renderer): void
+    public function handle(RenderCampaignMessage $renderer, ClinicContext $clinicContext): void
     {
-        $campaign = WhatsappCampaign::query()->with(['messages', 'user'])->find($this->campaignId);
+        $campaign = WhatsappCampaign::withoutGlobalScopes()
+            ->with(['messages', 'user'])
+            ->find($this->campaignId);
         if (! $campaign) {
             return;
         }
 
-        /** @var User $user */
-        $user = $campaign->user;
-        if (! $user || ! filled($user->whatsapp_session_id) || $user->whatsapp_status !== 'connected') {
+        $clinic = $campaign->clinic_id
+            ? Clinic::query()->find($campaign->clinic_id)
+            : null;
+
+        if (! $clinic) {
+            return;
+        }
+
+        $clinicContext->set($clinic);
+
+        $connection = Connection::withoutGlobalScopes()
+            ->where('clinic_id', $campaign->clinic_id)
+            ->first();
+
+        if (
+            ! $connection
+            || ! filled($connection->session_id)
+            || $connection->status !== 'connected'
+        ) {
             $campaign->update([
                 'status' => 'failed',
                 'completed_at' => now(),
@@ -61,8 +81,8 @@ class RunWhatsappCampaignJob implements ShouldQueue
         $jitter = (int) ($campaign->delay_jitter_sec ?: 0);
         $sentCount = (int) $campaign->sent_count;
         $failedCount = (int) $campaign->failed_count;
-        $client = new WhatsappApiClient($user);
-        $sessionId = (string) $user->whatsapp_session_id;
+        $client = new WhatsappApiClient($connection);
+        $sessionId = (string) $connection->session_id;
 
         $recipients = WhatsappCampaignRecipient::query()
             ->where('whatsapp_campaign_id', $campaign->id)
@@ -132,7 +152,7 @@ class RunWhatsappCampaignJob implements ShouldQueue
                         throw new \RuntimeException('Empty message body after template render');
                     }
 
-                    $this->sendMessage($client, $user, $sessionId, $campaign, $recipient, $body);
+                    $this->sendMessage($client, $connection, $sessionId, $campaign, $recipient, $body);
 
                     if ($msgIdx < count($sequence) - 1) {
                         $delayAfter = (int) ($msg['delay_after_sec'] ?? 0);
@@ -198,7 +218,7 @@ class RunWhatsappCampaignJob implements ShouldQueue
 
     private function sendMessage(
         WhatsappApiClient $client,
-        User $user,
+        Connection $connection,
         string $sessionId,
         WhatsappCampaign $campaign,
         WhatsappCampaignRecipient $recipient,
@@ -209,7 +229,9 @@ class RunWhatsappCampaignJob implements ShouldQueue
         $messageId = $result['messageId'] ?? $result['message_id'] ?? null;
 
         WhatsappMessage::create([
-            'user_id' => $user->id,
+            'clinic_id' => $connection->clinic_id,
+            'connection_id' => $connection->id,
+            'user_id' => $campaign->user_id,
             'session_id' => $sessionId,
             'whatsapp_jid' => $jid,
             'phone_number' => $recipient->phone,
@@ -226,9 +248,6 @@ class RunWhatsappCampaignJob implements ShouldQueue
         ]);
     }
 
-    /**
-     * Sleep in chunks and abort early on pause/cancel.
-     */
     private function sleepInterruptible(WhatsappCampaign $campaign, int $seconds): bool
     {
         $remaining = max(0, $seconds);

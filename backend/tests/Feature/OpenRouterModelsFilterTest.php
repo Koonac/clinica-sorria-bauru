@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Database\Seeders\ClinicSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
@@ -11,6 +12,12 @@ use Tests\TestCase;
 class OpenRouterModelsFilterTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(ClinicSeeder::class);
+    }
 
     public function test_lista_com_tools_1_so_retorna_modelos_com_tools(): void
     {

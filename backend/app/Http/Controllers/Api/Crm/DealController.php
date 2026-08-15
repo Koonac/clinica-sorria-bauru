@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\StoreDealRequest;
 use App\Http\Requests\Crm\UpdateDealRequest;
 use App\Models\Crm\Activity;
+use App\Models\Crm\Connection;
 use App\Models\Crm\Deal;
 use App\Models\Crm\PipelineStage;
 use App\Services\Crm\SyncWhatsappLabels;
@@ -114,13 +115,16 @@ class DealController extends Controller
 
         $fresh = $deal->fresh(['contact', 'organization', 'owner', 'source', 'stage']);
 
-        if ($stageMudou && $request->user()) {
-            $this->labelSync->moveCardLabels(
-                $request->user(),
-                $fresh->whatsapp_jid ?: $fresh->contact?->whatsapp_jid,
-                $origem,
-                $destino ?? $fresh->stage,
-            );
+        if ($stageMudou) {
+            $connection = Connection::query()->first();
+            if ($connection) {
+                $this->labelSync->moveCardLabels(
+                    $connection,
+                    $fresh->whatsapp_jid ?: $fresh->contact?->whatsapp_jid,
+                    $origem,
+                    $destino ?? $fresh->stage,
+                );
+            }
         }
 
         return response()->json(['data' => $fresh]);

@@ -2,8 +2,8 @@
 
 namespace App\Services\Crm;
 
+use App\Models\Crm\Connection;
 use App\Models\Crm\PipelineStage;
-use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -16,15 +16,15 @@ class SyncWhatsappLabels
         return "{$prefix}: {$stage->name}";
     }
 
-    public function ensurePipelineLabels(User $user): void
+    public function ensurePipelineLabels(Connection $connection): void
     {
-        if (! $this->canSync($user)) {
+        if (! $this->canSync($connection)) {
             return;
         }
 
         try {
-            $client = new WhatsappApiClient($user);
-            $sessionId = (string) $user->whatsapp_session_id;
+            $client = new WhatsappApiClient($connection);
+            $sessionId = (string) $connection->session_id;
             $existing = $this->indexLabelsByName($client->listLabels($sessionId));
 
             $stages = PipelineStage::query()
@@ -47,21 +47,21 @@ class SyncWhatsappLabels
             }
         } catch (Throwable $e) {
             Log::warning('Falha ao garantir labels do pipeline no WhatsApp.', [
-                'user_id' => $user->id,
+                'connection_id' => $connection->id,
                 'error' => $e->getMessage(),
             ]);
         }
     }
 
-    public function ensureStageLabel(User $user, PipelineStage $stage): ?string
+    public function ensureStageLabel(Connection $connection, PipelineStage $stage): ?string
     {
-        if (! $this->canSync($user)) {
+        if (! $this->canSync($connection)) {
             return null;
         }
 
         try {
-            $client = new WhatsappApiClient($user);
-            $sessionId = (string) $user->whatsapp_session_id;
+            $client = new WhatsappApiClient($connection);
+            $sessionId = (string) $connection->session_id;
             $name = $this->labelName($stage);
             $existing = $this->indexLabelsByName($client->listLabels($sessionId));
 
@@ -76,7 +76,7 @@ class SyncWhatsappLabels
             }
         } catch (Throwable $e) {
             Log::warning('Falha ao garantir label de estágio no WhatsApp.', [
-                'user_id' => $user->id,
+                'connection_id' => $connection->id,
                 'stage_id' => $stage->id,
                 'error' => $e->getMessage(),
             ]);
@@ -86,13 +86,13 @@ class SyncWhatsappLabels
     }
 
     public function moveCardLabels(
-        User $user,
+        Connection $connection,
         ?string $jid,
         ?PipelineStage $from,
         ?PipelineStage $to,
     ): void {
         $jid = trim((string) $jid);
-        if ($jid === '' || ! $this->canSync($user)) {
+        if ($jid === '' || ! $this->canSync($connection)) {
             return;
         }
 
@@ -101,8 +101,8 @@ class SyncWhatsappLabels
         }
 
         try {
-            $client = new WhatsappApiClient($user);
-            $sessionId = (string) $user->whatsapp_session_id;
+            $client = new WhatsappApiClient($connection);
+            $sessionId = (string) $connection->session_id;
             $existing = $this->indexLabelsByName($client->listLabels($sessionId));
 
             if ($from) {
@@ -113,7 +113,7 @@ class SyncWhatsappLabels
                         $client->unlinkLabel($sessionId, $fromId, $jid);
                     } catch (Throwable $e) {
                         Log::warning('Falha ao remover label antiga no WhatsApp.', [
-                            'user_id' => $user->id,
+                            'connection_id' => $connection->id,
                             'jid' => $jid,
                             'label' => $fromName,
                             'error' => $e->getMessage(),
@@ -137,7 +137,7 @@ class SyncWhatsappLabels
             }
         } catch (Throwable $e) {
             Log::warning('Falha ao sincronizar labels do card no WhatsApp.', [
-                'user_id' => $user->id,
+                'connection_id' => $connection->id,
                 'jid' => $jid,
                 'from_stage_id' => $from?->id,
                 'to_stage_id' => $to?->id,
@@ -146,17 +146,17 @@ class SyncWhatsappLabels
         }
     }
 
-    public function applyStageLabel(User $user, ?string $jid, ?PipelineStage $stage): void
+    public function applyStageLabel(Connection $connection, ?string $jid, ?PipelineStage $stage): void
     {
-        $this->moveCardLabels($user, $jid, null, $stage);
+        $this->moveCardLabels($connection, $jid, null, $stage);
     }
 
-    private function canSync(User $user): bool
+    private function canSync(Connection $connection): bool
     {
-        return $user->whatsapp_status === 'connected'
-            && (bool) $user->whatsapp_is_business
-            && filled($user->whatsapp_session_id)
-            && $user->hasWhatsappCredentials();
+        return $connection->status === 'connected'
+            && (bool) $connection->is_business
+            && filled($connection->session_id)
+            && $connection->hasCredentials();
     }
 
     /**

@@ -27,6 +27,12 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+
+  const clinicId = localStorage.getItem('sorria.activeClinicId')
+  if (clinicId) {
+    config.headers['X-Clinic-Id'] = clinicId
+  }
+
   return config
 })
 

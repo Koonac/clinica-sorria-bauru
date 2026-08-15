@@ -43,35 +43,34 @@ class EnviarRespostaTool implements AgentTool
             throw new RuntimeException('texto é obrigatório.');
         }
 
-        $user = $context->user;
-        if ($user->whatsapp_status !== 'connected' || ! filled($user->whatsapp_session_id)) {
+        $connection = $context->connection;
+        if ($connection->status !== 'connected' || ! filled($connection->session_id)) {
             throw new RuntimeException('WhatsApp não está conectado.');
         }
 
-        $client = new WhatsappApiClient($user);
+        $client = new WhatsappApiClient($connection);
         $to = $context->jid;
-        $result = $client->send($user->whatsapp_session_id, $to, $texto);
+        $result = $client->send((string) $connection->session_id, $to, $texto);
 
         $resultTo = is_string($result['to'] ?? null) ? $result['to'] : $to;
         $messageId = isset($result['messageId']) ? (string) $result['messageId'] : null;
 
-        $resolved = $this->leadResolver->resolve($user, [
+        $resolved = $this->leadResolver->resolve($connection, [
             'jid' => $to,
             'phone_number' => $context->lead?->mobile,
             'contact_name' => $context->lead?->name,
-        ]);
+        ], $context->user);
 
-        // Evita duplicata se o webhook message_create ganhou a corrida.
         $existing = null;
         if ($messageId) {
             $existing = WhatsappMessage::query()
-                ->where('session_id', $user->whatsapp_session_id)
+                ->where('session_id', $connection->session_id)
                 ->where('message_id', $messageId)
                 ->first();
         }
         if (! $existing) {
             $existing = WhatsappMessage::query()
-                ->where('session_id', $user->whatsapp_session_id)
+                ->where('session_id', $connection->session_id)
                 ->where('direction', 'outbound')
                 ->where('body', $texto)
                 ->where('created_at', '>=', now()->subSeconds(60))
@@ -103,8 +102,10 @@ class EnviarRespostaTool implements AgentTool
         }
 
         $record = WhatsappMessage::create([
-            'user_id' => $user->id,
-            'session_id' => $user->whatsapp_session_id,
+            'clinic_id' => $connection->clinic_id,
+            'connection_id' => $connection->id,
+            'user_id' => $context->user->id,
+            'session_id' => $connection->session_id,
             'whatsapp_jid' => $resultTo ?: $to,
             'phone_number' => $resolved['lead']?->mobile ?? $context->lead?->mobile,
             'contact_name' => $resolved['lead']?->name ?? $context->lead?->name,

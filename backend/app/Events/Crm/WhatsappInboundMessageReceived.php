@@ -2,7 +2,7 @@
 
 namespace App\Events\Crm;
 
-use App\Models\User;
+use App\Models\Crm\Connection;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
@@ -14,7 +14,7 @@ class WhatsappInboundMessageReceived
      * @param  array<string, mixed>  $payload
      */
     public function __construct(
-        public User $user,
+        public Connection $connection,
         public string $sessionId,
         public array $payload,
     ) {}

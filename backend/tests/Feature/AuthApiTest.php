@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Http\Middleware\EnsureUserHasRole;
+use App\Models\Clinic;
 use App\Models\User;
 use Database\Seeders\AdminUserSeeder;
+use Database\Seeders\ClinicSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Laravel\Sanctum\Sanctum;
@@ -14,8 +16,15 @@ class AuthApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(ClinicSeeder::class);
+    }
+
     public function test_login_unico_funciona_para_admin_e_funcionario(): void
     {
+        $clinic = Clinic::query()->firstOrFail();
         User::factory()->admin()->create([
             'username' => 'AdminTest',
             'password' => 'senha-admin',
@@ -23,6 +32,7 @@ class AuthApiTest extends TestCase
         User::factory()->funcionario()->create([
             'username' => 'FuncTest',
             'password' => 'senha-func',
+            'clinic_id' => $clinic->id,
         ]);
 
         $this->postJson('/api/v1/auth/login', [
@@ -167,6 +177,7 @@ class AuthApiTest extends TestCase
             'email' => 'maria@teste.local',
             'password' => 'SenhaForte123!',
             'role' => User::ROLE_FUNCIONARIO,
+            'clinic_id' => Clinic::query()->firstOrFail()->id,
         ])->assertCreated()
             ->assertJsonPath('data.role', User::ROLE_FUNCIONARIO)
             ->assertJsonPath('data.username', 'maria')
@@ -218,6 +229,7 @@ class AuthApiTest extends TestCase
 
         $this->patchJson('/api/v1/users/'.$admin->id, [
             'role' => User::ROLE_FUNCIONARIO,
+            'clinic_id' => Clinic::query()->firstOrFail()->id,
         ])->assertUnprocessable();
     }
 }

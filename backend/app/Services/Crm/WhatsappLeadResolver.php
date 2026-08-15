@@ -2,6 +2,7 @@
 
 namespace App\Services\Crm;
 
+use App\Models\Crm\Connection;
 use App\Models\Crm\Contact;
 use App\Models\Crm\Deal;
 use App\Models\Crm\Lead;
@@ -15,11 +16,12 @@ class WhatsappLeadResolver
 
     /**
      * Localiza lead/deal/contato pelo JID (ou telefone) ou cria um lead novo.
+     * Requer ClinicContext definido (escopo BelongsToClinic).
      *
      * @param  array{jid?: string|null, phone_number?: string|null, contact_name?: string|null}  $payload
      * @return array{lead: ?Lead, deal: ?Deal, contact: ?Contact}
      */
-    public function resolve(User $user, array $payload): array
+    public function resolve(Connection $connection, array $payload, ?User $owner = null): array
     {
         $jid = trim((string) ($payload['jid'] ?? ''));
         $phone = preg_replace('/\D+/', '', (string) ($payload['phone_number'] ?? '')) ?: null;
@@ -103,7 +105,8 @@ class WhatsappLeadResolver
             : ($name !== '' ? $name : ($phone ?: $jid));
 
         $sourceId = Source::query()->where('slug', 'whatsapp')->value('id');
-        $stageId = $this->resolveDefaultLeadStageId($user);
+        $stageId = $this->resolveDefaultLeadStageId($connection);
+        $ownerId = $owner?->id ?? $connection->created_by;
 
         $lead = Lead::create([
             'title' => $displayName,
@@ -111,15 +114,16 @@ class WhatsappLeadResolver
             'status' => 'new',
             'mobile' => $phone,
             'whatsapp_jid' => $jid !== '' ? $jid : null,
-            'owner_id' => $user->id,
+            'owner_id' => $ownerId,
             'source_id' => $sourceId,
             'stage_id' => $stageId,
+            'clinic_id' => $connection->clinic_id,
         ]);
 
         if ($stageId && $jid !== '') {
             $stage = PipelineStage::find($stageId);
             if ($stage) {
-                $this->labelSync->applyStageLabel($user, $jid, $stage);
+                $this->labelSync->applyStageLabel($connection, $jid, $stage);
             }
         }
 
@@ -196,9 +200,9 @@ class WhatsappLeadResolver
         return false;
     }
 
-    private function resolveDefaultLeadStageId(User $user): ?int
+    private function resolveDefaultLeadStageId(Connection $connection): ?int
     {
-        $preferredId = $user->whatsapp_default_lead_stage_id;
+        $preferredId = $connection->default_lead_stage_id;
         if ($preferredId) {
             $preferred = PipelineStage::ofKind('lead')
                 ->where('active', true)

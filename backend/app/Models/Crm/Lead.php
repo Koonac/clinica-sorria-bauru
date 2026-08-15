@@ -2,6 +2,7 @@
 
 namespace App\Models\Crm;
 
+use App\Models\Concerns\BelongsToClinic;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,9 +11,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Lead extends Model
 {
+    use BelongsToClinic;
+
     public const STATUSES = ['new', 'contacted', 'qualified', 'unqualified', 'converted'];
 
     protected $fillable = [
+        'clinic_id',
         'title',
         'status',
         'stage_id',

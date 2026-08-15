@@ -2,6 +2,7 @@
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { ApiError } from '@/api/client'
+import { listClinics, type Clinic } from '@/api/clinics'
 import { createUser, updateUser } from '@/api/users'
 import type { AuthUser } from '@/stores/auth'
 import Select from '@/components/Forms/Select.vue'
@@ -26,6 +27,8 @@ const inputClass =
 
 const isEdit = computed(() => Boolean(props.user))
 
+const clinics = ref<Clinic[]>([])
+
 const form = reactive({
   name: '',
   username: '',
@@ -33,6 +36,7 @@ const form = reactive({
   password: '',
   passwordConfirmation: '',
   role: 'funcionario' as AuthUser['role'],
+  clinic_id: '' as string | number,
 })
 
 const fieldErrors = reactive({
@@ -42,7 +46,13 @@ const fieldErrors = reactive({
   password: '',
   passwordConfirmation: '',
   role: '',
+  clinic_id: '',
 })
+
+const clinicOptions = computed(() => [
+  { value: '', label: 'Sem clínica (somente admin)' },
+  ...clinics.value.map((c) => ({ value: String(c.id), label: c.name })),
+])
 
 const showPassword = ref(false)
 const showConfirmation = ref(false)
@@ -55,6 +65,7 @@ const canSubmit = computed(() => {
   if (!form.name.trim() || !form.username.trim() || !form.email.trim()) return false
   if (!isEdit.value && !form.password) return false
   if (form.password && !form.passwordConfirmation) return false
+  if (form.role === 'funcionario' && form.clinic_id === '') return false
   return true
 })
 
@@ -65,6 +76,7 @@ function clearFieldErrors() {
   fieldErrors.password = ''
   fieldErrors.passwordConfirmation = ''
   fieldErrors.role = ''
+  fieldErrors.clinic_id = ''
 }
 
 function resetForm() {
@@ -74,6 +86,7 @@ function resetForm() {
   form.password = ''
   form.passwordConfirmation = ''
   form.role = props.user?.role ?? 'funcionario'
+  form.clinic_id = props.user?.clinic_id ? String(props.user.clinic_id) : ''
   showPassword.value = false
   showConfirmation.value = false
   loading.value = false
@@ -92,10 +105,15 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
-watch(open, (isOpen) => {
+watch(open, async (isOpen) => {
   if (isOpen) {
     resetForm()
     document.addEventListener('keydown', onKeydown)
+    try {
+      clinics.value = await listClinics()
+    } catch {
+      clinics.value = []
+    }
     requestAnimationFrame(() => {
       panelRef.value?.querySelector<HTMLInputElement>('input')?.focus()
     })
@@ -115,6 +133,7 @@ function applyApiFieldErrors(details?: Record<string, string[]>) {
   fieldErrors.email = details.email?.[0] || ''
   fieldErrors.password = details.password?.[0] || ''
   fieldErrors.role = details.role?.[0] || ''
+  fieldErrors.clinic_id = details.clinic_id?.[0] || ''
 }
 
 async function onSubmit() {
@@ -138,18 +157,23 @@ async function onSubmit() {
   try {
     let saved: AuthUser
 
+    const clinicId =
+      form.clinic_id === '' ? null : Number(form.clinic_id)
+
     if (isEdit.value && props.user) {
       const payload: {
         name: string
         username: string
         email: string
         role: AuthUser['role']
+        clinic_id: number | null
         password?: string
       } = {
         name: form.name.trim(),
         username: form.username.trim(),
         email: form.email.trim(),
         role: form.role,
+        clinic_id: clinicId,
       }
       if (form.password) payload.password = form.password
       saved = await updateUser(props.user.id, payload)
@@ -160,6 +184,7 @@ async function onSubmit() {
         email: form.email.trim(),
         password: form.password,
         role: form.role,
+        clinic_id: clinicId,
       })
     }
 
@@ -340,6 +365,19 @@ async function onSubmit() {
             />
             <span v-if="fieldErrors.role" class="text-sm text-brand-ink/70" role="alert">
               {{ fieldErrors.role }}
+            </span>
+          </label>
+
+          <label class="flex flex-col gap-1.5">
+            <span class="text-sm font-medium text-brand-ink/80">Clínica</span>
+            <Select
+              v-model="form.clinic_id"
+              name="clinic_id"
+              :required="form.role === 'funcionario'"
+              :options="clinicOptions"
+            />
+            <span v-if="fieldErrors.clinic_id" class="text-sm text-brand-ink/70" role="alert">
+              {{ fieldErrors.clinic_id }}
             </span>
           </label>
 

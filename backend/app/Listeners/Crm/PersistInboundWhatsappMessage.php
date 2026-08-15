@@ -4,6 +4,7 @@ namespace App\Listeners\Crm;
 
 use App\Events\Crm\WhatsappInboundMessageReceived;
 use App\Events\Crm\WhatsappMessageStored;
+use App\Models\User;
 use App\Services\Crm\PauseWhatsappAgentForLead;
 use App\Services\Crm\ProcessInboundWhatsappMessage;
 
@@ -17,7 +18,7 @@ class PersistInboundWhatsappMessage
     public function handle(WhatsappInboundMessageReceived $event): void
     {
         $message = $this->processor->handle(
-            $event->user,
+            $event->connection,
             $event->sessionId,
             $event->payload,
         );
@@ -26,14 +27,16 @@ class PersistInboundWhatsappMessage
             return;
         }
 
-        // Outbound novo vindo do celular (from_me) — pausa o agent neste lead.
-        // Envios da API/agent já existem por message_id e não chegam aqui.
         if ($message->direction === 'outbound' && $message->lead_id) {
             $lead = $message->lead;
-            if ($lead) {
+            $user = $event->connection->created_by
+                ? User::query()->find($event->connection->created_by)
+                : null;
+
+            if ($lead && $user) {
                 $this->pauseAgent->handle(
                     $lead,
-                    $event->user,
+                    $user,
                     'phone',
                     is_string($message->body) ? mb_substr($message->body, 0, 500) : null,
                 );

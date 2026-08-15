@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Services\Crm\OpenRouterCampaignClient;
 use App\Services\Crm\ParseCampaignCsv;
 use App\Services\Crm\RenderCampaignMessage;
+use App\Services\Crm\UpsertClinicConnection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -33,11 +34,7 @@ class WhatsappCampaignController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        /** @var User $user */
-        $user = $request->user();
-
         $query = WhatsappCampaign::query()
-            ->where('user_id', $user->id)
             ->latest('updated_at');
 
         if ($status = $request->query('status')) {
@@ -349,17 +346,16 @@ class WhatsappCampaignController extends Controller
         ]);
     }
 
-    public function start(Request $request, WhatsappCampaign $campaign): JsonResponse
+    public function start(Request $request, WhatsappCampaign $campaign, UpsertClinicConnection $upsert): JsonResponse
     {
         $this->authorizeCampaign($request, $campaign);
 
-        /** @var User $user */
-        $user = $request->user();
+        $connection = $upsert->handle([], $request->user()?->id);
 
-        if (! $user->hasWhatsappCredentials() || ! filled($user->whatsapp_session_id)) {
+        if (! $connection->hasCredentials() || ! filled($connection->session_id)) {
             return response()->json(['message' => 'WhatsApp integration is not enabled'], 422);
         }
-        if ($user->whatsapp_status !== 'connected') {
+        if ($connection->status !== 'connected') {
             return response()->json(['message' => 'WhatsApp session is not connected. Connect it in Settings.'], 422);
         }
 
@@ -456,9 +452,8 @@ class WhatsappCampaignController extends Controller
 
     private function authorizeCampaign(Request $request, WhatsappCampaign $campaign): void
     {
-        /** @var User $user */
-        $user = $request->user();
-        abort_if($campaign->user_id !== $user->id, 404);
+        // Escopo de clínica (BelongsToClinic) já restringe a campanha da clínica ativa.
+        abort_if(! $campaign->exists, 404);
     }
 
     private function assertRecipientBelongs(WhatsappCampaign $campaign, WhatsappCampaignRecipient $recipient): void

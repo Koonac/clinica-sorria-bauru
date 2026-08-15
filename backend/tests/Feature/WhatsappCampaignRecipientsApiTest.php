@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Crm\WhatsappCampaign;
 use App\Models\User;
+use Database\Seeders\ClinicSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -11,6 +12,13 @@ use Tests\TestCase;
 class WhatsappCampaignRecipientsApiTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(ClinicSeeder::class);
+        $this->defaultClinic();
+    }
 
     private function autenticar(): User
     {

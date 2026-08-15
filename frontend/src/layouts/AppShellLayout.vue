@@ -2,20 +2,26 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
+import ClinicFormModal from '@/components/Modals/ClinicFormModal.vue'
 import SettingsModal from '@/components/Modals/SettingsModal.vue'
 import { NAV_ITEMS } from '@/navigation/nav'
 import { useAuthStore } from '@/stores/auth'
+import { useClinicsStore } from '@/stores/clinics'
 
 const SIDEBAR_KEY = 'sorria.sidebar.collapsed'
 
 const auth = useAuthStore()
+const clinics = useClinicsStore()
 const router = useRouter()
 const route = useRoute()
 
 const collapsed = ref(false)
 const menuOpen = ref(false)
 const settingsOpen = ref(false)
+const clinicMenuOpen = ref(false)
+const clinicFormOpen = ref(false)
 const loggingOut = ref(false)
+const clinicMenuRef = ref<HTMLElement | null>(null)
 
 const visibleNavItems = computed(() => {
   const role = auth.user?.role
@@ -25,6 +31,8 @@ const visibleNavItems = computed(() => {
   })
 })
 
+const showClinicSwitcher = computed(() => auth.isAdmin)
+
 onMounted(() => {
   try {
     collapsed.value = localStorage.getItem(SIDEBAR_KEY) === '1'
@@ -32,10 +40,13 @@ onMounted(() => {
     collapsed.value = false
   }
   document.addEventListener('keydown', onKeydown)
+  document.addEventListener('pointerdown', onPointerDown)
+  void clinics.bootstrap()
 })
 
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
+  document.removeEventListener('pointerdown', onPointerDown)
   document.body.classList.remove('menu-mobile-aberto')
 })
 
@@ -47,13 +58,27 @@ watch(
   () => route.fullPath,
   () => {
     menuOpen.value = false
+    clinicMenuOpen.value = false
   },
 )
 
 function onKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape' && menuOpen.value && !settingsOpen.value) {
-    menuOpen.value = false
+  if (event.key === 'Escape') {
+    if (clinicMenuOpen.value) {
+      clinicMenuOpen.value = false
+      return
+    }
+    if (menuOpen.value && !settingsOpen.value && !clinicFormOpen.value) {
+      menuOpen.value = false
+    }
   }
+}
+
+function onPointerDown(event: PointerEvent) {
+  if (!clinicMenuOpen.value) return
+  const target = event.target as Node | null
+  if (target && clinicMenuRef.value?.contains(target)) return
+  clinicMenuOpen.value = false
 }
 
 function toggleCollapsed() {
@@ -68,6 +93,22 @@ function toggleCollapsed() {
 function openSettings() {
   settingsOpen.value = true
   menuOpen.value = false
+  clinicMenuOpen.value = false
+}
+
+function toggleClinicMenu() {
+  if (!showClinicSwitcher.value) return
+  clinicMenuOpen.value = !clinicMenuOpen.value
+}
+
+function selectClinic(id: number) {
+  clinics.setActiveClinic(id)
+  clinicMenuOpen.value = false
+}
+
+function openCreateClinic() {
+  clinicMenuOpen.value = false
+  clinicFormOpen.value = true
 }
 
 async function sair() {
@@ -75,6 +116,7 @@ async function sair() {
   loggingOut.value = true
   try {
     await auth.logout()
+    clinics.clear()
     await router.replace({ name: 'login' })
   } finally {
     loggingOut.value = false
@@ -132,9 +174,69 @@ function isActive(name: string) {
           width="40"
           height="40"
         />
-        <div class="rail-marca flex min-w-0 flex-1 flex-col leading-none">
-          <strong class="truncate text-lg font-semibold tracking-tight">Sorria Bauru</strong>
-          <span class="mt-1 text-xs text-brand-cyan-ink">Painel da clínica</span>
+        <div ref="clinicMenuRef" class="rail-marca relative flex min-w-0 flex-1 flex-col leading-none">
+          <button
+            v-if="showClinicSwitcher"
+            type="button"
+            class="group/clinic flex w-full min-w-0 cursor-pointer items-center gap-1 rounded-md text-left outline-none transition hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue"
+            :aria-expanded="clinicMenuOpen"
+            aria-haspopup="listbox"
+            aria-label="Selecionar clínica"
+            @click="toggleClinicMenu"
+          >
+            <span class="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
+              {{ clinics.activeClinic?.name || 'Selecionar clínica' }}
+            </span>
+            <Icon
+              icon="lucide:chevron-down"
+              class="size-3.5 shrink-0 text-brand-ink/40 transition group-hover/clinic:text-brand-blue"
+              :class="clinicMenuOpen ? 'rotate-180 text-brand-blue' : ''"
+              aria-hidden="true"
+            />
+          </button>
+          <strong v-else class="truncate text-lg font-semibold tracking-tight">
+            {{ clinics.activeClinic?.name || 'Sorria Bauru' }}
+          </strong>
+          <span class="mt-1 truncate text-xs text-brand-cyan-ink">Painel da clínica</span>
+
+          <div
+            v-if="clinicMenuOpen"
+            class="absolute top-[calc(100%+0.5rem)] left-0 z-30 w-[min(16rem,calc(100vw-5rem))] overflow-hidden rounded-xl border border-brand-ink/10 bg-white py-1 shadow-lg"
+            role="listbox"
+            aria-label="Clínicas"
+          >
+            <button
+              v-for="clinic in clinics.clinics"
+              :key="clinic.id"
+              type="button"
+              role="option"
+              class="flex w-full cursor-pointer items-center gap-2 px-3 py-2.5 text-left text-sm transition hover:bg-[#f4f6f8]"
+              :class="
+                clinic.id === clinics.activeClinicId
+                  ? 'font-semibold text-brand-cyan-ink'
+                  : 'font-medium text-brand-ink/80'
+              "
+              :aria-selected="clinic.id === clinics.activeClinicId"
+              @click="selectClinic(clinic.id)"
+            >
+              <span class="min-w-0 flex-1 truncate">{{ clinic.name }}</span>
+              <Icon
+                v-if="clinic.id === clinics.activeClinicId"
+                icon="lucide:check"
+                class="size-4 shrink-0"
+                aria-hidden="true"
+              />
+            </button>
+            <div class="my-1 border-t border-brand-ink/10" />
+            <button
+              type="button"
+              class="flex w-full cursor-pointer items-center gap-2 px-3 py-2.5 text-left text-sm font-medium text-brand-ink/70 transition hover:bg-[#f4f6f8] hover:text-brand-ink"
+              @click="openCreateClinic"
+            >
+              <Icon icon="lucide:plus" class="size-4 shrink-0" aria-hidden="true" />
+              Nova clínica
+            </button>
+          </div>
         </div>
         <button
           type="button"
@@ -226,11 +328,12 @@ function isActive(name: string) {
     />
 
     <main class="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      <RouterView v-slot="{ Component }">
+      <RouterView :key="clinics.activeClinicId ?? 'none'" v-slot="{ Component }">
         <component :is="Component" class="min-h-0 w-full flex-1" />
       </RouterView>
     </main>
 
     <SettingsModal v-model:open="settingsOpen" />
+    <ClinicFormModal v-model:open="clinicFormOpen" />
   </div>
 </template>

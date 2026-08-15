@@ -17,8 +17,8 @@ class ActivateAgent
         }
 
         return DB::transaction(function () use ($agent) {
-            Agent::query()
-                ->forUser($agent->user_id)
+            Agent::withoutGlobalScopes()
+                ->where('clinic_id', $agent->clinic_id)
                 ->where('id', '!=', $agent->id)
                 ->where('is_active', true)
                 ->update(['is_active' => false]);

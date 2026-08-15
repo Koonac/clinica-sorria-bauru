@@ -54,7 +54,7 @@ class AgentsApiTest extends TestCase
             ->assertJsonPath('data.debounce_seconds', 12);
     }
 
-    public function test_ativar_agent_desativa_os_demais_do_mesmo_user(): void
+    public function test_ativar_agent_desativa_os_demais_da_mesma_clinica(): void
     {
         $user = $this->autenticar();
 
