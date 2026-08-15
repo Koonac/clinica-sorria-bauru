@@ -135,6 +135,36 @@ class AgentsApiTest extends TestCase
         $this->assertNull($lead->fresh()->whatsapp_agent_resume_at);
     }
 
+    public function test_finaliza_conversa_whatsapp_do_lead(): void
+    {
+        $user = $this->autenticar();
+        $lead = Lead::create([
+            'title' => 'Lead',
+            'name' => 'Maria',
+            'owner_id' => $user->id,
+            'whatsapp_agent_paused_at' => now(),
+            'whatsapp_agent_resume_at' => now()->addHours(12),
+        ]);
+
+        $this->postJson("/api/v1/crm/leads/{$lead->id}/whatsapp/finalize")
+            ->assertOk()
+            ->assertJsonPath('data.owner_id', null)
+            ->assertJsonPath('data.whatsapp_agent_paused_at', null)
+            ->assertJsonPath('data.whatsapp_agent_resume_at', null);
+
+        $fresh = $lead->fresh();
+        $this->assertNull($fresh->owner_id);
+        $this->assertNull($fresh->whatsapp_agent_paused_at);
+        $this->assertNull($fresh->whatsapp_agent_resume_at);
+
+        $this->assertDatabaseHas('activities', [
+            'lead_id' => $lead->id,
+            'user_id' => $user->id,
+            'type' => 'note',
+            'subject' => 'Conversa finalizada',
+        ]);
+    }
+
     public function test_nao_acessa_agent_de_outro_user(): void
     {
         $this->autenticar();

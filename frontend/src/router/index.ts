@@ -80,6 +80,28 @@ const router = createRouter({
           },
         },
         {
+          path: 'agents/novo',
+          name: 'agents-create',
+          component: () => import('@/views/AgentFormView.vue'),
+          meta: {
+            requiresAuth: true,
+            roles: ['admin'],
+            title: 'Novo agent',
+            icon: 'lucide:bot',
+          },
+        },
+        {
+          path: 'agents/:id/editar',
+          name: 'agents-edit',
+          component: () => import('@/views/AgentFormView.vue'),
+          meta: {
+            requiresAuth: true,
+            roles: ['admin'],
+            title: 'Editar agent',
+            icon: 'lucide:bot',
+          },
+        },
+        {
           path: 'usuarios',
           name: 'users',
           component: () => import('@/views/UsersView.vue'),

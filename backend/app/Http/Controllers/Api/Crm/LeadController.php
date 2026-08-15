@@ -10,6 +10,7 @@ use App\Http\Requests\Crm\UpdateLeadRequest;
 use App\Models\Crm\Lead;
 use App\Models\Crm\PipelineStage;
 use App\Services\Crm\ConvertLead;
+use App\Services\Crm\FinalizeWhatsappConversationForLead;
 use App\Services\Crm\MoveLead;
 use App\Services\Crm\PauseWhatsappAgentIndefinitelyForLead;
 use App\Services\Crm\PauseWhatsappAgentWithAutoResumeForLead;
@@ -139,5 +140,16 @@ class LeadController extends Controller
     public function pauseAgent(Lead $lead, PauseWhatsappAgentIndefinitelyForLead $pauser): JsonResponse
     {
         return response()->json(['data' => $pauser->handle($lead)]);
+    }
+
+    public function finalizeWhatsapp(
+        Request $request,
+        Lead $lead,
+        FinalizeWhatsappConversationForLead $finalizer,
+    ): JsonResponse {
+        $user = $request->user();
+        abort_unless($user !== null, 401);
+
+        return response()->json(['data' => $finalizer->handle($lead, $user)]);
     }
 }

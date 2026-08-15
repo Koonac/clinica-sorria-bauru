@@ -18,6 +18,7 @@ const emit = defineEmits<{
   transfer: [ownerId: number]
   pauseAgent: []
   resumeAgent: []
+  finalize: []
   toggleLeadSidebar: []
   rename: [name: string]
 }>()
@@ -34,6 +35,10 @@ const canAssign = computed(() => Boolean(props.chat.lead_id))
 const canRename = computed(() => Boolean(props.chat.lead_id))
 const isMine = computed(() => props.chat.owner_id === auth.user?.id)
 const agentPaused = computed(() => Boolean(props.chat.whatsapp_agent_paused_at))
+const isFinalized = computed(
+  () => Boolean(props.chat.lead_id) && props.chat.owner_id == null && !agentPaused.value,
+)
+const canFinalize = computed(() => canAssign.value && !isFinalized.value)
 const agentResumeLabel = computed(() => {
   if (!agentPaused.value) return null
   if (props.chat.whatsapp_agent_resume_at) {
@@ -149,6 +154,7 @@ function toggleAgent() {
       </button>
       <p class="mt-0.5 text-xs text-brand-ink/50">
         <template v-if="chat.owner_name">Atendente: {{ chat.owner_name }}</template>
+        <template v-else-if="isFinalized">Finalizado · Agent IA ativo</template>
         <template v-else-if="chat.lead_id">Sem atendente</template>
         <template v-else>Sem lead vinculado</template>
         <template v-if="agentResumeLabel"> · {{ agentResumeLabel }}</template>
@@ -156,6 +162,17 @@ function toggleAgent() {
     </div>
 
     <div class="flex flex-wrap items-center gap-1.5">
+      <Button
+        v-if="canFinalize"
+        size="sm"
+        variant="secondary"
+        :loading="busy"
+        icon="lucide:check-check"
+        @click="emit('finalize')"
+      >
+        Finalizar
+      </Button>
+
       <Button
         v-if="canAssign && !isMine"
         size="sm"

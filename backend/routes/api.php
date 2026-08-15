@@ -66,6 +66,7 @@ Route::prefix('v1/crm')->middleware(['auth:sanctum', 'clinic'])->group(function 
     Route::post('leads/{lead}/move', [LeadController::class, 'move']);
     Route::post('leads/{lead}/agent/resume', [LeadController::class, 'resumeAgent']);
     Route::post('leads/{lead}/agent/pause', [LeadController::class, 'pauseAgent']);
+    Route::post('leads/{lead}/whatsapp/finalize', [LeadController::class, 'finalizeWhatsapp']);
 
     Route::get('agents', [AgentController::class, 'index']);
     Route::post('agents', [AgentController::class, 'store']);

@@ -743,7 +743,8 @@ class WhatsappController extends Controller
     {
         return match ($filter) {
             'mine' => ($item['owner_id'] ?? null) === $userId,
-            'unassigned' => ($item['lead_id'] ?? null) === null || ($item['owner_id'] ?? null) === null,
+            // "Finalizados": lead sem atendente humano (após finalizar ou nunca atribuído).
+            'unassigned' => ($item['lead_id'] ?? null) !== null && ($item['owner_id'] ?? null) === null,
             'unread' => ((int) ($item['unread_count'] ?? 0)) > 0,
             'human' => filled($item['whatsapp_agent_paused_at'] ?? null),
             'agent' => ($item['lead_id'] ?? null) !== null && ! filled($item['whatsapp_agent_paused_at'] ?? null),

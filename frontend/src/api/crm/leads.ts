@@ -97,3 +97,12 @@ export async function resumeLeadAgent(id: number): Promise<Lead> {
     throw toApiError(error)
   }
 }
+
+export async function finalizeLeadWhatsapp(id: number): Promise<Lead> {
+  try {
+    const { data } = await api.post<DataResponse<Lead>>(`/v1/crm/leads/${id}/whatsapp/finalize`)
+    return data.data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}

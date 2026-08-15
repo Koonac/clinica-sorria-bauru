@@ -2,7 +2,7 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { ApiError } from '@/api/client'
 import { listAttendants } from '@/api/crm/attendants'
-import { pauseLeadAgent, resumeLeadAgent, updateLead } from '@/api/crm/leads'
+import { pauseLeadAgent, resumeLeadAgent, finalizeLeadWhatsapp, updateLead } from '@/api/crm/leads'
 import { listWhatsappChats, markWhatsappChatRead } from '@/api/crm/whatsapp'
 import type { CrmAttendant, WhatsappChat, WhatsappChatFilter } from '@/api/crm/types'
 import WhatsappChatList from '@/components/whatsapp/WhatsappChatList.vue'
@@ -207,6 +207,28 @@ async function resumeAgent() {
   }
 }
 
+async function finalizeChat() {
+  if (!selected.value?.lead_id || actionBusy.value) return
+  actionBusy.value = true
+  errorMessage.value = ''
+  try {
+    const lead = await finalizeLeadWhatsapp(selected.value.lead_id)
+    selected.value = {
+      ...selected.value,
+      owner_id: null,
+      owner_name: null,
+      whatsapp_agent_paused_at: lead.whatsapp_agent_paused_at ?? null,
+      whatsapp_agent_resume_at: lead.whatsapp_agent_resume_at ?? null,
+    }
+    await loadChats(true)
+  } catch (e) {
+    errorMessage.value =
+      e instanceof ApiError ? e.message : 'Não foi possível finalizar a conversa.'
+  } finally {
+    actionBusy.value = false
+  }
+}
+
 async function renameLead(name: string) {
   if (!selected.value?.lead_id || actionBusy.value) return
   actionBusy.value = true
@@ -319,6 +341,7 @@ onUnmounted(() => {
             @transfer="transferChat"
             @pause-agent="pauseAgent"
             @resume-agent="resumeAgent"
+            @finalize="finalizeChat"
             @toggle-lead-sidebar="toggleLeadSidebar"
             @rename="renameLead"
           />
@@ -336,7 +359,7 @@ onUnmounted(() => {
             </div>
             <WhatsappLeadSidebar
               v-if="leadSidebarOpen && selected.lead_id"
-              :key="`${selected.lead_id}-${selected.contact_name || ''}`"
+              :key="`${selected.lead_id}-${selected.owner_id ?? 'none'}-${selected.whatsapp_agent_paused_at ?? 'active'}-${selected.contact_name || ''}`"
               :lead-id="selected.lead_id"
               @close="leadSidebarOpen = false"
             />

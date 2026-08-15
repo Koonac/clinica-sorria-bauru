@@ -147,7 +147,8 @@ async function sair() {
 }
 
 function isActive(name: string) {
-  return route.name === name
+  const current = String(route.name ?? '')
+  return current === name || current.startsWith(`${name}-`)
 }
 </script>
 

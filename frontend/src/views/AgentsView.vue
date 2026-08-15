@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { ApiError } from '@/api/client'
 import {
@@ -12,13 +13,13 @@ import {
 import Button from '@/components/Buttons/Button.vue'
 import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
 import PageView from '@/components/Layout/PageView.vue'
-import AgentFormModal from '@/components/Modals/AgentFormModal.vue'
+
+const route = useRoute()
+const router = useRouter()
 
 const agents = ref<Agent[]>([])
 const loading = ref(true)
 const listError = ref('')
-const formOpen = ref(false)
-const editingAgent = ref<Agent | null>(null)
 const deletingAgent = ref<Agent | null>(null)
 const deleteLoading = ref(false)
 const deleteError = ref('')
@@ -32,13 +33,11 @@ const totalLabel = computed(() => {
 })
 
 function openCreate() {
-  editingAgent.value = null
-  formOpen.value = true
+  void router.push({ name: 'agents-create' })
 }
 
 function openEdit(agent: Agent) {
-  editingAgent.value = agent
-  formOpen.value = true
+  void router.push({ name: 'agents-edit', params: { id: String(agent.id) } })
 }
 
 function askDelete(agent: Agent) {
@@ -59,6 +58,26 @@ function onDeleteKeydown(event: KeyboardEvent) {
   }
 }
 
+function consumeFlashFromQuery() {
+  const kind = route.query.flash
+  const name = typeof route.query.name === 'string' ? route.query.name : ''
+  if (kind !== 'created' && kind !== 'updated') return
+
+  flash.value =
+    kind === 'created'
+      ? name
+        ? `Agent ${name} cadastrado.`
+        : 'Agent cadastrado.'
+      : name
+        ? `Agent ${name} atualizado.`
+        : 'Agent atualizado.'
+
+  const nextQuery = { ...route.query }
+  delete nextQuery.flash
+  delete nextQuery.name
+  void router.replace({ name: 'agents', query: nextQuery })
+}
+
 async function loadAgents() {
   loading.value = true
   listError.value = ''
@@ -73,14 +92,6 @@ async function loadAgents() {
   } finally {
     loading.value = false
   }
-}
-
-function onSaved(agent: Agent) {
-  flash.value = editingAgent.value
-    ? `Agent ${agent.name} atualizado.`
-    : `Agent ${agent.name} cadastrado.`
-  actionError.value = ''
-  void loadAgents()
 }
 
 async function toggleActive(agent: Agent) {
@@ -135,8 +146,16 @@ async function confirmDelete() {
   }
 }
 
+watch(
+  () => route.query.flash,
+  () => {
+    consumeFlashFromQuery()
+  },
+)
+
 onMounted(() => {
   document.addEventListener('keydown', onDeleteKeydown)
+  consumeFlashFromQuery()
   void loadAgents()
 })
 
@@ -252,8 +271,6 @@ onUnmounted(() => {
         </tbody>
       </table>
     </div>
-
-    <AgentFormModal v-model:open="formOpen" :agent="editingAgent" @saved="onSaved" />
 
     <Teleport to="body">
       <div

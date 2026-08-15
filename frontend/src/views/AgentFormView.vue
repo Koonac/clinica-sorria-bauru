@@ -1,27 +1,33 @@
 <script setup lang="ts">
-import { computed, onUnmounted, reactive, ref, watch } from 'vue'
-import { Icon } from '@iconify/vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '@/api/client'
 import {
   createAgent,
+  getAgent,
   updateAgent,
   type Agent,
 } from '@/api/crm/agents'
+import Button from '@/components/Buttons/Button.vue'
+import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
+import PageView from '@/components/Layout/PageView.vue'
 
-const open = defineModel<boolean>('open', { default: false })
-
-const props = defineProps<{
-  agent: Agent | null
-}>()
-
-const emit = defineEmits<{
-  saved: [agent: Agent]
-}>()
+const route = useRoute()
+const router = useRouter()
 
 const inputClass =
   'w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-base text-brand-ink outline-none transition placeholder:text-brand-ink/35 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25'
 
-const isEdit = computed(() => Boolean(props.agent))
+const agentId = computed(() => {
+  const raw = route.params.id
+  if (raw == null || Array.isArray(raw)) return null
+  const id = Number(raw)
+  return Number.isFinite(id) && id > 0 ? id : null
+})
+
+const isEdit = computed(() => route.name === 'agents-edit')
+
+const pageTitle = computed(() => (isEdit.value ? 'Editar agent' : 'Novo agent'))
 
 const form = reactive({
   name: '',
@@ -38,11 +44,13 @@ const fieldErrors = reactive({
 })
 
 const loading = ref(false)
+const pageLoading = ref(isEdit.value)
+const pageError = ref('')
 const formError = ref('')
-const panelRef = ref<HTMLElement | null>(null)
+const agent = ref<Agent | null>(null)
 
 const canSubmit = computed(() => {
-  if (loading.value) return false
+  if (loading.value || pageLoading.value) return false
   if (!form.name.trim()) return false
   if (form.is_active && !form.system_prompt.trim()) return false
   const debounce = Number(form.debounce_seconds)
@@ -57,42 +65,14 @@ function clearFieldErrors() {
   fieldErrors.is_active = ''
 }
 
-function resetForm() {
-  form.name = props.agent?.name ?? ''
-  form.system_prompt = props.agent?.system_prompt ?? ''
-  form.debounce_seconds = props.agent?.debounce_seconds ?? 10
-  form.is_active = props.agent?.is_active ?? false
-  loading.value = false
-  formError.value = ''
+function fillForm(source: Agent | null) {
+  form.name = source?.name ?? ''
+  form.system_prompt = source?.system_prompt ?? ''
+  form.debounce_seconds = source?.debounce_seconds ?? 10
+  form.is_active = source?.is_active ?? false
   clearFieldErrors()
+  formError.value = ''
 }
-
-function close() {
-  open.value = false
-}
-
-function onKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape' && open.value) {
-    event.preventDefault()
-    close()
-  }
-}
-
-watch(open, (isOpen) => {
-  if (isOpen) {
-    resetForm()
-    document.addEventListener('keydown', onKeydown)
-    requestAnimationFrame(() => {
-      panelRef.value?.querySelector<HTMLInputElement>('input')?.focus()
-    })
-  } else {
-    document.removeEventListener('keydown', onKeydown)
-  }
-})
-
-onUnmounted(() => {
-  document.removeEventListener('keydown', onKeydown)
-})
 
 function applyApiFieldErrors(details?: Record<string, string[]>) {
   if (!details) return
@@ -100,6 +80,38 @@ function applyApiFieldErrors(details?: Record<string, string[]>) {
   fieldErrors.system_prompt = details.system_prompt?.[0] || ''
   fieldErrors.debounce_seconds = details.debounce_seconds?.[0] || ''
   fieldErrors.is_active = details.is_active?.[0] || ''
+}
+
+function goBack() {
+  void router.push({ name: 'agents' })
+}
+
+async function loadAgent() {
+  const id = agentId.value
+  if (!isEdit.value || id == null) {
+    agent.value = null
+    fillForm(null)
+    pageLoading.value = false
+    pageError.value = ''
+    return
+  }
+
+  pageLoading.value = true
+  pageError.value = ''
+
+  try {
+    agent.value = await getAgent(id)
+    fillForm(agent.value)
+  } catch (error) {
+    agent.value = null
+    if (error instanceof ApiError) {
+      pageError.value = error.message || 'Não foi possível carregar o agent.'
+    } else {
+      pageError.value = 'Servidor indisponível. Tente novamente.'
+    }
+  } finally {
+    pageLoading.value = false
+  }
 }
 
 async function onSubmit() {
@@ -124,12 +136,14 @@ async function onSubmit() {
     }
 
     const saved =
-      isEdit.value && props.agent
-        ? await updateAgent(props.agent.id, payload)
+      isEdit.value && agent.value
+        ? await updateAgent(agent.value.id, payload)
         : await createAgent(payload)
 
-    emit('saved', saved)
-    close()
+    await router.push({
+      name: 'agents',
+      query: { flash: isEdit.value ? 'updated' : 'created', name: saved.name },
+    })
   } catch (error) {
     if (error instanceof ApiError) {
       applyApiFieldErrors(error.details)
@@ -146,52 +160,44 @@ async function onSubmit() {
     loading.value = false
   }
 }
+
+watch(
+  () => [route.name, route.params.id] as const,
+  () => {
+    void loadAgent()
+  },
+)
+
+onMounted(() => {
+  void loadAgent()
+})
 </script>
 
 <template>
-  <Teleport to="body">
-    <div
-      v-if="open"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 backdrop-blur-sm sm:p-6"
-      role="presentation"
-      @click.self="close"
-    >
-      <div
-        ref="panelRef"
-        role="dialog"
-        aria-modal="true"
-        :aria-labelledby="isEdit ? 'agent-edit-title' : 'agent-create-title'"
-        class="flex max-h-[min(90vh,820px)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-2xl"
-        @click.stop
-      >
-        <header
-          class="flex shrink-0 items-start justify-between gap-3 border-b border-brand-ink/10 px-5 pt-5 pb-4"
-        >
-          <div class="min-w-0">
-            <p class="mb-1 text-[0.65rem] font-medium tracking-[0.22em] text-brand-cyan-ink uppercase">
-              Agents
-            </p>
-            <h2
-              :id="isEdit ? 'agent-edit-title' : 'agent-create-title'"
-              class="text-xl font-semibold tracking-tight text-brand-ink"
-            >
-              {{ isEdit ? 'Editar agent' : 'Cadastrar agent' }}
-            </h2>
-          </div>
-          <button
-            type="button"
-            class="inline-flex size-8 cursor-pointer items-center justify-center rounded-full text-brand-ink/55 transition hover:bg-[#f4f6f8] hover:text-brand-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue"
-            aria-label="Fechar"
-            @click="close"
-          >
-            <Icon icon="lucide:x" class="size-[18px]" aria-hidden="true" />
-          </button>
-        </header>
+  <PageView :title="pageTitle">
+    <template #actions>
+      <Button variant="secondary" icon="lucide:arrow-left" @click="goBack">Voltar</Button>
+    </template>
 
-        <form
-          class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5"
-          @submit.prevent="onSubmit"
-        >
+    <ContentSkeleton v-if="pageLoading" variant="detail" />
+
+    <div
+      v-else-if="pageError"
+      class="flex flex-col gap-4 rounded-2xl border border-brand-ink/10 bg-white p-5"
+    >
+      <p class="text-sm text-brand-ink" role="alert">{{ pageError }}</p>
+      <div>
+        <Button variant="secondary" icon="lucide:arrow-left" @click="goBack">Voltar</Button>
+      </div>
+    </div>
+
+    <form
+      v-else
+      class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto rounded-2xl border border-brand-ink/10 bg-white p-5 md:p-6"
+      @submit.prevent="onSubmit"
+    >
+      <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]">
+        <div class="flex min-w-0 flex-col gap-5">
           <label class="flex flex-col gap-1.5">
             <span class="text-sm font-medium text-brand-ink/80">Nome</span>
             <input
@@ -207,21 +213,23 @@ async function onSubmit() {
             </span>
           </label>
 
-          <label class="flex flex-col gap-1.5">
+          <label class="flex min-h-0 flex-1 flex-col gap-1.5">
             <span class="text-sm font-medium text-brand-ink/80">System prompt</span>
             <textarea
               v-model="form.system_prompt"
               name="system_prompt"
-              rows="6"
+              rows="18"
               :required="form.is_active"
               placeholder="Instruções do agent para atendimento no WhatsApp"
-              :class="[inputClass, 'min-h-32 resize-y']"
+              :class="[inputClass, 'min-h-80 flex-1 resize-y']"
             />
             <span v-if="fieldErrors.system_prompt" class="text-sm text-brand-ink/70" role="alert">
               {{ fieldErrors.system_prompt }}
             </span>
           </label>
+        </div>
 
+        <aside class="flex flex-col gap-5">
           <label class="flex flex-col gap-1.5">
             <span class="text-sm font-medium text-brand-ink/80">Debounce (segundos)</span>
             <input
@@ -262,34 +270,25 @@ async function onSubmit() {
           <span v-if="fieldErrors.is_active" class="text-sm text-brand-ink/70" role="alert">
             {{ fieldErrors.is_active }}
           </span>
-
-          <p
-            v-if="formError"
-            class="rounded-xl border border-brand-ink/10 bg-brand-ink/[0.04] px-3.5 py-2.5 text-sm leading-snug text-brand-ink"
-            role="alert"
-          >
-            {{ formError }}
-          </p>
-
-          <div class="mt-1 flex flex-wrap gap-2 pt-1">
-            <button
-              type="submit"
-              :disabled="!canSubmit"
-              class="cursor-pointer rounded-full bg-brand-cyan px-6 py-3 text-sm font-semibold text-brand-ink transition hover:-translate-y-px hover:brightness-105 focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-brand-blue disabled:cursor-not-allowed disabled:opacity-55"
-            >
-              <span v-if="loading">Salvando…</span>
-              <span v-else>{{ isEdit ? 'Salvar' : 'Cadastrar' }}</span>
-            </button>
-            <button
-              type="button"
-              class="cursor-pointer rounded-full border border-brand-ink/15 px-6 py-3 text-sm font-medium text-brand-ink/70 transition hover:border-brand-ink/25 hover:bg-[#f4f6f8] hover:text-brand-ink"
-              @click="close"
-            >
-              Cancelar
-            </button>
-          </div>
-        </form>
+        </aside>
       </div>
-    </div>
-  </Teleport>
+
+      <p
+        v-if="formError"
+        class="rounded-xl border border-brand-ink/10 bg-brand-ink/[0.04] px-3.5 py-2.5 text-sm leading-snug text-brand-ink"
+        role="alert"
+      >
+        {{ formError }}
+      </p>
+
+      <div class="flex flex-wrap gap-2 border-t border-brand-ink/10 pt-4">
+        <Button type="submit" icon="lucide:save" :loading="loading" :disabled="!canSubmit">
+          {{ isEdit ? 'Salvar' : 'Cadastrar' }}
+        </Button>
+        <Button type="button" variant="secondary" :disabled="loading" @click="goBack">
+          Cancelar
+        </Button>
+      </div>
+    </form>
+  </PageView>
 </template>

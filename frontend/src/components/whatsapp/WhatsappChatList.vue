@@ -42,7 +42,7 @@ const primaryFilters: { id: WhatsappChatFilter; label: string }[] = [
 const moreFilterIds: WhatsappChatFilter[] = ['unassigned', 'unread', 'human']
 
 const moreOptions: { value: WhatsappChatFilter; label: string }[] = [
-  { value: 'unassigned', label: 'Sem dono' },
+  { value: 'unassigned', label: 'Finalizados' },
   { value: 'unread', label: 'Não lidas' },
   { value: 'human', label: 'Humano' },
 ]
@@ -72,6 +72,32 @@ function preview(chat: WhatsappChat): string {
 
 function title(chat: WhatsappChat): string {
   return chat.contact_name || chat.phone_number || chat.whatsapp_jid
+}
+
+function isFinalized(chat: WhatsappChat): boolean {
+  return Boolean(chat.lead_id) && chat.owner_id == null && !chat.whatsapp_agent_paused_at
+}
+
+function ownershipBadge(chat: WhatsappChat): { label: string; className: string } | null {
+  if (isFinalized(chat)) {
+    return {
+      label: 'Finalizado',
+      className: 'rounded bg-brand-ink/10 px-1.5 py-0.5 font-medium text-brand-ink/70',
+    }
+  }
+  if (chat.whatsapp_agent_paused_at) {
+    return {
+      label: chat.owner_name || 'Humano',
+      className: 'rounded bg-amber-500/15 px-1.5 py-0.5 font-medium text-amber-800',
+    }
+  }
+  if (chat.lead_id) {
+    return {
+      label: 'Agent IA',
+      className: 'rounded bg-brand-cyan/15 px-1.5 py-0.5 font-medium text-brand-cyan-ink',
+    }
+  }
+  return null
 }
 
 function onListScroll(event: Event) {
@@ -189,16 +215,10 @@ function onListScroll(event: Event) {
             <div class="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-brand-ink/40">
               <span>{{ formatDateTime(chat.last_message.wa_timestamp || chat.last_message.created_at) }}</span>
               <span
-                v-if="chat.whatsapp_agent_paused_at"
-                class="rounded bg-amber-500/15 px-1.5 py-0.5 font-medium text-amber-800"
+                v-if="ownershipBadge(chat)"
+                :class="ownershipBadge(chat)?.className"
               >
-                {{ chat.owner_name || 'Sem dono' }}
-              </span>
-              <span
-                v-else-if="chat.lead_id"
-                class="rounded bg-brand-cyan/15 px-1.5 py-0.5 font-medium text-brand-cyan-ink"
-              >
-                Agent IA
+                {{ ownershipBadge(chat)?.label }}
               </span>
               <span v-else-if="chat.owner_name">· {{ chat.owner_name }}</span>
             </div>

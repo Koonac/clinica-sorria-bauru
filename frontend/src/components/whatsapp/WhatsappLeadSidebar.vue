@@ -127,7 +127,7 @@ watch(
             <dt class="text-[11px] font-medium tracking-wide text-brand-ink/40 uppercase">
               Atendente
             </dt>
-            <dd class="mt-0.5 text-brand-ink">{{ lead.owner?.name || 'Sem dono' }}</dd>
+            <dd class="mt-0.5 text-brand-ink">{{ lead.owner?.name || 'Finalizado' }}</dd>
           </div>
           <div>
             <dt class="text-[11px] font-medium tracking-wide text-brand-ink/40 uppercase">
