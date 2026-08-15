@@ -1,1 +1,46 @@
 @import 'tailwindcss';
+
+@theme {
+  --color-brand-blue: #0708f8;
+  --color-brand-cyan: #00e1ff;
+  --color-brand-cyan-ink: #006e7d;
+  --color-brand-ink: #0f1319;
+  --font-sans: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html,
+  body,
+  #app {
+    min-height: 100%;
+  }
+
+  body {
+    @apply m-0 bg-white font-sans text-brand-ink antialiased;
+  }
+}
+
+@utility animate-fade-up {
+  animation: fade-up 0.8s ease both;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
