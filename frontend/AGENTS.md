@@ -33,7 +33,7 @@ frontend/src/
 ├── router/index.ts     # Rotas + guards (auth e roles)
 ├── stores/             # Pinia (auth, etc.)
 ├── views/              # Páginas (lazy import nas rotas)
-├── components/         # (criar conforme necessário — UI reutilizável)
+├── components/         # UI por categoria (Buttons/, Layout/, Modals/)
 ├── App.vue
 └── main.ts
 ```

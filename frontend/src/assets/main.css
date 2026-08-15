@@ -12,16 +12,138 @@
   html,
   body,
   #app {
-    min-height: 100%;
+    height: 100%;
+    min-height: 100dvh;
   }
 
   body {
     @apply m-0 bg-white font-sans text-brand-ink antialiased;
   }
+
+  #app {
+    @apply flex min-h-dvh flex-col;
+  }
 }
 
 @utility animate-fade-up {
   animation: fade-up 0.8s ease both;
+}
+
+/* Sidebar: larguras e estados que utilitários sozinhos não cobrem bem */
+.app-rail {
+  width: 15rem;
+  transition:
+    width 0.2s ease,
+    transform 0.2s ease;
+}
+
+.app-rail[data-recolhida] {
+  width: 4.5rem;
+}
+
+.app-rail[data-recolhida] .rail-marca,
+.app-rail[data-recolhida] .rail-rotulo {
+  display: none;
+}
+
+.app-rail[data-recolhida] .rail-topo {
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 0.75rem 0.5rem;
+  gap: 0.5rem;
+  min-height: auto;
+}
+
+.app-rail[data-recolhida] .rail-logo {
+  margin-inline: auto;
+}
+
+.app-rail[data-recolhida] .rail-nav {
+  align-items: center;
+}
+
+.app-rail[data-recolhida] .rail-nav a,
+.app-rail[data-recolhida] .rail-sair {
+  justify-content: center;
+  padding-inline: 0.75rem;
+}
+
+.app-rail[data-recolhida] .rail-rodape > div {
+  flex-direction: column;
+  align-items: center;
+}
+
+.app-rail[data-recolhida] .rail-sair {
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+}
+
+@media (max-width: 767px) {
+  .app-rail {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: min(18rem, calc(100vw - 3rem));
+    height: 100%;
+    max-height: 100dvh;
+    transform: translateX(-100%);
+    box-shadow: none;
+  }
+
+  .app-rail[data-menu-aberto] {
+    transform: translateX(0);
+    box-shadow: 8px 0 32px rgb(15 19 25 / 0.14);
+  }
+
+  .app-rail[data-recolhida] {
+    width: min(18rem, calc(100vw - 3rem));
+  }
+
+  .app-rail[data-recolhida] .rail-marca {
+    display: flex;
+  }
+
+  .app-rail[data-recolhida] .rail-rotulo {
+    display: revert;
+  }
+
+  .app-rail[data-recolhida] .rail-topo {
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 1rem;
+    gap: 0.75rem;
+    min-height: 4.5rem;
+  }
+
+  .app-rail[data-recolhida] .rail-nav {
+    align-items: stretch;
+  }
+
+  .app-rail[data-recolhida] .rail-nav a,
+  .app-rail[data-recolhida] .rail-sair {
+    justify-content: flex-start;
+    padding-inline: 0.875rem;
+  }
+
+  .app-rail[data-recolhida] .rail-rodape > div {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .app-rail[data-recolhida] .rail-sair {
+    flex: 1;
+    width: auto;
+    height: auto;
+    padding: 0.625rem 0.875rem;
+  }
+
+  body.menu-mobile-aberto {
+    overflow: hidden;
+  }
 }
 
 @keyframes fade-up {

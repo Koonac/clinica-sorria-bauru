@@ -74,6 +74,22 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function changePassword(
+    currentPassword: string,
+    password: string,
+    passwordConfirmation: string,
+  ) {
+    try {
+      await api.post('/v1/auth/password', {
+        current_password: currentPassword,
+        password,
+        password_confirmation: passwordConfirmation,
+      })
+    } catch (error) {
+      throw toApiError(error)
+    }
+  }
+
   return {
     token,
     user,
@@ -81,6 +97,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAdmin,
     login,
     logout,
+    changePassword,
     clear,
   }
 })
