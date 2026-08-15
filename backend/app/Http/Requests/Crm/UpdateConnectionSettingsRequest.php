@@ -20,6 +20,7 @@ class UpdateConnectionSettingsRequest extends FormRequest
                 ),
             ],
             'whatsapp_agent_auto_resume_hours' => ['sometimes', 'integer', 'min:1', 'max:168'],
+            'whatsapp_attendance_auto_close_minutes' => ['sometimes', 'integer', 'min:1', 'max:1440'],
         ];
     }
 }

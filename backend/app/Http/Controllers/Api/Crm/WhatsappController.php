@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\Crm\EnsureWhatsappAvatar;
 use App\Services\Crm\MarkWhatsappChatRead;
 use App\Services\Crm\PauseWhatsappAgentForLead;
+use App\Services\Crm\ScheduleWhatsappAttendanceAutoClose;
 use App\Services\Crm\SyncWhatsappLabels;
 use App\Services\Crm\UpsertClinicConnection;
 use App\Services\Crm\WhatsappApiClient;
@@ -42,6 +43,7 @@ class WhatsappController extends Controller
         private WhatsappConversationKey $conversationKey,
         private MarkWhatsappChatRead $markChatRead,
         private EnsureWhatsappAvatar $ensureAvatar,
+        private ScheduleWhatsappAttendanceAutoClose $autoClose,
     ) {}
 
     public function send(SendWhatsappMessageRequest $request): JsonResponse
@@ -144,6 +146,7 @@ class WhatsappController extends Controller
                 $connection,
                 mb_substr($message !== '' ? $message : '[imagem]', 0, 500),
             );
+            $this->autoClose->handle($resolved['lead']->fresh() ?? $resolved['lead'], $connection);
         }
 
         return response()->json([
@@ -265,7 +268,7 @@ class WhatsappController extends Controller
             $leadsById = Lead::query()
                 ->with('owner:id,name')
                 ->whereIn('id', $leadIds)
-                ->get(['id', 'owner_id', 'whatsapp_agent_paused_at', 'whatsapp_agent_resume_at', 'name', 'contact_id', 'whatsapp_jid'])
+                ->get(['id', 'owner_id', 'whatsapp_agent_paused_at', 'whatsapp_agent_resume_at', 'whatsapp_conversation_closed_at', 'name', 'contact_id', 'whatsapp_jid'])
                 ->keyBy('id');
             foreach ($leadsById as $lead) {
                 if ($lead->contact_id) {
@@ -381,6 +384,7 @@ class WhatsappController extends Controller
                 'owner_name' => $lead?->owner?->name,
                 'whatsapp_agent_paused_at' => $lead?->whatsapp_agent_paused_at?->toIso8601String(),
                 'whatsapp_agent_resume_at' => $lead?->whatsapp_agent_resume_at?->toIso8601String(),
+                'whatsapp_conversation_closed_at' => $lead?->whatsapp_conversation_closed_at?->toIso8601String(),
                 'unread_count' => $unread,
                 'last_message' => [
                     'id' => (int) $row->id,
@@ -746,11 +750,14 @@ class WhatsappController extends Controller
     {
         return match ($filter) {
             'mine' => ($item['owner_id'] ?? null) === $userId,
-            // "Finalizados": lead sem atendente humano (após finalizar ou nunca atribuído).
-            'unassigned' => ($item['lead_id'] ?? null) !== null && ($item['owner_id'] ?? null) === null,
+            // "Finalizados": conversa encerrada (manual, IA ou auto-close).
+            'unassigned' => ($item['lead_id'] ?? null) !== null && filled($item['whatsapp_conversation_closed_at'] ?? null),
             'unread' => ((int) ($item['unread_count'] ?? 0)) > 0,
-            'human' => filled($item['whatsapp_agent_paused_at'] ?? null),
-            'agent' => ($item['lead_id'] ?? null) !== null && ! filled($item['whatsapp_agent_paused_at'] ?? null),
+            'human' => filled($item['whatsapp_agent_paused_at'] ?? null)
+                && ! filled($item['whatsapp_conversation_closed_at'] ?? null),
+            'agent' => ($item['lead_id'] ?? null) !== null
+                && ! filled($item['whatsapp_agent_paused_at'] ?? null)
+                && ! filled($item['whatsapp_conversation_closed_at'] ?? null),
             default => true,
         };
     }

@@ -44,7 +44,7 @@ class TrackWhatsappAttendanceSegment
             if ($open) {
                 $open->forceFill([
                     'ended_at' => $now,
-                    'duration_seconds' => max(0, $open->started_at->diffInSeconds($now)),
+                    'duration_seconds' => max(0, (int) $open->started_at->diffInSeconds($now)),
                 ])->save();
             }
 

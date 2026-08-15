@@ -110,6 +110,6 @@ class GetAttendanceStats
             return 0;
         }
 
-        return max(0, $start->diffInSeconds($end));
+        return max(0, (int) $start->diffInSeconds($end));
     }
 }

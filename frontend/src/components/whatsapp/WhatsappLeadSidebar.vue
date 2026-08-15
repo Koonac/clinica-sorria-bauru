@@ -160,7 +160,12 @@ watch(
             <dt class="text-[11px] font-medium tracking-wide text-brand-ink/40 uppercase">
               Atendente
             </dt>
-            <dd class="mt-0.5 text-brand-ink">{{ lead.owner?.name || 'Finalizado' }}</dd>
+            <dd class="mt-0.5 text-brand-ink">
+              {{
+                lead.owner?.name
+                  || (lead.whatsapp_conversation_closed_at ? 'Finalizado' : 'Sem atendente')
+              }}
+            </dd>
           </div>
           <div>
             <dt class="text-[11px] font-medium tracking-wide text-brand-ink/40 uppercase">

@@ -14,6 +14,8 @@ class ProcessInboundWhatsappMessage
     public function __construct(
         private WhatsappLeadResolver $leadResolver,
         private ClinicContext $clinicContext,
+        private ReopenWhatsappConversationForLead $reopener,
+        private ScheduleWhatsappAttendanceAutoClose $autoClose,
     ) {}
 
     /**
@@ -76,6 +78,16 @@ class ProcessInboundWhatsappMessage
             'phone_number' => $payload['phone_number'] ?? null,
             'contact_name' => $payload['contact_name'] ?? null,
         ]);
+
+        $lead = $resolved['lead'];
+        if ($lead && $direction === 'inbound') {
+            if ($lead->isWhatsappConversationClosed()) {
+                $lead = $this->reopener->handle($lead, 'reopen');
+            } else {
+                $lead = $this->autoClose->clear($lead);
+            }
+            $resolved['lead'] = $lead;
+        }
 
         $media = $payload['media'] ?? null;
         if (is_array($media) && isset($media['data']) && is_string($media['data']) && strlen($media['data']) > 200_000) {

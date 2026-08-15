@@ -7,12 +7,14 @@ use App\Events\Crm\WhatsappMessageStored;
 use App\Models\User;
 use App\Services\Crm\PauseWhatsappAgentForLead;
 use App\Services\Crm\ProcessInboundWhatsappMessage;
+use App\Services\Crm\ScheduleWhatsappAttendanceAutoClose;
 
 class PersistInboundWhatsappMessage
 {
     public function __construct(
         private ProcessInboundWhatsappMessage $processor,
         private PauseWhatsappAgentForLead $pauseAgent,
+        private ScheduleWhatsappAttendanceAutoClose $autoClose,
     ) {}
 
     public function handle(WhatsappInboundMessageReceived $event): void
@@ -41,6 +43,7 @@ class PersistInboundWhatsappMessage
                     $event->connection,
                     is_string($message->body) ? mb_substr($message->body, 0, 500) : null,
                 );
+                $this->autoClose->handle($lead->fresh() ?? $lead, $event->connection);
             }
         }
 

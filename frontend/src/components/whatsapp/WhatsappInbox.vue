@@ -140,6 +140,7 @@ async function assumeChat() {
       owner_name: auth.user.name,
       whatsapp_agent_paused_at: lead.whatsapp_agent_paused_at ?? selected.value.whatsapp_agent_paused_at,
       whatsapp_agent_resume_at: lead.whatsapp_agent_resume_at ?? null,
+      whatsapp_conversation_closed_at: lead.whatsapp_conversation_closed_at ?? null,
     }
     await loadChats(true)
   } catch (e) {
@@ -162,6 +163,7 @@ async function transferChat(ownerId: number) {
       owner_name: attendant?.name ?? lead.owner?.name ?? null,
       whatsapp_agent_paused_at: lead.whatsapp_agent_paused_at ?? selected.value.whatsapp_agent_paused_at,
       whatsapp_agent_resume_at: lead.whatsapp_agent_resume_at ?? null,
+      whatsapp_conversation_closed_at: lead.whatsapp_conversation_closed_at ?? null,
     }
     await loadChats(true)
   } catch (e) {
@@ -219,6 +221,7 @@ async function finalizeChat() {
       owner_name: null,
       whatsapp_agent_paused_at: lead.whatsapp_agent_paused_at ?? null,
       whatsapp_agent_resume_at: lead.whatsapp_agent_resume_at ?? null,
+      whatsapp_conversation_closed_at: lead.whatsapp_conversation_closed_at ?? new Date().toISOString(),
     }
     await loadChats(true)
   } catch (e) {

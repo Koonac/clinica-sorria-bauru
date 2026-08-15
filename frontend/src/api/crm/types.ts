@@ -107,6 +107,9 @@ export type Lead = {
   lost_reason?: string | null
   whatsapp_agent_paused_at?: string | null
   whatsapp_agent_resume_at?: string | null
+  whatsapp_conversation_closed_at?: string | null
+  whatsapp_conversation_closed_by?: number | null
+  whatsapp_auto_close_at?: string | null
   converted_deal_id?: number | null
   converted_at?: string | null
   created_at?: string
@@ -187,6 +190,7 @@ export type WhatsappChat = {
   owner_name?: string | null
   whatsapp_agent_paused_at?: string | null
   whatsapp_agent_resume_at?: string | null
+  whatsapp_conversation_closed_at?: string | null
   unread_count: number
   last_message: {
     id: number

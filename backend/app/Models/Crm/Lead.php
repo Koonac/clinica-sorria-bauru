@@ -36,6 +36,9 @@ class Lead extends Model
         'lost_reason',
         'whatsapp_agent_paused_at',
         'whatsapp_agent_resume_at',
+        'whatsapp_conversation_closed_at',
+        'whatsapp_conversation_closed_by',
+        'whatsapp_auto_close_at',
         'converted_deal_id',
         'converted_at',
     ];
@@ -47,12 +50,24 @@ class Lead extends Model
             'converted_at' => 'datetime',
             'whatsapp_agent_paused_at' => 'datetime',
             'whatsapp_agent_resume_at' => 'datetime',
+            'whatsapp_conversation_closed_at' => 'datetime',
+            'whatsapp_auto_close_at' => 'datetime',
         ];
     }
 
     public function isWhatsappAgentPaused(): bool
     {
         return $this->whatsapp_agent_paused_at !== null;
+    }
+
+    public function isWhatsappConversationClosed(): bool
+    {
+        return $this->whatsapp_conversation_closed_at !== null;
+    }
+
+    public function whatsappConversationClosedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'whatsapp_conversation_closed_by');
     }
 
     public function contact(): BelongsTo

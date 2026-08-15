@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('crm:resume-whatsapp-agents')->everyMinute();
+Schedule::command('crm:auto-close-whatsapp-conversations')->everyMinute();

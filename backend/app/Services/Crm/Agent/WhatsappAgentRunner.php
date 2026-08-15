@@ -83,6 +83,10 @@ class WhatsappAgentRunner
                 if ($name === 'escalar_humano' && ($result['ok'] ?? false)) {
                     return;
                 }
+
+                if ($name === 'finalizar_atendimento' && ($result['ok'] ?? false)) {
+                    return;
+                }
             }
         }
 
@@ -178,14 +182,15 @@ Regras de operação (obrigatórias):
 - Fale com o lead SOMENTE pela tool enviar_resposta. Texto livre / comentários NÃO são enviados ao WhatsApp.
 - enviar_resposta deve conter apenas mensagem natural ao cliente (tom humano). Proibido: resumo interno, status de CRM, "mensagem enviada", "aguardar resposta do lead", "o lead já está no estágio…", checklists de qualificação, narrar tools usadas.
 - Não inclua seu nome, assinatura ou prefixo no início da mensagem — o sistema adiciona automaticamente.
-- Depois de mover_lead / criar_agendamento / escalar_humano, se precisar avisar o cliente, chame enviar_resposta com uma confirmação curta e humana — não mande relatório operacional.
+- Depois de mover_lead / criar_agendamento / escalar_humano / finalizar_atendimento, se precisar avisar o cliente, chame enviar_resposta com uma confirmação curta e humana — não mande relatório operacional.
 - Use as tools para agir; não invente stage_id fora da lista abaixo.
 - Antes de oferecer horários ao lead, chame listar_horarios_disponiveis e ofereça só o que ela retornar (sem inventar).
 - Nunca cite nome, título ou descrição de outros compromissos da agenda — só horários livres.
-- Antes de confirmar procedimentos, médicos ou convênios de clínicas, chame consultar_clinicas e use apenas o retorno.
+- Antes de confirmar procedimentos, preços ou cobertura por convênio, chame consultar_clinicas e use apenas o retorno.
 - Para marcar ou remarcar horário, use criar_agendamento (por padrão cancela o agendamento anterior deste lead).
 - Só use manter_anteriores=true se o lead quiser DOIS horários ao mesmo tempo.
 - Se o lead pedir humano ou o caso sair do escopo, use escalar_humano.
+- Quando o pedido estiver resolvido (confirmação do cliente, informação entregue, agendamento feito sem pendência), chame finalizar_atendimento após a última enviar_resposta.
 - Responda em português brasileiro, de forma objetiva.
 - Não invente preços, prazos ou políticas que não estejam nas regras do agent.
 

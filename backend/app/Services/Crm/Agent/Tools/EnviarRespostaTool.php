@@ -5,13 +5,17 @@ namespace App\Services\Crm\Agent\Tools;
 use App\Models\Crm\WhatsappMessage;
 use App\Services\Crm\Agent\AgentContext;
 use App\Services\Crm\Agent\AgentTool;
+use App\Services\Crm\ScheduleWhatsappAttendanceAutoClose;
 use App\Services\Crm\WhatsappApiClient;
 use App\Services\Crm\WhatsappLeadResolver;
 use RuntimeException;
 
 class EnviarRespostaTool implements AgentTool
 {
-    public function __construct(private WhatsappLeadResolver $leadResolver) {}
+    public function __construct(
+        private WhatsappLeadResolver $leadResolver,
+        private ScheduleWhatsappAttendanceAutoClose $autoClose,
+    ) {}
 
     public function name(): string
     {
@@ -95,6 +99,11 @@ class EnviarRespostaTool implements AgentTool
                 $existing->forceFill(['message_id' => $messageId])->save();
             }
 
+            $lead = $context->lead ?? $resolved['lead'];
+            if ($lead) {
+                $this->autoClose->handle($lead, $connection);
+            }
+
             return [
                 'ok' => true,
                 'whatsapp_message_id' => $existing->id,
@@ -122,6 +131,11 @@ class EnviarRespostaTool implements AgentTool
             'raw' => $result,
             'wa_timestamp' => now(),
         ]);
+
+        $lead = $context->lead ?? $resolved['lead'];
+        if ($lead) {
+            $this->autoClose->handle($lead, $connection);
+        }
 
         return [
             'ok' => true,

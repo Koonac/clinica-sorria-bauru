@@ -32,6 +32,7 @@ class Connection extends Model
         'is_business',
         'default_lead_stage_id',
         'whatsapp_agent_auto_resume_hours',
+        'whatsapp_attendance_auto_close_minutes',
         'created_by',
     ];
 
@@ -119,6 +120,7 @@ class Connection extends Model
             'session_id' => $this->session_id,
             'default_lead_stage_id' => $this->default_lead_stage_id,
             'whatsapp_agent_auto_resume_hours' => (int) ($this->whatsapp_agent_auto_resume_hours ?? 24),
+            'whatsapp_attendance_auto_close_minutes' => (int) ($this->whatsapp_attendance_auto_close_minutes ?? 10),
             'api_username' => $this->api_username,
         ];
     }

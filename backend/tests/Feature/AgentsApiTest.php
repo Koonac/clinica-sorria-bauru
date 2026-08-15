@@ -138,13 +138,22 @@ class AgentsApiTest extends TestCase
     public function test_finaliza_conversa_whatsapp_do_lead(): void
     {
         $user = $this->autenticar();
+        $this->defaultClinic();
         $lead = Lead::create([
             'title' => 'Lead',
             'name' => 'Maria',
             'owner_id' => $user->id,
             'whatsapp_agent_paused_at' => now(),
             'whatsapp_agent_resume_at' => now()->addHours(12),
+            'whatsapp_auto_close_at' => now()->addMinutes(10),
         ]);
+
+        $this->app->make(\App\Services\Crm\TrackWhatsappAttendanceSegment::class)->handle(
+            $lead,
+            \App\Models\Crm\WhatsappAttendanceSegment::MODE_HUMAN,
+            $user->id,
+            'assume',
+        );
 
         $this->postJson("/api/v1/crm/leads/{$lead->id}/whatsapp/finalize")
             ->assertOk()
@@ -156,6 +165,9 @@ class AgentsApiTest extends TestCase
         $this->assertNull($fresh->owner_id);
         $this->assertNull($fresh->whatsapp_agent_paused_at);
         $this->assertNull($fresh->whatsapp_agent_resume_at);
+        $this->assertNull($fresh->whatsapp_auto_close_at);
+        $this->assertNotNull($fresh->whatsapp_conversation_closed_at);
+        $this->assertSame($user->id, $fresh->whatsapp_conversation_closed_by);
 
         $this->assertDatabaseHas('activities', [
             'lead_id' => $lead->id,
@@ -164,11 +176,18 @@ class AgentsApiTest extends TestCase
             'subject' => 'Conversa finalizada',
         ]);
 
-        $this->assertDatabaseHas('whatsapp_attendance_segments', [
-            'lead_id' => $lead->id,
-            'mode' => 'ai',
-            'source' => 'finalize',
-        ]);
+        $open = \App\Models\Crm\WhatsappAttendanceSegment::query()
+            ->where('lead_id', $lead->id)
+            ->whereNull('ended_at')
+            ->count();
+        $this->assertSame(0, $open);
+
+        $closed = \App\Models\Crm\WhatsappAttendanceSegment::query()
+            ->where('lead_id', $lead->id)
+            ->where('mode', 'human')
+            ->whereNotNull('ended_at')
+            ->exists();
+        $this->assertTrue($closed);
     }
 
     public function test_assume_lead_cria_segmento_humano_por_usuario(): void

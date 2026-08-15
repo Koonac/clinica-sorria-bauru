@@ -118,6 +118,16 @@ class LeadController extends Controller
         if ($ownerChanged) {
             $connection = $upsertConnection->handle([], $request->user()?->id);
             $fresh = $lead->fresh() ?? $lead;
+
+            if ($fresh->isWhatsappConversationClosed()) {
+                $fresh->forceFill([
+                    'whatsapp_conversation_closed_at' => null,
+                    'whatsapp_conversation_closed_by' => null,
+                    'whatsapp_auto_close_at' => null,
+                ])->save();
+                $fresh = $fresh->fresh() ?? $fresh;
+            }
+
             $pauseWithResume->handle(
                 $fresh,
                 $connection,
@@ -185,6 +195,10 @@ class LeadController extends Controller
         $user = $request->user();
         abort_unless($user !== null, 401);
 
-        return response()->json(['data' => $finalizer->handle($lead, $user)]);
+        return response()->json(['data' => $finalizer->handle(
+            $lead,
+            $user,
+            FinalizeWhatsappConversationForLead::SOURCE_MANUAL,
+        )]);
     }
 }

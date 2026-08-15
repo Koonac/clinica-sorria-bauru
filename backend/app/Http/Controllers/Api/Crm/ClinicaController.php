@@ -26,7 +26,7 @@ class ClinicaController extends Controller
         return response()->json([
             'data' => [
                 'ok' => true,
-                'mock' => true,
+                'mock' => false,
                 'clinica' => $found,
             ],
         ]);

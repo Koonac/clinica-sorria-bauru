@@ -75,7 +75,7 @@ function title(chat: WhatsappChat): string {
 }
 
 function isFinalized(chat: WhatsappChat): boolean {
-  return Boolean(chat.lead_id) && chat.owner_id == null && !chat.whatsapp_agent_paused_at
+  return Boolean(chat.lead_id) && Boolean(chat.whatsapp_conversation_closed_at)
 }
 
 function ownershipBadge(chat: WhatsappChat): { label: string; className: string } | null {

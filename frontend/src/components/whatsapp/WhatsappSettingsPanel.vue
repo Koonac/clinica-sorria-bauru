@@ -36,6 +36,7 @@ const settings = ref({
   ai_display_name: '',
   default_lead_stage_id: '' as string | number,
   whatsapp_agent_auto_resume_hours: 24,
+  whatsapp_attendance_auto_close_minutes: 10,
 })
 
 const inputClass =
@@ -84,6 +85,8 @@ function applyConnection(next: ClinicConnection) {
     : ''
   settings.value.whatsapp_agent_auto_resume_hours =
     next.whatsapp_agent_auto_resume_hours ?? 24
+  settings.value.whatsapp_attendance_auto_close_minutes =
+    next.whatsapp_attendance_auto_close_minutes ?? 10
 }
 
 async function load() {
@@ -172,6 +175,9 @@ async function saveSettings() {
       ai_display_name: settings.value.ai_display_name.trim() || null,
       default_lead_stage_id: stageId === '' ? null : Number(stageId),
       whatsapp_agent_auto_resume_hours: Number(settings.value.whatsapp_agent_auto_resume_hours),
+      whatsapp_attendance_auto_close_minutes: Number(
+        settings.value.whatsapp_attendance_auto_close_minutes,
+      ),
     })
     applyConnection(next)
     flash.value = 'Configurações salvas.'
@@ -346,6 +352,23 @@ onMounted(() => {
               Quando um atendente responde pelo WhatsApp (plataforma ou celular), a IA fica pausada
               por este período e retoma automaticamente. Pausar pelo botão permanece até retomada
               manual. (1–168 horas)
+            </span>
+          </label>
+          <label class="flex flex-col gap-1.5 sm:col-span-2">
+            <span class="text-sm font-medium text-brand-ink/80">
+              Minutos sem resposta do cliente para fechar atendimento
+            </span>
+            <input
+              v-model.number="settings.whatsapp_attendance_auto_close_minutes"
+              type="number"
+              min="1"
+              max="1440"
+              required
+              :class="inputClass"
+            />
+            <span class="text-xs text-brand-ink/45">
+              Após uma mensagem nossa (IA ou humano), se o cliente não responder neste prazo, o
+              atendimento é finalizado automaticamente. (1–1440 minutos; padrão 10)
             </span>
           </label>
         </div>

@@ -6,6 +6,7 @@ use App\Services\Crm\Agent\Tools\ConsultarClinicasTool;
 use App\Services\Crm\Agent\Tools\CriarAgendamentoTool;
 use App\Services\Crm\Agent\Tools\EnviarRespostaTool;
 use App\Services\Crm\Agent\Tools\EscalarHumanoTool;
+use App\Services\Crm\Agent\Tools\FinalizarAtendimentoTool;
 use App\Services\Crm\Agent\Tools\ListarHorariosDisponiveisTool;
 use App\Services\Crm\Agent\Tools\MoverLeadTool;
 use RuntimeException;
@@ -23,6 +24,7 @@ class WhatsappAgentToolRegistry
         ListarHorariosDisponiveisTool $horarios,
         ConsultarClinicasTool $clinicas,
         EscalarHumanoTool $escalar,
+        FinalizarAtendimentoTool $finalizar,
     ) {
         $this->tools = [
             $enviar->name() => $enviar,
@@ -31,6 +33,7 @@ class WhatsappAgentToolRegistry
             $horarios->name() => $horarios,
             $clinicas->name() => $clinicas,
             $escalar->name() => $escalar,
+            $finalizar->name() => $finalizar,
         ];
     }
 

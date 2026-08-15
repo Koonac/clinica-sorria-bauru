@@ -20,45 +20,33 @@ class ConsultarClinicasTool implements AgentTool
     {
         return [
             'name' => $this->name(),
-            'description' => 'Consulta clínicas (estéticas, odontológicas, médicas particulares): procedimentos atendidos, médicos disponíveis e convênios aceitos. Use ANTES de confirmar qualquer procedimento, médico ou convênio ao lead.',
+            'description' => 'Consulta os serviços/procedimentos cadastrados da clínica atual (nome, código, duração, preço particular, se aceita convênio e descrição). Use ANTES de confirmar qualquer procedimento, preço ou cobertura por convênio ao lead.',
             'parameters' => [
                 'type' => 'object',
                 'properties' => [
                     'id' => [
                         'type' => 'string',
-                        'description' => 'ID (cli-001) ou nome da clínica para detalhe.',
+                        'description' => 'ID, slug ou nome da clínica para detalhe completo.',
                     ],
                     'q' => [
                         'type' => 'string',
-                        'description' => 'Busca livre (nome, procedimento, médico, convênio).',
-                    ],
-                    'tipo' => [
-                        'type' => 'string',
-                        'description' => 'estetica | odontologica | medica_particular',
-                    ],
-                    'cidade' => [
-                        'type' => 'string',
-                        'description' => 'Cidade (ex.: Bauru).',
-                    ],
-                    'bairro' => [
-                        'type' => 'string',
-                        'description' => 'Bairro.',
-                    ],
-                    'convenio' => [
-                        'type' => 'string',
-                        'description' => 'Convênio a checar (ex.: Unimed, Amil, Particular).',
+                        'description' => 'Busca livre (nome, código ou descrição do serviço).',
                     ],
                     'procedimento' => [
                         'type' => 'string',
-                        'description' => 'Nome ou código do procedimento (ex.: limpeza, implante, botox).',
+                        'description' => 'Nome, código ou trecho da descrição do serviço (ex.: limpeza, implante, clareamento).',
                     ],
-                    'medico_disponivel' => [
+                    'codigo' => [
+                        'type' => 'string',
+                        'description' => 'Código do serviço (ex.: ODO-LIMPEZA).',
+                    ],
+                    'aceita_convenio' => [
                         'type' => 'boolean',
-                        'description' => 'Se true, só clínicas com pelo menos um médico disponível.',
+                        'description' => 'Se true, só serviços que aceitam convênio; se false, só particular.',
                     ],
                     'limite' => [
                         'type' => 'integer',
-                        'description' => 'Máximo de clínicas (1–20). Default 5.',
+                        'description' => 'Máximo de clínicas no retorno (1–20). Default 5.',
                     ],
                 ],
                 'required' => [],
@@ -77,9 +65,9 @@ class ConsultarClinicasTool implements AgentTool
 
             return [
                 'ok' => true,
-                'mock' => true,
+                'mock' => false,
                 'clinica' => $clinica,
-                'aviso' => 'Dados fictícios (mock). Confirme procedimentos, médicos e convênios só com base neste retorno.',
+                'aviso' => 'Use apenas estes serviços/procedimentos ao confirmar preços, duração ou cobertura por convênio ao lead.',
             ];
         }
 

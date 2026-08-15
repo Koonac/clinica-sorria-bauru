@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Jobs\Crm\ProcessWhatsappAiReplyJob;
+use App\Models\Clinic;
 use App\Models\Crm\Agent;
+use App\Models\Crm\ClinicService;
 use App\Models\Crm\Lead;
 use App\Models\Crm\WhatsappMessage;
 use App\Models\User;
@@ -26,34 +28,38 @@ class ClinicasApiTest extends TestCase
             'services.openrouter.agent_model' => 'openai/gpt-4o-mini',
             'services.whatsapp.url' => 'http://whatsapp.test',
         ]);
+        $this->seedClinicServices();
     }
 
-    public function test_api_clinicas_filtra_procedimento_e_convenio(): void
+    public function test_api_clinicas_filtra_procedimento(): void
     {
         Sanctum::actingAs(User::factory()->create());
 
-        $response = $this->getJson('/api/v1/crm/clinicas?tipo=odontologica&procedimento=limpeza&convenio=OdontoPrev')
+        $response = $this->getJson('/api/v1/crm/clinicas?procedimento=limpeza')
             ->assertOk()
-            ->assertJsonPath('data.mock', true);
+            ->assertJsonPath('data.mock', false);
 
         $clinicas = $response->json('data.clinicas');
         $this->assertNotEmpty($clinicas);
         foreach ($clinicas as $cli) {
-            $this->assertSame('odontologica', $cli['tipo']);
-            $this->assertTrue(collect($cli['convenios'])->contains(
-                fn ($c) => str_contains(mb_strtolower($c), 'odontoprev')
-            ));
+            $this->assertNotEmpty($cli['procedimentos']);
+            foreach ($cli['procedimentos'] as $proc) {
+                $hay = mb_strtolower(($proc['nome'] ?? '').' '.($proc['codigo'] ?? ''));
+                $this->assertTrue(str_contains($hay, 'limpeza'));
+            }
         }
     }
 
     public function test_api_clinica_detalhe(): void
     {
         Sanctum::actingAs(User::factory()->create());
+        $clinic = Clinic::query()->where('slug', 'sorria-bauru')->firstOrFail();
 
-        $this->getJson('/api/v1/crm/clinicas/cli-001')
+        $this->getJson('/api/v1/crm/clinicas/'.$clinic->id)
             ->assertOk()
-            ->assertJsonPath('data.clinica.tipo', 'estetica')
-            ->assertJsonStructure(['data' => ['clinica' => ['procedimentos', 'medicos', 'convenios']]]);
+            ->assertJsonPath('data.mock', false)
+            ->assertJsonPath('data.clinica.nome', $clinic->name)
+            ->assertJsonStructure(['data' => ['clinica' => ['procedimentos']]]);
     }
 
     public function test_tool_consultar_clinicas_via_agent(): void
@@ -71,8 +77,6 @@ class ClinicasApiTest extends TestCase
                                 'function' => [
                                     'name' => 'consultar_clinicas',
                                     'arguments' => json_encode([
-                                        'tipo' => 'odontologica',
-                                        'convenio' => 'OdontoPrev',
                                         'procedimento' => 'limpeza',
                                     ]),
                                 ],
@@ -91,7 +95,7 @@ class ClinicasApiTest extends TestCase
                                 'function' => [
                                     'name' => 'enviar_resposta',
                                     'arguments' => json_encode([
-                                        'texto' => 'Sim, atendemos limpeza com OdontoPrev. Quer agendar?',
+                                        'texto' => 'Sim, fazemos limpeza. Quer agendar?',
                                     ], JSON_UNESCAPED_UNICODE),
                                 ],
                             ]],
@@ -123,7 +127,7 @@ class ClinicasApiTest extends TestCase
             'whatsapp_jid' => '5511999990000@c.us',
             'phone_number' => '5511999990000',
             'direction' => 'inbound',
-            'body' => 'Vocês fazem limpeza com OdontoPrev?',
+            'body' => 'Vocês fazem limpeza?',
             'message_id' => 'in-cli-1',
             'type' => 'chat',
             'has_media' => false,
@@ -137,8 +141,35 @@ class ClinicasApiTest extends TestCase
         $this->assertDatabaseHas('whatsapp_messages', [
             'user_id' => $user->id,
             'direction' => 'outbound',
-            'body' => 'Sim, atendemos limpeza com OdontoPrev. Quer agendar?',
+            'body' => 'Sim, fazemos limpeza. Quer agendar?',
             'lead_id' => $lead->id,
+        ]);
+    }
+
+    private function seedClinicServices(): void
+    {
+        $clinic = $this->defaultClinic();
+
+        ClinicService::query()->create([
+            'clinic_id' => $clinic->id,
+            'code' => 'ODO-LIMPEZA',
+            'name' => 'Profilaxia / limpeza',
+            'duration_minutes' => 45,
+            'price_particular_min' => 120,
+            'price_particular_max' => 220,
+            'accepts_insurance' => true,
+            'description' => 'Limpeza dental profissional',
+        ]);
+
+        ClinicService::query()->create([
+            'clinic_id' => $clinic->id,
+            'code' => 'ODO-CLAREAM',
+            'name' => 'Clareamento dental',
+            'duration_minutes' => 90,
+            'price_particular_min' => 800,
+            'price_particular_max' => 1500,
+            'accepts_insurance' => false,
+            'description' => null,
         ]);
     }
 
