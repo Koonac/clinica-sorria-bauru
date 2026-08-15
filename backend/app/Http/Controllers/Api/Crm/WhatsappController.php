@@ -14,6 +14,7 @@ use App\Models\Crm\Lead;
 use App\Models\Crm\WhatsappConversationRead;
 use App\Models\Crm\WhatsappMessage;
 use App\Models\User;
+use App\Services\Crm\EnsureContactForLead;
 use App\Services\Crm\EnsureWhatsappAvatar;
 use App\Services\Crm\MarkWhatsappChatRead;
 use App\Services\Crm\PauseWhatsappAgentForLead;
@@ -43,6 +44,7 @@ class WhatsappController extends Controller
         private WhatsappConversationKey $conversationKey,
         private MarkWhatsappChatRead $markChatRead,
         private EnsureWhatsappAvatar $ensureAvatar,
+        private EnsureContactForLead $ensureContact,
         private ScheduleWhatsappAttendanceAutoClose $autoClose,
     ) {}
 
@@ -268,8 +270,16 @@ class WhatsappController extends Controller
             $leadsById = Lead::query()
                 ->with('owner:id,name')
                 ->whereIn('id', $leadIds)
-                ->get(['id', 'owner_id', 'whatsapp_agent_paused_at', 'whatsapp_agent_resume_at', 'whatsapp_conversation_closed_at', 'name', 'contact_id', 'whatsapp_jid'])
+                ->get(['id', 'owner_id', 'whatsapp_agent_paused_at', 'whatsapp_agent_resume_at', 'whatsapp_conversation_closed_at', 'name', 'contact_id', 'whatsapp_jid', 'email', 'mobile', 'instagram', 'organization_id', 'clinic_id'])
                 ->keyBy('id');
+
+            foreach ($leadsById as $lead) {
+                if (! $lead->contact_id && filled($lead->whatsapp_jid)) {
+                    $contact = $this->ensureContact->handle($lead);
+                    $lead->setAttribute('contact_id', $contact->id);
+                }
+            }
+
             foreach ($leadsById as $lead) {
                 if ($lead->contact_id) {
                     $contactIds[] = (int) $lead->contact_id;
@@ -806,7 +816,7 @@ class WhatsappController extends Controller
         $seen = [];
 
         foreach ($chats as $chat) {
-            if ($dispatched >= 5) {
+            if ($dispatched >= 12) {
                 break;
             }
 

@@ -11,6 +11,7 @@ import WhatsappLeadSidebar from '@/components/whatsapp/WhatsappLeadSidebar.vue'
 import WhatsappThread from '@/components/whatsapp/WhatsappThread.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useClinicsStore } from '@/stores/clinics'
+import { playTransferSound, unlockTransferSound } from '@/utils/playTransferSound'
 
 const auth = useAuthStore()
 const clinics = useClinicsStore()
@@ -31,6 +32,43 @@ const actionBusy = ref(false)
 const errorMessage = ref('')
 let listPoll: ReturnType<typeof setInterval> | null = null
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
+/** conversation_key/jid → last known owner_id (null = sem dono) */
+const knownOwners = new Map<string, number | null>()
+let ownersPrimed = false
+
+function chatKey(chat: WhatsappChat): string {
+  return chat.conversation_key || chat.whatsapp_jid
+}
+
+function rememberOwnerLocally(chat: WhatsappChat, ownerId: number | null) {
+  knownOwners.set(chatKey(chat), ownerId)
+}
+
+function detectIncomingTransfers(next: WhatsappChat[]) {
+  const myId = auth.user?.id
+  if (!myId || !ownersPrimed) {
+    for (const chat of next) {
+      knownOwners.set(chatKey(chat), chat.owner_id ?? null)
+    }
+    ownersPrimed = true
+    return
+  }
+
+  let shouldPlay = false
+  for (const chat of next) {
+    const key = chatKey(chat)
+    const nextOwner = chat.owner_id ?? null
+    const hadKey = knownOwners.has(key)
+    const prevOwner = knownOwners.get(key) ?? null
+
+    if (nextOwner === myId && (!hadKey || prevOwner !== myId)) {
+      shouldPlay = true
+    }
+    knownOwners.set(key, nextOwner)
+  }
+
+  if (shouldPlay) playTransferSound()
+}
 
 function syncSelected(next: WhatsappChat[]) {
   if (!selected.value) return
@@ -57,6 +95,7 @@ async function loadChats(silent = false) {
       limit,
       offset: 0,
     })
+    detectIncomingTransfers(page.data)
     chats.value = page.data
     hasMore.value = page.has_more
     syncSelected(page.data)
@@ -133,6 +172,7 @@ async function assumeChat() {
   actionBusy.value = true
   errorMessage.value = ''
   try {
+    rememberOwnerLocally(selected.value, auth.user.id)
     const lead = await updateLead(selected.value.lead_id, { owner_id: auth.user.id })
     selected.value = {
       ...selected.value,
@@ -155,6 +195,7 @@ async function transferChat(ownerId: number) {
   actionBusy.value = true
   errorMessage.value = ''
   try {
+    rememberOwnerLocally(selected.value, ownerId)
     const lead = await updateLead(selected.value.lead_id, { owner_id: ownerId })
     const attendant = attendants.value.find((a) => a.id === ownerId)
     selected.value = {
@@ -260,6 +301,7 @@ function onSent() {
 
 function onThreadAssumed(ownerId: number) {
   if (!selected.value || !auth.user) return
+  rememberOwnerLocally(selected.value, ownerId)
   selected.value = {
     ...selected.value,
     owner_id: ownerId,
@@ -287,7 +329,13 @@ function stopListPoll() {
   }
 }
 
+function onPointerUnlock() {
+  void unlockTransferSound()
+}
+
 watch(filter, () => {
+  knownOwners.clear()
+  ownersPrimed = false
   void loadChats()
 })
 
@@ -303,6 +351,8 @@ watch(
   () => {
     selected.value = null
     leadSidebarOpen.value = false
+    knownOwners.clear()
+    ownersPrimed = false
     void loadChats()
     void loadAttendants()
   },
@@ -312,11 +362,13 @@ onMounted(() => {
   void loadChats()
   void loadAttendants()
   startListPoll()
+  window.addEventListener('pointerdown', onPointerUnlock, { once: true })
 })
 
 onUnmounted(() => {
   stopListPoll()
   if (searchDebounce) clearTimeout(searchDebounce)
+  window.removeEventListener('pointerdown', onPointerUnlock)
 })
 </script>
 

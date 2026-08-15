@@ -3,6 +3,7 @@ import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { CrmAttendant, WhatsappChat } from '@/api/crm/types'
 import Button from '@/components/Buttons/Button.vue'
+import WhatsappAvatar from '@/components/whatsapp/WhatsappAvatar.vue'
 import { useAuthStore } from '@/stores/auth'
 import { formatDateTime } from '@/utils/crmFormat'
 
@@ -121,7 +122,13 @@ function toggleAgent() {
 
 <template>
   <header class="flex shrink-0 flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 px-4 py-3">
-    <div class="min-w-0 flex-1">
+    <div class="flex min-w-0 flex-1 items-start gap-3">
+      <WhatsappAvatar
+        :src="chat.avatar_url"
+        :label="title"
+        size-class="mt-0.5 size-11 text-base"
+      />
+      <div class="min-w-0 flex-1">
       <input
         v-if="editingName"
         ref="nameInput"
@@ -159,6 +166,7 @@ function toggleAgent() {
         <template v-else>Sem lead vinculado</template>
         <template v-if="agentResumeLabel"> · {{ agentResumeLabel }}</template>
       </p>
+      </div>
     </div>
 
     <div class="flex flex-wrap items-center gap-1.5">

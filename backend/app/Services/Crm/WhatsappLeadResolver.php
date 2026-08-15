@@ -91,6 +91,11 @@ class WhatsappLeadResolver
                 $contact->update(['whatsapp_jid' => $jid]);
             }
 
+            if ($lead && ! $lead->contact_id) {
+                $contact = $this->ensureContact->handle($lead->fresh() ?? $lead);
+                $lead = $lead->fresh() ?? $lead;
+            }
+
             $contact = $contact ?? $lead?->contact ?? $deal?->contact;
             $this->applyDisplayName($lead, $deal, $contact, $name, $phone, $jid);
 

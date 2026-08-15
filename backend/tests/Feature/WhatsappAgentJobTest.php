@@ -284,12 +284,17 @@ class WhatsappAgentJobTest extends TestCase
 
         [$user, $connection] = $this->userConectado();
         $this->agentAtivo($user);
+        $funcionario = User::factory()->create([
+            'clinic_id' => $connection->clinic_id,
+            'role' => User::ROLE_FUNCIONARIO,
+            'name' => 'Atendente Teste',
+        ]);
         $lead = Lead::create([
             'title' => 'L',
             'name' => 'Ana',
             'mobile' => '5511999990000',
             'whatsapp_jid' => '5511999990000@c.us',
-            'owner_id' => $user->id,
+            'owner_id' => null,
             'stage_id' => PipelineStage::ofKind('lead')->orderBy('position')->value('id'),
         ]);
         $this->inbound($user, $connection, $lead, 'Quero falar com alguém');
@@ -299,8 +304,13 @@ class WhatsappAgentJobTest extends TestCase
 
         $lead->refresh();
         $this->assertSame((int) $stage->id, (int) $lead->stage_id);
+        $this->assertSame((int) $funcionario->id, (int) $lead->owner_id);
         $this->assertNotNull($lead->whatsapp_agent_paused_at);
         $this->assertNotNull($lead->whatsapp_agent_resume_at);
+        $this->assertDatabaseHas('activities', [
+            'lead_id' => $lead->id,
+            'subject' => 'Agent escalou para humano',
+        ]);
     }
 
     public function test_criar_agendamento_cria_task_e_evento_google(): void
