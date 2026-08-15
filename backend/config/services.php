@@ -41,7 +41,7 @@ return [
 
     'openrouter' => [
         'key' => env('OPENROUTER_API_KEY'),
-        'agent_model' => env('OPENROUTER_AGENT_MODEL', 'deepseek/deepseek-v4-flash-0731'),
+        'agent_model' => env('OPENROUTER_AGENT_MODEL', 'deepseek/deepseek-v4-pro'),
     ],
 
     'google_calendar' => [
@@ -57,4 +57,3 @@ return [
     ],
 
 ];
-

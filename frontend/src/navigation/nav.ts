@@ -13,8 +13,8 @@ export type NavItem = {
 export const NAV_ITEMS: NavItem[] = [
   {
     name: 'home',
-    label: 'Início',
-    icon: 'lucide:home',
+    label: 'Dashboard',
+    icon: 'lucide:layout-dashboard',
     to: { name: 'home' },
     roles: ['admin'],
   },

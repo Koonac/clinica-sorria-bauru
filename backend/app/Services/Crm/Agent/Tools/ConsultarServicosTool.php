@@ -4,37 +4,37 @@ namespace App\Services\Crm\Agent\Tools;
 
 use App\Services\Crm\Agent\AgentContext;
 use App\Services\Crm\Agent\AgentTool;
-use App\Services\Crm\ClinicaCatalog;
+use App\Services\Crm\ClinicServiceCatalog;
 use RuntimeException;
 
-class ConsultarClinicasTool implements AgentTool
+class ConsultarServicosTool implements AgentTool
 {
-    public function __construct(private ClinicaCatalog $catalog) {}
+    public function __construct(private ClinicServiceCatalog $catalog) {}
 
     public function name(): string
     {
-        return 'consultar_clinicas';
+        return 'consultar_servicos';
     }
 
     public function schema(): array
     {
         return [
             'name' => $this->name(),
-            'description' => 'Consulta os serviços/procedimentos cadastrados da clínica atual (nome, código, duração, preço particular, se aceita convênio e descrição). Use ANTES de confirmar qualquer procedimento, preço ou cobertura por convênio ao lead.',
+            'description' => 'Consulta os serviços/procedimentos cadastrados da clínica deste atendimento (nome, código, duração, preço particular, se aceita convênio e descrição). A clínica já é conhecida pelo contexto do lead — não precisa escolher clínica. Use ANTES de confirmar qualquer procedimento, preço ou cobertura por convênio.',
             'parameters' => [
                 'type' => 'object',
                 'properties' => [
                     'id' => [
                         'type' => 'string',
-                        'description' => 'ID, slug ou nome da clínica para detalhe completo.',
+                        'description' => 'ID numérico ou código exato do serviço para detalhe.',
                     ],
                     'q' => [
                         'type' => 'string',
-                        'description' => 'Busca livre (nome, código ou descrição do serviço).',
+                        'description' => 'Busca livre (nome, código ou descrição).',
                     ],
-                    'procedimento' => [
+                    'nome' => [
                         'type' => 'string',
-                        'description' => 'Nome, código ou trecho da descrição do serviço (ex.: limpeza, implante, clareamento).',
+                        'description' => 'Nome ou trecho do serviço (ex.: limpeza, implante, clareamento).',
                     ],
                     'codigo' => [
                         'type' => 'string',
@@ -46,7 +46,7 @@ class ConsultarClinicasTool implements AgentTool
                     ],
                     'limite' => [
                         'type' => 'integer',
-                        'description' => 'Máximo de clínicas no retorno (1–20). Default 5.',
+                        'description' => 'Máximo de serviços (1–50). Default 20.',
                     ],
                 ],
                 'required' => [],
@@ -58,16 +58,15 @@ class ConsultarClinicasTool implements AgentTool
     {
         $id = trim((string) ($arguments['id'] ?? ''));
         if ($id !== '') {
-            $clinica = $this->catalog->find($id);
-            if (! $clinica) {
-                throw new RuntimeException("Clínica não encontrada: {$id}");
+            $servico = $this->catalog->find($id);
+            if (! $servico) {
+                throw new RuntimeException("Serviço não encontrado: {$id}");
             }
 
             return [
                 'ok' => true,
-                'mock' => false,
-                'clinica' => $clinica,
-                'aviso' => 'Use apenas estes serviços/procedimentos ao confirmar preços, duração ou cobertura por convênio ao lead.',
+                'servico' => $servico,
+                'aviso' => 'Use apenas estes dados ao confirmar preço, duração ou cobertura por convênio ao lead.',
             ];
         }
 

@@ -6,7 +6,6 @@ use App\Http\Controllers\Api\Crm\ActivityController;
 use App\Http\Controllers\Api\Crm\AgentController;
 use App\Http\Controllers\Api\Crm\AttendantController;
 use App\Http\Controllers\Api\Crm\ClinicController;
-use App\Http\Controllers\Api\Crm\ClinicaController;
 use App\Http\Controllers\Api\Crm\ClinicServiceController;
 use App\Http\Controllers\Api\Crm\ConnectionController;
 use App\Http\Controllers\Api\Crm\ContactController;
@@ -90,9 +89,6 @@ Route::prefix('v1/crm')->middleware(['auth:sanctum', 'clinic'])->group(function 
     Route::patch('pipeline-stages/{pipelineStage}', [PipelineStageController::class, 'update']);
     Route::delete('pipeline-stages/{pipelineStage}', [PipelineStageController::class, 'destroy']);
     Route::get('sources', [SourceController::class, 'index']);
-
-    Route::get('clinicas', [ClinicaController::class, 'index']);
-    Route::get('clinicas/{clinica}', [ClinicaController::class, 'show']);
 
     Route::get('services', [ClinicServiceController::class, 'index']);
     Route::post('services', [ClinicServiceController::class, 'store']);

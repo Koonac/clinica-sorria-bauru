@@ -77,7 +77,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <PageView title="Início">
+  <PageView title="Dashboard">
     <template v-if="auth.isAdmin" #actions>
       <Button variant="secondary" icon="lucide:refresh-cw" @click="loadDashboard">
         Atualizar

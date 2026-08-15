@@ -17,10 +17,10 @@ class ClinicServiceController extends Controller
 
         $q = trim((string) $request->query('q', ''));
         if ($q !== '') {
-            $like = '%'.$q.'%';
+            $like = '%'.mb_strtolower($q).'%';
             $query->where(function ($builder) use ($like) {
-                $builder->where('code', 'ilike', $like)
-                    ->orWhere('name', 'ilike', $like);
+                $builder->whereRaw('LOWER(code) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(name) LIKE ?', [$like]);
             });
         }
 

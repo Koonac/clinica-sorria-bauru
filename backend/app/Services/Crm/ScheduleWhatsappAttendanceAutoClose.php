@@ -17,12 +17,20 @@ class ScheduleWhatsappAttendanceAutoClose
         }
 
         $minutes = max(1, min(1440, (int) ($connection->whatsapp_attendance_auto_close_minutes ?? 10)));
+        $closesAt = now()->addMinutes($minutes);
 
-        $lead->forceFill([
-            'whatsapp_auto_close_at' => now()->addMinutes($minutes),
-        ])->save();
+        // Update direto evita falha silenciosa por global scope / instância stale no queue worker.
+        Lead::withoutGlobalScopes()
+            ->whereKey($lead->id)
+            ->whereNull('whatsapp_conversation_closed_at')
+            ->update([
+                'whatsapp_auto_close_at' => $closesAt,
+                'updated_at' => now(),
+            ]);
 
-        return $lead->fresh() ?? $lead;
+        $lead->whatsapp_auto_close_at = $closesAt;
+
+        return $lead;
     }
 
     /**
@@ -34,10 +42,15 @@ class ScheduleWhatsappAttendanceAutoClose
             return $lead;
         }
 
-        $lead->forceFill([
-            'whatsapp_auto_close_at' => null,
-        ])->save();
+        Lead::withoutGlobalScopes()
+            ->whereKey($lead->id)
+            ->update([
+                'whatsapp_auto_close_at' => null,
+                'updated_at' => now(),
+            ]);
 
-        return $lead->fresh() ?? $lead;
+        $lead->whatsapp_auto_close_at = null;
+
+        return $lead;
     }
 }

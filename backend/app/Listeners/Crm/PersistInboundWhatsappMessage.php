@@ -29,8 +29,11 @@ class PersistInboundWhatsappMessage
             return;
         }
 
-        if ($message->direction === 'outbound' && $message->lead_id) {
+        if ($message->direction === 'outbound') {
             $lead = $message->lead;
+            if (! $lead && $message->lead_id) {
+                $lead = \App\Models\Crm\Lead::withoutGlobalScopes()->find($message->lead_id);
+            }
             $user = $event->connection->created_by
                 ? User::query()->find($event->connection->created_by)
                 : null;
@@ -43,6 +46,9 @@ class PersistInboundWhatsappMessage
                     $event->connection,
                     is_string($message->body) ? mb_substr($message->body, 0, 500) : null,
                 );
+            }
+
+            if ($lead) {
                 $this->autoClose->handle($lead->fresh() ?? $lead, $event->connection);
             }
         }

@@ -62,7 +62,7 @@ class Agent extends Model
 
     public function resolvedModel(): string
     {
-        return (string) config('services.openrouter.agent_model', 'deepseek/deepseek-v4-flash-0731');
+        return (string) config('services.openrouter.agent_model', 'deepseek/deepseek-v4-pro');
     }
 
     public function canActivate(): bool

@@ -33,7 +33,7 @@ const router = createRouter({
           path: '',
           name: 'home',
           component: () => import('@/views/HomeView.vue'),
-          meta: { requiresAuth: true, roles: ['admin'], title: 'Início', icon: 'lucide:home' },
+          meta: { requiresAuth: true, roles: ['admin'], title: 'Dashboard', icon: 'lucide:layout-dashboard' },
         },
         {
           path: 'crm',

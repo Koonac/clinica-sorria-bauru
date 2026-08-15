@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Jobs\Crm\ProcessWhatsappAiReplyJob;
-use App\Models\Clinic;
 use App\Models\Crm\Agent;
 use App\Models\Crm\ClinicService;
 use App\Models\Crm\Lead;
@@ -15,7 +14,7 @@ use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
-class ClinicasApiTest extends TestCase
+class ClinicServicesCatalogTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -31,38 +30,22 @@ class ClinicasApiTest extends TestCase
         $this->seedClinicServices();
     }
 
-    public function test_api_clinicas_filtra_procedimento(): void
+    public function test_api_services_filtra_por_nome(): void
     {
         Sanctum::actingAs(User::factory()->create());
 
-        $response = $this->getJson('/api/v1/crm/clinicas?procedimento=limpeza')
-            ->assertOk()
-            ->assertJsonPath('data.mock', false);
+        $response = $this->getJson('/api/v1/crm/services?q=limpeza')
+            ->assertOk();
 
-        $clinicas = $response->json('data.clinicas');
-        $this->assertNotEmpty($clinicas);
-        foreach ($clinicas as $cli) {
-            $this->assertNotEmpty($cli['procedimentos']);
-            foreach ($cli['procedimentos'] as $proc) {
-                $hay = mb_strtolower(($proc['nome'] ?? '').' '.($proc['codigo'] ?? ''));
-                $this->assertTrue(str_contains($hay, 'limpeza'));
-            }
+        $services = $response->json('data');
+        $this->assertNotEmpty($services);
+        foreach ($services as $service) {
+            $hay = mb_strtolower(($service['name'] ?? '').' '.($service['code'] ?? ''));
+            $this->assertTrue(str_contains($hay, 'limpeza'));
         }
     }
 
-    public function test_api_clinica_detalhe(): void
-    {
-        Sanctum::actingAs(User::factory()->create());
-        $clinic = Clinic::query()->where('slug', 'sorria-bauru')->firstOrFail();
-
-        $this->getJson('/api/v1/crm/clinicas/'.$clinic->id)
-            ->assertOk()
-            ->assertJsonPath('data.mock', false)
-            ->assertJsonPath('data.clinica.nome', $clinic->name)
-            ->assertJsonStructure(['data' => ['clinica' => ['procedimentos']]]);
-    }
-
-    public function test_tool_consultar_clinicas_via_agent(): void
+    public function test_tool_consultar_servicos_via_agent(): void
     {
         Http::fake([
             'openrouter.ai/*' => Http::sequence()
@@ -72,12 +55,12 @@ class ClinicasApiTest extends TestCase
                             'role' => 'assistant',
                             'content' => null,
                             'tool_calls' => [[
-                                'id' => 'call_cli',
+                                'id' => 'call_svc',
                                 'type' => 'function',
                                 'function' => [
-                                    'name' => 'consultar_clinicas',
+                                    'name' => 'consultar_servicos',
                                     'arguments' => json_encode([
-                                        'procedimento' => 'limpeza',
+                                        'nome' => 'limpeza',
                                     ]),
                                 ],
                             ]],
@@ -114,7 +97,7 @@ class ClinicasApiTest extends TestCase
             'whatsapp.test/*' => Http::response([
                 'success' => true,
                 'to' => '5511999990000@c.us',
-                'messageId' => 'out-cli',
+                'messageId' => 'out-svc',
             ], 200),
         ]);
 
@@ -128,7 +111,7 @@ class ClinicasApiTest extends TestCase
             'phone_number' => '5511999990000',
             'direction' => 'inbound',
             'body' => 'Vocês fazem limpeza?',
-            'message_id' => 'in-cli-1',
+            'message_id' => 'in-svc-1',
             'type' => 'chat',
             'has_media' => false,
             'lead_id' => $lead->id,

@@ -211,19 +211,6 @@ onBeforeUnmount(() => {
     <ContentSkeleton v-if="loading" variant="dashboard" />
 
     <template v-else>
-      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <article
-          v-for="kpi in kpis"
-          :key="kpi.label"
-          class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-4"
-        >
-          <p class="text-[0.7rem] font-medium tracking-wider text-brand-ink/45 uppercase">
-            {{ kpi.label }}
-          </p>
-          <p class="mt-2 text-xl font-semibold text-brand-ink">{{ kpi.value }}</p>
-        </article>
-      </div>
-
       <section v-if="attendance" class="space-y-3">
         <h3 class="text-sm font-semibold text-brand-ink">
           Tempo de atendimento
@@ -297,6 +284,19 @@ onBeforeUnmount(() => {
           </table>
         </div>
       </section>
+
+      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <article
+          v-for="kpi in kpis"
+          :key="kpi.label"
+          class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-4"
+        >
+          <p class="text-[0.7rem] font-medium tracking-wider text-brand-ink/45 uppercase">
+            {{ kpi.label }}
+          </p>
+          <p class="mt-2 text-xl font-semibold text-brand-ink">{{ kpi.value }}</p>
+        </article>
+      </div>
 
       <div class="grid gap-4 lg:grid-cols-2">
         <section class="rounded-2xl border border-brand-ink/10 bg-white p-4">

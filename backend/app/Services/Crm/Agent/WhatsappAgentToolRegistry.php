@@ -2,7 +2,7 @@
 
 namespace App\Services\Crm\Agent;
 
-use App\Services\Crm\Agent\Tools\ConsultarClinicasTool;
+use App\Services\Crm\Agent\Tools\ConsultarServicosTool;
 use App\Services\Crm\Agent\Tools\CriarAgendamentoTool;
 use App\Services\Crm\Agent\Tools\EnviarRespostaTool;
 use App\Services\Crm\Agent\Tools\EscalarHumanoTool;
@@ -22,7 +22,7 @@ class WhatsappAgentToolRegistry
         MoverLeadTool $mover,
         CriarAgendamentoTool $agendar,
         ListarHorariosDisponiveisTool $horarios,
-        ConsultarClinicasTool $clinicas,
+        ConsultarServicosTool $servicos,
         EscalarHumanoTool $escalar,
         FinalizarAtendimentoTool $finalizar,
     ) {
@@ -31,7 +31,7 @@ class WhatsappAgentToolRegistry
             $mover->name() => $mover,
             $agendar->name() => $agendar,
             $horarios->name() => $horarios,
-            $clinicas->name() => $clinicas,
+            $servicos->name() => $servicos,
             $escalar->name() => $escalar,
             $finalizar->name() => $finalizar,
         ];

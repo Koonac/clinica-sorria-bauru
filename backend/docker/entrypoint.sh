@@ -46,6 +46,12 @@ if [ "$ROLE" = "queue" ]; then
   exec php artisan queue:work --timeout=21600 --tries=1 --sleep=1 --max-time=3600
 fi
 
+if [ "$ROLE" = "scheduler" ]; then
+  echo "==> [backend] scheduler"
+  php artisan config:cache
+  exec php artisan schedule:work
+fi
+
 echo "==> [backend] migrate + cache"
 php artisan migrate --force
 php artisan config:cache
