@@ -21,6 +21,7 @@ class Connection extends Model
     protected $fillable = [
         'clinic_id',
         'name',
+        'ai_display_name',
         'api_username',
         'api_password',
         'session_id',
@@ -72,6 +73,7 @@ class Connection extends Model
             'id' => $this->id,
             'clinic_id' => $this->clinic_id,
             'name' => $this->name,
+            'ai_display_name' => $this->ai_display_name,
             'status' => $this->status,
             'phone' => $this->phone,
             'is_business' => (bool) $this->is_business,

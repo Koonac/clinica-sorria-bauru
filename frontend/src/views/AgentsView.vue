@@ -14,6 +14,32 @@ import Button from '@/components/Buttons/Button.vue'
 import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
 import PageView from '@/components/Layout/PageView.vue'
 
+const AGENT_ICONS = [
+  'lucide:bot',
+  'lucide:sparkles',
+  'lucide:message-circle',
+  'lucide:cpu',
+  'lucide:zap',
+  'lucide:brain',
+  'lucide:headset',
+  'lucide:radio',
+  'lucide:orbit',
+  'lucide:wand-sparkles',
+  'lucide:fingerprint',
+  'lucide:shield',
+] as const
+
+const AGENT_ICON_STYLES = [
+  'bg-brand-blue/15 text-brand-blue',
+  'bg-brand-cyan/20 text-brand-cyan-ink',
+  'bg-emerald-100 text-emerald-700',
+  'bg-amber-100 text-amber-700',
+  'bg-rose-100 text-rose-700',
+  'bg-sky-100 text-sky-700',
+  'bg-orange-100 text-orange-700',
+  'bg-teal-100 text-teal-700',
+] as const
+
 const route = useRoute()
 const router = useRouter()
 
@@ -32,6 +58,19 @@ const totalLabel = computed(() => {
   return n === 1 ? '1 agent' : `${n} agents`
 })
 
+function pickIndex(id: number, size: number) {
+  const hash = Math.abs((id * 2654435761) >>> 0)
+  return hash % size
+}
+
+function agentIcon(agent: Agent) {
+  return AGENT_ICONS[pickIndex(agent.id, AGENT_ICONS.length)]!
+}
+
+function agentIconStyle(agent: Agent) {
+  return AGENT_ICON_STYLES[pickIndex(agent.id * 17 + 3, AGENT_ICON_STYLES.length)]!
+}
+
 function openCreate() {
   void router.push({ name: 'agents-create' })
 }
@@ -40,7 +79,8 @@ function openEdit(agent: Agent) {
   void router.push({ name: 'agents-edit', params: { id: String(agent.id) } })
 }
 
-function askDelete(agent: Agent) {
+function askDelete(agent: Agent, event: Event) {
+  event.stopPropagation()
   deletingAgent.value = agent
   deleteError.value = ''
 }
@@ -55,6 +95,13 @@ function onDeleteKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape' && deletingAgent.value) {
     event.preventDefault()
     closeDelete()
+  }
+}
+
+function onCardKeydown(agent: Agent, event: KeyboardEvent) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    openEdit(agent)
   }
 }
 
@@ -94,7 +141,8 @@ async function loadAgents() {
   }
 }
 
-async function toggleActive(agent: Agent) {
+async function toggleActive(agent: Agent, event: Event) {
+  event.stopPropagation()
   if (actionId.value != null) return
 
   actionId.value = agent.id
@@ -195,81 +243,76 @@ onUnmounted(() => {
       {{ listError }}
     </p>
 
-    <ContentSkeleton v-else-if="loading && agents.length === 0" variant="table" :rows="6" />
+    <ContentSkeleton v-else-if="loading && agents.length === 0" variant="cards" :rows="6" />
 
     <p v-else-if="!loading && agents.length === 0" class="text-sm text-brand-ink/55">
       Nenhum agent cadastrado. Crie um para atender leads no WhatsApp.
     </p>
 
-    <div v-else class="min-h-0 flex-1 overflow-auto">
-      <table class="w-full min-w-[640px] border-collapse text-left text-sm">
-        <thead class="sticky top-0 bg-[#f4f6f8] text-brand-ink/55">
-          <tr class="border-b border-brand-ink/10">
-            <th class="px-4 py-3 font-medium">Nome</th>
-            <th class="px-4 py-3 font-medium">Debounce</th>
-            <th class="px-4 py-3 font-medium">Status</th>
-            <th class="px-4 py-3 font-medium text-right">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="agent in agents"
-            :key="agent.id"
-            class="border-b border-brand-ink/5 transition hover:bg-white/70"
+    <div
+      v-else
+      class="grid min-h-0 flex-1 content-start gap-4 overflow-auto sm:grid-cols-2 xl:grid-cols-3"
+    >
+      <article
+        v-for="agent in agents"
+        :key="agent.id"
+        role="button"
+        tabindex="0"
+        class="group flex cursor-pointer flex-col rounded-2xl border border-brand-ink/10 bg-white p-5 text-left transition hover:-translate-y-0.5 hover:border-brand-ink/20 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue"
+        :aria-label="`Abrir agent ${agent.name}`"
+        @click="openEdit(agent)"
+        @keydown="onCardKeydown(agent, $event)"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <span
+            class="inline-flex size-14 items-center justify-center rounded-2xl"
+            :class="agentIconStyle(agent)"
           >
-            <td class="px-4 py-3 font-medium text-brand-ink">{{ agent.name }}</td>
-            <td class="px-4 py-3 text-brand-ink/80">{{ agent.debounce_seconds }}s</td>
-            <td class="px-4 py-3">
-              <span
-                class="inline-flex rounded-lg px-2 py-1 text-xs font-medium"
-                :class="
-                  agent.is_active
-                    ? 'bg-brand-cyan/15 text-brand-cyan-ink'
-                    : 'bg-brand-ink/5 text-brand-ink/70'
-                "
-              >
-                {{ agent.is_active ? 'Ativo' : 'Inativo' }}
-              </span>
-            </td>
-            <td class="px-4 py-3">
-              <div class="flex items-center justify-end gap-1.5">
-                <button
-                  type="button"
-                  class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg border border-brand-ink/10 bg-white text-brand-ink/60 transition hover:border-brand-ink/20 hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-40"
-                  :title="agent.is_active ? 'Desativar' : 'Ativar'"
-                  :aria-label="agent.is_active ? 'Desativar agent' : 'Ativar agent'"
-                  :disabled="actionId === agent.id"
-                  @click="toggleActive(agent)"
-                >
-                  <Icon
-                    :icon="agent.is_active ? 'lucide:pause' : 'lucide:play'"
-                    class="size-4"
-                    aria-hidden="true"
-                  />
-                </button>
-                <button
-                  type="button"
-                  class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg border border-brand-ink/10 bg-white text-brand-ink/60 transition hover:border-brand-ink/20 hover:text-brand-ink"
-                  title="Editar"
-                  aria-label="Editar agent"
-                  @click="openEdit(agent)"
-                >
-                  <Icon icon="lucide:pencil" class="size-4" aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg border border-brand-ink/10 bg-white text-brand-ink/60 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
-                  title="Excluir"
-                  aria-label="Excluir agent"
-                  @click="askDelete(agent)"
-                >
-                  <Icon icon="lucide:trash-2" class="size-4" aria-hidden="true" />
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            <Icon :icon="agentIcon(agent)" class="size-7" aria-hidden="true" />
+          </span>
+          <span
+            class="inline-flex rounded-lg px-2 py-1 text-xs font-medium"
+            :class="
+              agent.is_active
+                ? 'bg-brand-cyan/15 text-brand-cyan-ink'
+                : 'bg-brand-ink/5 text-brand-ink/70'
+            "
+          >
+            {{ agent.is_active ? 'Ativo' : 'Inativo' }}
+          </span>
+        </div>
+
+        <h2 class="mt-4 text-base font-semibold tracking-tight text-brand-ink">
+          {{ agent.name }}
+        </h2>
+        <p class="mt-1 text-sm text-brand-ink/55">Debounce {{ agent.debounce_seconds }}s</p>
+
+        <div class="mt-5 flex items-center gap-1.5 border-t border-brand-ink/8 pt-4">
+          <button
+            type="button"
+            class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg border border-brand-ink/10 bg-white text-brand-ink/60 transition hover:border-brand-ink/20 hover:text-brand-ink disabled:cursor-not-allowed disabled:opacity-40"
+            :title="agent.is_active ? 'Desativar' : 'Ativar'"
+            :aria-label="agent.is_active ? 'Desativar agent' : 'Ativar agent'"
+            :disabled="actionId === agent.id"
+            @click="toggleActive(agent, $event)"
+          >
+            <Icon
+              :icon="agent.is_active ? 'lucide:pause' : 'lucide:play'"
+              class="size-4"
+              aria-hidden="true"
+            />
+          </button>
+          <button
+            type="button"
+            class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg border border-brand-ink/10 bg-white text-brand-ink/60 transition hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+            title="Excluir"
+            aria-label="Excluir agent"
+            @click="askDelete(agent, $event)"
+          >
+            <Icon icon="lucide:trash-2" class="size-4" aria-hidden="true" />
+          </button>
+        </div>
+      </article>
     </div>
 
     <Teleport to="body">

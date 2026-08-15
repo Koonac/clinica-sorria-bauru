@@ -255,6 +255,16 @@ function onSent() {
   void loadChats(true)
 }
 
+function onThreadAssumed(ownerId: number) {
+  if (!selected.value || !auth.user) return
+  selected.value = {
+    ...selected.value,
+    owner_id: ownerId,
+    owner_name: auth.user.name,
+  }
+  void loadChats(true)
+}
+
 function toggleLeadSidebar() {
   if (!selected.value?.lead_id) return
   leadSidebarOpen.value = !leadSidebarOpen.value
@@ -352,8 +362,11 @@ onUnmounted(() => {
                 :lead-id="selected.lead_id"
                 :deal-id="selected.deal_id"
                 :contact-name="selected.contact_name"
+                :owner-id="selected.owner_id"
+                :owner-name="selected.owner_name"
                 :poll-ms="3000"
                 @sent="onSent"
+                @assumed="onThreadAssumed"
                 @error="errorMessage = $event"
               />
             </div>

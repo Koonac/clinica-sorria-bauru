@@ -11,6 +11,7 @@ class UpdateConnectionSettingsRequest extends FormRequest
     {
         return [
             'name' => ['sometimes', 'nullable', 'string', 'max:120'],
+            'ai_display_name' => ['sometimes', 'nullable', 'string', 'max:120'],
             'default_lead_stage_id' => [
                 'nullable',
                 'integer',

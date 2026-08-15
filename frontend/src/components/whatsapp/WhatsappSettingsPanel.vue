@@ -33,6 +33,7 @@ const credentials = ref({
 
 const settings = ref({
   name: '',
+  ai_display_name: '',
   default_lead_stage_id: '' as string | number,
   whatsapp_agent_auto_resume_hours: 24,
 })
@@ -77,6 +78,7 @@ function applyConnection(next: ClinicConnection) {
   connection.value = next
   credentials.value.api_username = next.api_username ?? ''
   settings.value.name = next.name ?? ''
+  settings.value.ai_display_name = next.ai_display_name ?? ''
   settings.value.default_lead_stage_id = next.default_lead_stage_id
     ? String(next.default_lead_stage_id)
     : ''
@@ -167,6 +169,7 @@ async function saveSettings() {
     const stageId = settings.value.default_lead_stage_id
     const next = await updateConnectionSettings({
       name: settings.value.name.trim() || null,
+      ai_display_name: settings.value.ai_display_name.trim() || null,
       default_lead_stage_id: stageId === '' ? null : Number(stageId),
       whatsapp_agent_auto_resume_hours: Number(settings.value.whatsapp_agent_auto_resume_hours),
     })
@@ -309,6 +312,19 @@ onMounted(() => {
           <label class="flex flex-col gap-1.5">
             <span class="text-sm font-medium text-brand-ink/80">Nome da conexão</span>
             <input v-model="settings.name" type="text" maxlength="120" :class="inputClass" />
+          </label>
+          <label class="flex flex-col gap-1.5">
+            <span class="text-sm font-medium text-brand-ink/80">Nome da IA</span>
+            <input
+              v-model="settings.ai_display_name"
+              type="text"
+              maxlength="120"
+              placeholder="Ex.: Assistente Sorria"
+              :class="inputClass"
+            />
+            <span class="text-xs text-brand-ink/45">
+              Aparece no início das mensagens enviadas pelo Agent IA.
+            </span>
           </label>
           <label class="flex flex-col gap-1.5">
             <span class="text-sm font-medium text-brand-ink/80">Estágio padrão do lead</span>

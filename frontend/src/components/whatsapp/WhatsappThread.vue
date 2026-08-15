@@ -5,11 +5,15 @@ import { Picker, EmojiIndex } from 'emoji-mart-vue-fast/src'
 import data from 'emoji-mart-vue-fast/data/all.json'
 import 'emoji-mart-vue-fast/css/emoji-mart.css'
 import { ApiError } from '@/api/client'
+import { updateLead } from '@/api/crm/leads'
 import { listWhatsappMessages, sendWhatsappMessage } from '@/api/crm/whatsapp'
 import type { WhatsappMessage } from '@/api/crm/types'
 import Button from '@/components/Buttons/Button.vue'
 import Skeleton from '@/components/Feedback/Skeleton.vue'
+import ConfirmModal from '@/components/Modals/ConfirmModal.vue'
+import { useAuthStore } from '@/stores/auth'
 import { formatDateTime, inputClass } from '@/utils/crmFormat'
+import { formatWhatsappText, whatsappSenderPrefix } from '@/utils/whatsappFormat'
 
 type SendStatus = 'pending' | 'failed'
 
@@ -23,14 +27,18 @@ const props = defineProps<{
   leadId?: number | null
   dealId?: number | null
   contactName?: string | null
+  ownerId?: number | null
+  ownerName?: string | null
   pollMs?: number
 }>()
 
 const emit = defineEmits<{
   sent: [message: WhatsappMessage]
+  assumed: [ownerId: number]
   error: [message: string]
 }>()
 
+const auth = useAuthStore()
 const emojiIndex = new EmojiIndex(data)
 
 const emojiI18n = {
@@ -58,8 +66,40 @@ const loading = ref(true)
 const showEmoji = ref(false)
 const scroller = ref<HTMLElement | null>(null)
 const composerRef = ref<HTMLElement | null>(null)
+const assumeOpen = ref(false)
+const assumeBusy = ref(false)
+const pendingBody = ref('')
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let localSeq = 0
+
+const needsAssumeConfirm = computed(() => {
+  if (!props.leadId || !auth.user?.id) return false
+  return props.ownerId !== auth.user.id
+})
+
+const assumeMessage = computed(() => {
+  if (props.ownerName) {
+    return `Este cliente está com ${props.ownerName}. Deseja assumir o atendimento antes de enviar?`
+  }
+  return 'Este cliente não está atribuído a você. Deseja assumir o atendimento antes de enviar?'
+})
+
+function formatOutboundBody(raw: string): string {
+  const name = auth.user?.name?.trim()
+  return name ? `${whatsappSenderPrefix(name)}${raw}` : raw
+}
+
+function bubbleHtml(body: string | null | undefined, hasMedia?: boolean): string {
+  const text = body || (hasMedia ? '[mídia]' : '')
+  return formatWhatsappText(text)
+}
+
+function onComposerKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Enter') return
+  if (event.shiftKey) return
+  event.preventDefault()
+  requestSend()
+}
 
 function isOutbound(direction: string): boolean {
   return direction === 'out' || direction === 'outbound'
@@ -157,12 +197,57 @@ function onDocPointerDown(event: PointerEvent) {
   }
 }
 
-async function send() {
-  if (!props.jid || !text.value.trim()) return
+function requestSend() {
+  if (!props.jid || !text.value.trim() || assumeBusy.value) return
   const body = text.value.trim()
+  if (needsAssumeConfirm.value) {
+    pendingBody.value = body
+    assumeOpen.value = true
+    return
+  }
   text.value = ''
   showEmoji.value = false
+  void deliverMessage(body)
+}
 
+async function onAssumeConfirm() {
+  if (!props.leadId || !auth.user?.id || assumeBusy.value) return
+  const body = pendingBody.value
+  if (!body) {
+    assumeOpen.value = false
+    return
+  }
+  assumeBusy.value = true
+  try {
+    await updateLead(props.leadId, { owner_id: auth.user.id })
+    emit('assumed', auth.user.id)
+    assumeOpen.value = false
+    pendingBody.value = ''
+    text.value = ''
+    showEmoji.value = false
+    await deliverMessage(body)
+  } catch (e) {
+    emit('error', e instanceof ApiError ? e.message : 'Não foi possível assumir o cliente.')
+  } finally {
+    assumeBusy.value = false
+  }
+}
+
+function onAssumeCancel() {
+  if (assumeBusy.value) return
+  const body = pendingBody.value
+  assumeOpen.value = false
+  pendingBody.value = ''
+  if (!body) return
+  text.value = ''
+  showEmoji.value = false
+  void deliverMessage(body)
+}
+
+async function deliverMessage(body: string) {
+  if (!props.jid || !body.trim()) return
+
+  const outboundBody = formatOutboundBody(body)
   const clientId = `local-${Date.now()}-${++localSeq}`
   const now = new Date().toISOString()
   const optimistic: ChatBubble = {
@@ -170,7 +255,7 @@ async function send() {
     client_id: clientId,
     send_status: 'pending',
     direction: 'outbound',
-    body,
+    body: outboundBody,
     whatsapp_jid: props.jid,
     contact_name: props.contactName,
     wa_timestamp: now,
@@ -211,6 +296,8 @@ watch(
   () => [props.jid, props.leadId, props.dealId] as const,
   () => {
     showEmoji.value = false
+    assumeOpen.value = false
+    pendingBody.value = ''
     void load().then(startPoll)
   },
   { immediate: true },
@@ -258,7 +345,10 @@ defineExpose({ reload: () => load(true) })
             m.send_status === 'pending' ? 'opacity-45' : 'opacity-100',
           ]"
         >
-          <p class="whitespace-pre-wrap">{{ m.body || (m.has_media ? '[mídia]' : '') }}</p>
+          <p
+            class="whitespace-pre-wrap break-words [&_em]:italic [&_strong]:font-semibold"
+            v-html="bubbleHtml(m.body, m.has_media)"
+          />
           <p
             class="mt-1 text-[10px]"
             :class="m.send_status === 'failed' ? 'text-red-700/80' : 'opacity-60'"
@@ -288,7 +378,7 @@ defineExpose({ reload: () => load(true) })
         />
       </div>
 
-      <form class="flex gap-2" @submit.prevent="send">
+      <form class="flex items-end gap-2" @submit.prevent="requestSend">
         <button
           type="button"
           class="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-brand-ink/10 bg-white text-brand-ink/55 transition hover:bg-[#f4f6f8] hover:text-brand-ink"
@@ -298,15 +388,28 @@ defineExpose({ reload: () => load(true) })
         >
           <Icon icon="lucide:smile" class="size-5" aria-hidden="true" />
         </button>
-        <input
+        <textarea
           v-model="text"
+          rows="1"
           placeholder="Mensagem…"
           :class="inputClass"
-          class="flex-1"
+          class="max-h-36 min-h-11 flex-1 resize-y py-2.5"
           @focus="showEmoji = false"
+          @keydown="onComposerKeydown"
         />
         <Button type="submit" icon="lucide:send">Enviar</Button>
       </form>
     </div>
+
+    <ConfirmModal
+      v-model:open="assumeOpen"
+      title="Assumir cliente?"
+      :message="assumeMessage"
+      confirm-label="Assumir e enviar"
+      cancel-label="Só enviar"
+      :busy="assumeBusy"
+      @confirm="onAssumeConfirm"
+      @cancel="onAssumeCancel"
+    />
   </div>
 </template>

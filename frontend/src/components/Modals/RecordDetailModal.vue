@@ -18,6 +18,7 @@ import Button from '@/components/Buttons/Button.vue'
 import Select from '@/components/Forms/Select.vue'
 import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
 import WhatsappThread from '@/components/whatsapp/WhatsappThread.vue'
+import { useAuthStore } from '@/stores/auth'
 import {
   formatDateTime,
   fromLocalInputValue,
@@ -42,6 +43,7 @@ const emit = defineEmits<{
   converted: []
 }>()
 
+const auth = useAuthStore()
 const sourceOptions = computed(() => [
   { value: '', label: '—' },
   ...props.sources.map((s) => ({ value: s.id, label: s.name })),
@@ -110,6 +112,19 @@ const tabs = computed(() => {
 
 function close() {
   open.value = false
+}
+
+function onChatAssumed(ownerId: number) {
+  if (props.kind === 'lead' && lead.value) {
+    lead.value = {
+      ...lead.value,
+      owner_id: ownerId,
+      owner: auth.user
+        ? { id: auth.user.id, name: auth.user.name }
+        : lead.value.owner,
+    }
+  }
+  emit('saved')
 }
 
 function onKeydown(event: KeyboardEvent) {
@@ -522,7 +537,10 @@ function activityLabel(a: Activity): string {
                 :lead-id="kind === 'lead' ? recordId : null"
                 :deal-id="kind === 'deal' ? recordId : null"
                 :contact-name="kind === 'lead' ? lead?.name : deal?.contact?.name"
+                :owner-id="kind === 'lead' ? lead?.owner_id : deal?.owner_id"
+                :owner-name="kind === 'lead' ? lead?.owner?.name : deal?.owner?.name"
                 :poll-ms="0"
+                @assumed="onChatAssumed"
                 @error="error = $event"
               />
             </div>

@@ -7,6 +7,7 @@ export type ClinicConnection = {
   id: number
   clinic_id: number
   name: string | null
+  ai_display_name: string | null
   status: ConnectionStatus
   phone: string | null
   is_business: boolean
@@ -50,6 +51,7 @@ export async function updateConnectionCredentials(payload: {
 
 export async function updateConnectionSettings(payload: {
   name?: string | null
+  ai_display_name?: string | null
   default_lead_stage_id?: number | null
   whatsapp_agent_auto_resume_hours?: number
 }): Promise<ClinicConnection> {

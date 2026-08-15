@@ -56,6 +56,9 @@ class WhatsappController extends Controller
 
         $to = trim($request->validated('to'));
         $message = trim((string) ($request->validated('message') ?? ''));
+        if ($message !== '' && filled($user->name)) {
+            $message = '*_'.trim((string) $user->name)."_*\n\n".$message;
+        }
         $contactName = $request->validated('contact_name');
         $mediaInput = $request->validated('media');
         $hasMedia = is_array($mediaInput) && filled($mediaInput['data'] ?? null);

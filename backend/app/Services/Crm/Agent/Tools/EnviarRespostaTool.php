@@ -48,6 +48,11 @@ class EnviarRespostaTool implements AgentTool
             throw new RuntimeException('WhatsApp não está conectado.');
         }
 
+        $aiName = trim((string) ($connection->ai_display_name ?? ''));
+        if ($aiName !== '') {
+            $texto = '*_'.$aiName."_*\n\n".$texto;
+        }
+
         $client = new WhatsappApiClient($connection);
         $to = $context->jid;
         $result = $client->send((string) $connection->session_id, $to, $texto);
