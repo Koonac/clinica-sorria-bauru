@@ -122,11 +122,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <PageView eyebrow="Administração" title="Usuários" :description="totalLabel">
+  <PageView title="Usuários">
     <template #actions>
       <Button icon="lucide:user-plus" @click="openCreate">Cadastrar</Button>
     </template>
 
+    <p class="shrink-0 text-sm text-brand-ink/50">{{ totalLabel }}</p>
     <p
       v-if="flash"
       class="shrink-0 rounded-xl border border-brand-cyan/35 bg-brand-cyan/10 px-3.5 py-2.5 text-sm leading-snug text-brand-ink"

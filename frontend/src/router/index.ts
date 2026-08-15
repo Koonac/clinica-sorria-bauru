@@ -38,7 +38,7 @@ const router = createRouter({
         {
           path: 'crm',
           name: 'crm',
-          component: () => import('@/views/PlaceholderView.vue'),
+          component: () => import('@/views/CrmView.vue'),
           meta: {
             requiresAuth: true,
             roles: bothRoles,
@@ -49,7 +49,7 @@ const router = createRouter({
         {
           path: 'agenda',
           name: 'agenda',
-          component: () => import('@/views/PlaceholderView.vue'),
+          component: () => import('@/views/AgendaView.vue'),
           meta: {
             requiresAuth: true,
             roles: bothRoles,

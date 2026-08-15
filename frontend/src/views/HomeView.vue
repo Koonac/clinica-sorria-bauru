@@ -12,12 +12,15 @@ const roleLabel = computed(() =>
 </script>
 
 <template>
-  <PageView eyebrow="Início" :title="`Olá, ${greetingName}`">
-    <template #description>
-      <p class="max-w-2xl text-base leading-relaxed text-brand-ink/70">
+  <PageView title="Início">
+    <div class="max-w-2xl">
+      <p class="text-xl font-semibold tracking-tight text-brand-ink">
+        Olá, {{ greetingName }}
+      </p>
+      <p class="mt-2 text-base leading-relaxed text-brand-ink/70">
         Bem-vindo ao painel da clínica. Use o menu lateral para navegar entre as seções.
       </p>
       <p class="mt-3 text-sm text-brand-ink/50">Perfil: {{ roleLabel }}</p>
-    </template>
+    </div>
   </PageView>
 </template>

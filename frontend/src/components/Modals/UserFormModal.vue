@@ -4,6 +4,7 @@ import { Icon } from '@iconify/vue'
 import { ApiError } from '@/api/client'
 import { createUser, updateUser } from '@/api/users'
 import type { AuthUser } from '@/stores/auth'
+import Select from '@/components/Forms/Select.vue'
 
 const open = defineModel<boolean>('open', { default: false })
 
@@ -14,6 +15,11 @@ const props = defineProps<{
 const emit = defineEmits<{
   saved: [user: AuthUser]
 }>()
+
+const roleOptions = [
+  { value: 'funcionario', label: 'Funcionário' },
+  { value: 'admin', label: 'Administrador' },
+] as const
 
 const inputClass =
   'w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-base text-brand-ink outline-none transition placeholder:text-brand-ink/35 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25'
@@ -326,10 +332,12 @@ async function onSubmit() {
 
           <label class="flex flex-col gap-1.5">
             <span class="text-sm font-medium text-brand-ink/80">Perfil</span>
-            <select v-model="form.role" name="role" required :class="inputClass">
-              <option value="funcionario">Funcionário</option>
-              <option value="admin">Administrador</option>
-            </select>
+            <Select
+              v-model="form.role"
+              name="role"
+              required
+              :options="[...roleOptions]"
+            />
             <span v-if="fieldErrors.role" class="text-sm text-brand-ink/70" role="alert">
               {{ fieldErrors.role }}
             </span>

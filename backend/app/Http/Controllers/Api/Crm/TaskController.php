@@ -6,28 +6,25 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\StoreTaskRequest;
 use App\Http\Requests\Crm\UpdateTaskRequest;
 use App\Models\Crm\Task;
+use App\Services\Crm\ListTasks;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class TaskController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ListTasks $listTasks): JsonResponse
     {
-        $query = Task::query()->with('user')->orderedByDue();
+        $filters = $request->validate([
+            'lead_id' => ['sometimes', 'nullable', 'integer'],
+            'deal_id' => ['sometimes', 'nullable', 'integer'],
+            'pending' => ['sometimes', 'boolean'],
+            'due_from' => ['sometimes', 'nullable', 'date'],
+            'due_to' => ['sometimes', 'nullable', 'date'],
+        ]);
 
-        if ($leadId = $request->query('lead_id')) {
-            $query->where('lead_id', $leadId);
-        }
+        $filters['pending'] = $request->boolean('pending');
 
-        if ($dealId = $request->query('deal_id')) {
-            $query->where('deal_id', $dealId);
-        }
-
-        if ($request->boolean('pending')) {
-            $query->pending();
-        }
-
-        return response()->json(['data' => $query->get()]);
+        return response()->json(['data' => $listTasks->handle($filters)]);
     }
 
     public function store(StoreTaskRequest $request): JsonResponse
@@ -37,7 +34,9 @@ class TaskController extends Controller
 
         $task = Task::create($data);
 
-        return response()->json(['data' => $task->load('user')], 201);
+        return response()->json([
+            'data' => $task->load(['user:id,name', 'lead:id,name', 'deal:id,title']),
+        ], 201);
     }
 
     public function update(UpdateTaskRequest $request, Task $task): JsonResponse
@@ -51,7 +50,9 @@ class TaskController extends Controller
 
         $task->update($data);
 
-        return response()->json(['data' => $task->fresh('user')]);
+        return response()->json([
+            'data' => $task->fresh(['user:id,name', 'lead:id,name', 'deal:id,title']),
+        ]);
     }
 
     public function destroy(Task $task): JsonResponse

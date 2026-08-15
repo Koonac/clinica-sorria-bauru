@@ -18,17 +18,16 @@ const icon = computed(() => {
 </script>
 
 <template>
-  <PageView eyebrow="Em breve" :title="title">
-    <template #description>
-      <p class="max-w-xl text-base leading-relaxed text-brand-ink/70">
+  <PageView :title="title">
+    <div class="max-w-xl">
+      <div
+        class="inline-flex size-12 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white text-brand-cyan-ink"
+      >
+        <Icon :icon="icon" class="size-6" aria-hidden="true" />
+      </div>
+      <p class="mt-4 text-base leading-relaxed text-brand-ink/70">
         Esta seção ainda está em construção. Em breve você poderá usá-la por aqui.
       </p>
-    </template>
-
-    <div
-      class="inline-flex size-12 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white text-brand-cyan-ink"
-    >
-      <Icon :icon="icon" class="size-6" aria-hidden="true" />
     </div>
   </PageView>
 </template>
