@@ -16,7 +16,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
-INTERFACE_DIR="$ROOT/Vekta AI/interface"
+INTERFACE_DIR="$ROOT/vekta-ai/interface"
 SKIP_PULL="${SKIP_PULL:-0}"
 
 if [ ! -d "$INTERFACE_DIR" ]; then
@@ -104,16 +104,6 @@ run_as_service install
 run_as_service run css:build
 run_as_service run lucide:build
 cd "$ROOT"
-
-# systemd WorkingDirectory usa o symlink sem espaço (evita status=200/CHDIR)
-VEKTA_LINK="${ROOT}/vekta-ai"
-run_root ln -sfn "Vekta AI" "$VEKTA_LINK"
-if [ ! -d "${VEKTA_LINK}/interface" ]; then
-  echo "erro: WorkingDirectory inválido: ${VEKTA_LINK}/interface" >&2
-  echo "  confira: ls -la \"$VEKTA_LINK\" \"$ROOT/Vekta AI/interface\"" >&2
-  echo "  ou reinstale a unit: bash deploy/host/setup-vekta-host.sh" >&2
-  exit 1
-fi
 
 WD="$(systemctl show -p WorkingDirectory --value vekta-ai.service 2>/dev/null || true)"
 if [ -n "$WD" ] && [ ! -d "$WD" ]; then

@@ -1,12 +1,12 @@
 # Stack central: Backend (Postgres) + WhatsApp API (rede vekta-network)
 #
 # A interface Vekta AI roda no HOST (não neste compose):
-#   cd "Vekta AI/interface"; npm install; npm run start
+#   cd vekta-ai/interface; npm install; npm run start
 #   → http://localhost:4680
 #
 # Pré-requisitos:
-#   1. Whatsapp-api/.env          (copie de Whatsapp-api/.env.example)
-#   2. "Vekta AI/interface/.env"  (copie de .env.example e preencha login web)
+#   1. whatsapp-api/.env          (copie de whatsapp-api/.env.example)
+#   2. vekta-ai/interface/.env    (copie de .env.example e preencha login web)
 #   3. Claude CLI no PATH (`npm i -g @anthropic-ai/claude-code`) e autenticado (`claude`)
 #
 # Uso:
@@ -59,12 +59,12 @@ services:
       - vekta-network
 
   wwebjs:
-    build: ./Whatsapp-api
+    build: ./whatsapp-api
     restart: unless-stopped
     ports:
       - "${PORT:-3000}:3000"
     env_file:
-      - ./Whatsapp-api/.env
+      - ./whatsapp-api/.env
     environment:
       PORT: "3000"
       MONGODB_URI: mongodb://mongo:27017/whatsapp-sessions
@@ -74,7 +74,7 @@ services:
         condition: service_healthy
     volumes:
       - sessions_data:/app/sessions
-      - ./Whatsapp-api/.env:/app/.env:ro
+      - ./whatsapp-api/.env:/app/.env:ro
     networks:
       - vekta-network
 

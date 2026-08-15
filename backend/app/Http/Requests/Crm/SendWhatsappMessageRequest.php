@@ -37,7 +37,7 @@ class SendWhatsappMessageRequest extends FormRequest
                     $validator->errors()->add('media.mimetype', 'Apenas imagens são suportadas (image/*).');
                 }
 
-                // ~8MB de arquivo em base64 (~10.7MB string) — alinhado ao limite da Whatsapp-api.
+                // ~8MB de arquivo em base64 (~10.7MB string) — alinhado ao limite da whatsapp-api.
                 if (strlen((string) $media['data']) > 11_000_000) {
                     $validator->errors()->add('media.data', 'Imagem muito grande (máx. ~8MB).');
                 }

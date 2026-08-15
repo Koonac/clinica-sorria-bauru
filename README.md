@@ -20,8 +20,8 @@ Backend e WhatsApp sobem na rede `vekta-network`. A interface não usa essa rede
 
 ```powershell
 # 1. Credenciais (uma vez)
-Copy-Item Whatsapp-api\.env.example Whatsapp-api\.env
-Copy-Item "Vekta AI\interface\.env.example" "Vekta AI\interface\.env"
+Copy-Item whatsapp-api\.env.example whatsapp-api\.env
+Copy-Item vekta-ai\interface\.env.example vekta-ai\interface\.env
 Copy-Item backend\.env.example backend\.env
 # Edite os .env (login da interface, basic auth do WhatsApp, APP_KEY do Laravel)
 
@@ -36,7 +36,7 @@ cd backend
 # composer install; php artisan migrate; php artisan serve
 
 # 5. Interface Vekta no host
-cd "Vekta AI\interface"
+cd vekta-ai\interface
 npm install
 npm run start
 # ou: npm run dev
@@ -78,9 +78,9 @@ Detalhes: [`docker-compose.prod.yml`](docker-compose.prod.yml), [`deploy/host/se
 ## Estrutura
 
 ```
-├── Vekta AI/                 # Interface + contexto do agente (host)
+├── vekta-ai/                 # Interface + contexto do agente (host)
 ├── backend/                  # CRM próprio — Laravel API (Docker em prod)
-├── Whatsapp-api/             # API WhatsApp (Docker; rede interna em prod)
+├── whatsapp-api/             # API WhatsApp (Docker; rede interna em prod)
 ├── deploy/nginx/             # Server blocks
 ├── deploy/host/              # Setup da interface no host
 ├── deploy/systemd/           # Unit vekta-ai.service

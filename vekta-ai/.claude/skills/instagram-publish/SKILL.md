@@ -47,7 +47,7 @@ Se faltar arquivo ou horário ambíguo, pergunte — não invente mídia.
 
 ## Como rodar
 
-A partir da **raiz do projeto** (`Vekta AI/`):
+A partir da **raiz do projeto** (`vekta-ai/`):
 
 ```bash
 # Post simples

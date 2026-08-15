@@ -72,7 +72,7 @@ fi
 
 VEKTA_GROUP="$(id -gn "$VEKTA_USER")"
 VEKTA_HOME="$(getent passwd "$VEKTA_USER" | cut -d: -f6)"
-INTERFACE_DIR="$ROOT/Vekta AI/interface"
+INTERFACE_DIR="$ROOT/vekta-ai/interface"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 UNIT_SRC="$ROOT/deploy/systemd/vekta-ai.service"
 UNIT_DST="/etc/systemd/system/vekta-ai.service"
@@ -253,7 +253,7 @@ pip_install playwright img2pdf
 run_root python3 -m playwright install --with-deps chromium
 
 echo "==> [setup-vekta] permissões do projeto para $VEKTA_USER"
-run_root chown -R "$VEKTA_USER:$VEKTA_GROUP" "$ROOT/Vekta AI" || true
+run_root chown -R "$VEKTA_USER:$VEKTA_GROUP" "$ROOT/vekta-ai" || true
 
 echo "==> [setup-vekta] npm install + build CSS/Lucide"
 cd "$INTERFACE_DIR"
@@ -268,10 +268,7 @@ VEKTA_PATH="${NODE_DIR}:/usr/local/bin:/usr/bin:/bin:${VEKTA_HOME}/.local/bin"
 RUN_SCRIPT="$ROOT/deploy/host/vekta-ai-run.sh"
 chmod +x "$RUN_SCRIPT"
 
-# systemd + paths com espaço: symlink estável sem espaço (evita \x20 / CHDIR)
-VEKTA_LINK="${ROOT}/vekta-ai"
-run_root ln -sfn "Vekta AI" "$VEKTA_LINK"
-INTERFACE_DIR_UNIT="${VEKTA_LINK}/interface"
+INTERFACE_DIR_UNIT="${INTERFACE_DIR}"
 
 echo "==> [setup-vekta] /etc/default/vekta-ai (env sem espaço no path do arquivo)"
 TMP_ENV="$(mktemp)"

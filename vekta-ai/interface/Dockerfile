@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Binário `claude` usado pelo chat (spawn em claude.service.js)
 RUN npm install -g @anthropic-ai/claude-code
 
-# Deps dos scripts em Vekta AI/.scripts (html-to-image/video, image-to-pdf, instagram-scraper)
+# Deps dos scripts em vekta-ai/.scripts (html-to-image/video, image-to-pdf, instagram-scraper)
 RUN pip3 install --no-cache-dir --break-system-packages playwright img2pdf \
     && playwright install --with-deps chromium
 

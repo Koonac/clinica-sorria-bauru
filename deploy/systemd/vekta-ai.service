@@ -1,5 +1,5 @@
 # Unit template — preenchido por deploy/host/setup-vekta-host.sh
-# Paths sem espaço (usa symlink vekta-ai → "Vekta AI").
+# WorkingDirectory: vekta-ai/interface
 #
 # Upstream nginx: 127.0.0.1:4680
 

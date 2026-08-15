@@ -109,7 +109,7 @@ SSH típico: `ssh vps1` (alias no seu `~/.ssh/config`).
 
 ```bash
 cp .env.example .env
-cp Whatsapp-api/.env.example Whatsapp-api/.env
+cp whatsapp-api/.env.example whatsapp-api/.env
 ```
 
 No `.env` da raiz (ajuste o domínio):
@@ -127,7 +127,7 @@ VEKTA_AI_SESSION_SECRET=…      # node -e "console.log(require('crypto').random
 VEKTA_CRM_SSO_SECRET=…         # MESMO valor no Frappe e na interface
 ```
 
-Preencha também `Whatsapp-api/.env` (Basic Auth, etc.). **Nunca** commite `.env`.
+Preencha também `whatsapp-api/.env` (Basic Auth, etc.). **Nunca** commite `.env`.
 
 ---
 
@@ -327,7 +327,7 @@ Após atualizar só o frontend Vue (build local de novo), reenvie `frontend/` + 
 ```text
 1. Customizar domínio / portas / namespace (A) — inclusive upstreams nginx únicos
 2. DNS A/AAAA → IP da VPS
-3. Copiar monorepo + .env (+ Whatsapp-api/.env)
+3. Copiar monorepo + .env (+ whatsapp-api/.env)
 4. docker compose -f docker-compose.prod.yml up -d --build
 5. bash deploy/frappe/create-crm-site.sh
 6. Frontend: build local + scp + symlink assets + clear-cache  (ou build na VPS se houver RAM)

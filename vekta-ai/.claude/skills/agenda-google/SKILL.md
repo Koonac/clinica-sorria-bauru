@@ -42,7 +42,7 @@ não invente.
 
 ## Como rodar
 
-A partir da **raiz do projeto** (`Vekta AI/`):
+A partir da **raiz do projeto** (`vekta-ai/`):
 
 ```bash
 # Criar reunião (1h se --fim omitido)

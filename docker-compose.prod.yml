@@ -10,7 +10,7 @@
 # Pré-requisitos:
 #   1. cp .env.example .env  (e preencha)
 #   2. cp backend/.env.example backend/.env  (APP_KEY, DB_PASSWORD, etc.)
-#   3. Whatsapp-api/.env
+#   3. whatsapp-api/.env
 #   4. DNS A/AAAA de ai.vektaai.com.br → IP do servidor
 #   5. Server blocks em deploy/nginx/ ativados no nginx do host
 #   6. Interface no host: bash deploy/host/setup-vekta-host.sh
@@ -143,11 +143,11 @@ services:
       - vekta-network
 
   wwebjs:
-    build: ./Whatsapp-api
+    build: ./whatsapp-api
     restart: unless-stopped
     # SEM ports: — não expor no host / nginx
     env_file:
-      - ./Whatsapp-api/.env
+      - ./whatsapp-api/.env
     environment:
       PORT: "3000"
       MONGODB_URI: mongodb://mongo:27017/whatsapp-sessions
@@ -157,7 +157,7 @@ services:
         condition: service_healthy
     volumes:
       - sessions_data:/app/sessions
-      - ./Whatsapp-api/.env:/app/.env:ro
+      - ./whatsapp-api/.env:/app/.env:ro
     networks:
       - vekta-network
 

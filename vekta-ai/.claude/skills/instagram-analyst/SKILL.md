@@ -56,7 +56,7 @@ O script também falha cedo com mensagem clara se o token faltar ou for inválid
 2. **Defina amostra e período**: padrão `--limit 30` e `--periodo days_28`.
 3. **Prepare a pasta de saída** com a data de hoje (`AAAA-MM-DD`):
    `saidas/analises/instagram/<username>/dados-brutos-<AAAA-MM-DD>/`
-4. **Rode a coleta** a partir da raiz do projeto (`Vekta AI/`):
+4. **Rode a coleta** a partir da raiz do projeto (`vekta-ai/`):
 
 ```bash
 python .scripts/instagram-analisar.py \

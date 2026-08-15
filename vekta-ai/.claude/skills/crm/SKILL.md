@@ -44,7 +44,7 @@ Se o pedido for ambíguo (“manda mensagem pro João”), busque o lead
 
 ## Como rodar
 
-A partir da **raiz do projeto** (`Vekta AI/`):
+A partir da **raiz do projeto** (`vekta-ai/`):
 
 ```bash
 # Leads

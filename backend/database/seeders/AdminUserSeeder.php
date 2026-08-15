@@ -24,7 +24,7 @@ class AdminUserSeeder extends Seeder
 
             $this->command?->warn('Token de serviço da interface (guarde — não será exibido de novo):');
             $this->command?->line($token);
-            $this->command?->info('Defina BACKEND_API_TOKEN com esse valor em "Vekta AI/interface/.env".');
+            $this->command?->info('Defina BACKEND_API_TOKEN com esse valor em "vekta-ai/interface/.env".');
         }
     }
 }

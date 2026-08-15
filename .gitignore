@@ -34,5 +34,5 @@ Thumbs.db
 *.swp
 *.swo
 .pi/
-Vekta AI/.playwright-profile/
+vekta-ai/.playwright-profile/
 **/.playwright-profile/

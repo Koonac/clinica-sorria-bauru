@@ -4606,7 +4606,7 @@ async function renderWhatsappPainel(estado, opcoes = {}) {
     el(
       "p",
       { class: "text-sm text-cinza" },
-      "Use o usuário e senha Basic Auth da WhatsApp-api. Ao conectar, escaneie o QR no celular.",
+      "Use o usuário e senha Basic Auth da whatsapp-api. Ao conectar, escaneie o QR no celular.",
     ),
   ];
 
