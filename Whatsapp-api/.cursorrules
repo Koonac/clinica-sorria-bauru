@@ -1,0 +1,17 @@
+# Descrição do projeto:
+Este projeto consiste em um microserviço desenvolvido com Node.js, utilizando as bibliotecas open source whatsapp-web.js e Express.js. O objetivo é construir uma API que permita a integração com outro aplicativo.
+
+## Funcionalidades:
+- Conexão de Múltiplos Usuários: O microserviço permitirá a conexão de vários usuários por meio de QR Codes, facilitando o acesso simultâneo a diferentes contas do WhatsApp.
+- Disparo de Webhooks: Quando mensagens forem recebidas por qualquer um dos usuários conectados, o sistema irá gerar disparos POST para webhooks configurados, permitindo que outros sistemas ou serviços respondam a essas interações em tempo real.
+
+## Arquitetura:
+Explicação de cada componente
+src/: Esta é a pasta principal onde todo o seu código-fonte reside.
+src/config/: Esta pasta lida com a configuração do seu projeto.
+src/controllers/: Esta pasta lida com a lógica de requisições e respostas.
+src/middlewares/: Esta pasta lida com os middlewares da sua API.
+src/routes/: Aqui é onde você define todas as rotas da sua API usando o Express.
+src/services/: Esta é a camada mais importante para a lógica de negócio.
+src/utils/: Use esta pasta para helpers ou funções utilitárias que podem ser usadas em várias partes do seu projeto.
+src/app.js: Este é o ponto de entrada da sua aplicação Express.

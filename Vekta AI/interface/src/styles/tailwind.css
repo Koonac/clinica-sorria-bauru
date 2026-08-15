@@ -1,0 +1,29 @@
+/* ============================================================
+   Fonte do Tailwind CSS — compilada em build/watch pelo @tailwindcss/cli
+   (npm run css:build / css:watch) para public/css/tailwind.css.
+   Tokens de marca ficam aqui (@theme); o resto da marcação é feito
+   com classes utilitárias em public/index.html e em src/views/
+   (páginas + Vekta do frontend — ver @source abaixo).
+   ============================================================ */
+@import "tailwindcss" source("../../public");
+@source "../views";
+
+@theme {
+  --color-fundo: #0a0b0f;
+  --color-superficie: #14161c;
+  --color-tinta: #eef0f4;
+  --color-cinza: #8890a1;
+  --color-cinza-claro: #565d6d;
+  --color-linha: #23262f;
+  --color-vekta: #0e8a76;
+  --color-vekta-escuro: #0a6f5f;
+  --color-vekta-suave: rgba(14, 138, 118, 0.16);
+  --color-alerta: #e8955a;
+  --color-alerta-suave: rgba(232, 149, 90, 0.16);
+
+  --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Sora', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --animate-pulsinho: pulsinho 1.2s ease-in-out infinite;
+}

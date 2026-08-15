@@ -1,0 +1,78 @@
+<!--vekta-pagina
+{ "titulo": "Visão geral", "icone": "lucide:layout-dashboard", "ordem": 20 }
+-->
+<section id="aba-dashboard" class="hidden flex flex-col h-full min-h-0 overflow-hidden">
+  <div class="ide-workspace flex flex-col md:flex-row flex-1 min-h-0 min-w-0">
+
+    <!-- Painel esquerdo: explorador de arquivos -->
+    <aside id="ide-explorer" class="ide-painel ide-explorer flex flex-col w-64 shrink-0 border-r border-linha bg-superficie min-h-0 max-md:w-full max-md:max-h-48 max-md:border-r-0 max-md:border-b">
+      <header class="ide-painel-cabecalho shrink-0 flex items-center justify-between gap-2 px-3 h-10 border-b border-linha">
+        <div class="flex items-center gap-2 min-w-0">
+          <iconify-icon noobserver icon="lucide:folder-tree" class="text-[15px] text-vekta shrink-0" aria-hidden="true"></iconify-icon>
+          <span class="font-mono text-[11px] uppercase tracking-widest text-cinza truncate">Explorador</span>
+        </div>
+        <button type="button" id="ide-atualizar-arvore" title="Atualizar árvore" aria-label="Atualizar árvore" class="inline-flex items-center justify-center w-7 h-7 rounded-md text-cinza transition-colors hover:bg-fundo hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta">
+          <iconify-icon noobserver icon="lucide:refresh-cw" class="text-[14px]" aria-hidden="true"></iconify-icon>
+        </button>
+      </header>
+      <div id="ide-sessao" class="ide-sessao shrink-0 border-b border-linha" hidden>
+        <div class="flex items-center justify-between gap-2 px-3 pt-2.5 pb-1.5">
+          <div class="flex items-center gap-1.5 min-w-0">
+            <iconify-icon noobserver icon="lucide:sparkles" class="text-[13px] text-vekta shrink-0" aria-hidden="true"></iconify-icon>
+            <span class="font-mono text-[10px] uppercase tracking-widest text-vekta truncate">Nesta conversa</span>
+            <span id="ide-sessao-count" class="ide-sessao-count font-mono text-[10px] text-cinza-claro"></span>
+          </div>
+          <button type="button" id="ide-sessao-limpar" title="Limpar lista desta conversa" aria-label="Limpar lista" class="font-mono text-[10px] text-cinza-claro transition-colors hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta">
+            Limpar
+          </button>
+        </div>
+        <p id="ide-sessao-id" class="font-mono text-[9px] text-cinza-claro px-3 pb-1 truncate" hidden></p>
+        <div id="ide-sessao-lista" class="ide-sessao-lista flex flex-col gap-0.5 px-1.5 pb-2 max-h-36 overflow-y-auto"></div>
+      </div>
+      <div id="ide-arvore" class="flex-1 overflow-y-auto overflow-x-hidden px-1.5 py-2 text-sm"></div>
+      <footer id="ide-explorer-status" class="shrink-0 px-3 py-2 border-t border-linha font-mono text-[10px] text-cinza-claro truncate"></footer>
+    </aside>
+
+    <!-- Painel central: visualizador de arquivo -->
+    <section id="ide-editor" class="ide-painel ide-editor flex flex-col flex-1 min-w-0 min-h-0 bg-fundo">
+      <header class="ide-painel-cabecalho shrink-0 flex items-center gap-2 px-3 h-10 border-b border-linha bg-superficie">
+        <iconify-icon noobserver icon="lucide:file-code-2" class="text-[15px] text-cinza shrink-0" aria-hidden="true"></iconify-icon>
+        <code id="ide-caminho" class="font-mono text-xs text-cinza flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">Nenhum arquivo selecionado</code>
+        <span id="ide-aviso-salvar" class="font-mono text-[10px] text-alerta truncate max-w-40" hidden></span>
+        <button type="button" id="ide-editar" hidden title="Editar markdown" aria-label="Editar" class="inline-flex items-center gap-1.5 px-2.5 py-1 border border-linha rounded-md bg-superficie text-[11px] font-medium text-cinza transition-colors hover:border-cinza-claro hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta">
+          <iconify-icon noobserver icon="lucide:pencil" class="text-[13px]" aria-hidden="true"></iconify-icon>
+          Editar
+        </button>
+        <button type="button" id="ide-cancelar-edicao" hidden title="Cancelar edição" aria-label="Cancelar" class="inline-flex items-center gap-1.5 px-2.5 py-1 border border-linha rounded-md bg-superficie text-[11px] font-medium text-cinza transition-colors hover:border-cinza-claro hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta">
+          Cancelar
+        </button>
+        <button type="button" id="ide-salvar" hidden title="Salvar arquivo" aria-label="Salvar" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-vekta border border-vekta text-[11px] font-medium text-white transition-colors hover:bg-vekta-escuro hover:border-vekta-escuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45">
+          <iconify-icon noobserver icon="lucide:save" class="text-[13px]" aria-hidden="true"></iconify-icon>
+          Salvar
+        </button>
+        <a id="ide-baixar" hidden title="Baixar imagem" aria-label="Baixar" download class="inline-flex items-center gap-1.5 px-2.5 py-1 border border-linha rounded-md bg-superficie text-[11px] font-medium text-cinza no-underline transition-colors hover:border-cinza-claro hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta">
+          <iconify-icon noobserver icon="lucide:download" class="text-[13px]" aria-hidden="true"></iconify-icon>
+          Baixar
+        </a>
+        <button type="button" id="ide-excluir" hidden title="Excluir arquivo" aria-label="Excluir arquivo" class="btn-excluir">
+          <iconify-icon noobserver icon="lucide:trash-2" class="text-[13px]" aria-hidden="true"></iconify-icon>
+          Excluir
+        </button>
+      </header>
+      <div id="ide-corpo" class="flex-1 min-h-0 overflow-auto p-5">
+        <div id="ide-vazio" class="h-full min-h-50 flex flex-col items-center justify-center text-center px-6 text-cinza">
+          <iconify-icon noobserver icon="lucide:panel-left" class="text-[36px] text-cinza-claro mb-3" aria-hidden="true"></iconify-icon>
+          <p class="font-display text-lg text-tinta mb-1">Workspace Vekta</p>
+          <p class="text-sm max-w-80">Selecione um arquivo na árvore à esquerda para visualizar. O chat fica à direita — a mesma conversa da aba Chat.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Separador redimensionável (desktop) -->
+    <div id="ide-resize-chat" class="ide-resize hidden md:block w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-vekta/40 active:bg-vekta/60 transition-colors" title="Arraste para redimensionar" aria-hidden="true"></div>
+
+    <!-- Slot do chat compartilhado (#chat-host migra para cá) -->
+    <aside id="chat-slot-ide" class="ide-painel ide-chat flex flex-col w-[min(420px,38vw)] shrink-0 border-l border-linha bg-superficie min-h-0 min-w-70 max-md:w-full max-md:max-h-[42vh] max-md:border-l-0 max-md:border-t"></aside>
+
+  </div>
+</section>

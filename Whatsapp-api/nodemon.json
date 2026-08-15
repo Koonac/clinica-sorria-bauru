@@ -1,0 +1,10 @@
+{
+  "watch": ["src", "index.js"],
+  "ignore": [
+    "sessions/**",
+    ".wwebjs_auth/**",
+    ".wwebjs_cache/**",
+    "node_modules/**"
+  ],
+  "ext": "js,json"
+}

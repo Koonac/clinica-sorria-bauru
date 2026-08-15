@@ -1,0 +1,85 @@
+<!--vekta-pagina
+{ "titulo": "Campanhas", "icone": "lucide:megaphone", "ordem": 61 }
+-->
+<section
+  id="aba-campanhas"
+  class="hidden flex flex-col h-full min-h-0 overflow-hidden"
+>
+  <div
+    class="flex flex-col flex-1 min-h-0 pt-6 px-10 pb-6 max-md:px-4 max-md:pt-4 max-md:pb-4"
+  >
+    <header
+      class="shrink-0 flex items-end justify-between gap-4 mb-5 max-md:flex-col max-md:items-start"
+    >
+      <div>
+        <p class="font-mono text-xs uppercase tracking-widest text-vekta mb-1.5">
+          whatsapp
+        </p>
+        <h1
+          id="camp-titulo"
+          class="font-display text-3xl font-semibold tracking-tight"
+        >
+          Campanhas
+        </h1>
+        <p id="camp-subtitulo" class="text-sm text-cinza mt-1.5 max-w-xl">
+          Disparo em massa via WhatsApp com leads importados de CSV.
+        </p>
+      </div>
+      <div id="camp-acoes" class="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          id="camp-voltar"
+          class="hidden inline-flex items-center gap-2 px-4 py-2 border border-linha rounded-full bg-superficie text-sm font-medium text-tinta transition-colors hover:border-cinza-claro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta"
+        >
+          <iconify-icon
+            noobserver
+            icon="lucide:arrow-left"
+            class="text-[15px]"
+            aria-hidden="true"
+          ></iconify-icon>
+          Voltar
+        </button>
+        <button
+          type="button"
+          id="camp-atualizar"
+          class="inline-flex items-center gap-2 px-4 py-2 border border-linha rounded-full bg-superficie text-sm font-medium text-tinta transition-colors hover:border-cinza-claro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45"
+          title="Atualizar"
+          aria-label="Atualizar"
+        >
+          <iconify-icon
+            noobserver
+            icon="lucide:refresh-cw"
+            class="text-[15px]"
+            aria-hidden="true"
+          ></iconify-icon>
+        </button>
+        <button
+          type="button"
+          id="camp-nova"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-vekta border border-vekta text-white text-sm font-medium transition-colors hover:bg-vekta-escuro hover:border-vekta-escuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45"
+        >
+          <iconify-icon
+            noobserver
+            icon="lucide:plus"
+            class="text-[15px]"
+            aria-hidden="true"
+          ></iconify-icon>
+          Nova campanha
+        </button>
+      </div>
+    </header>
+
+    <p
+      id="camp-status"
+      class="shrink-0 text-xs text-cinza mb-3 min-h-[1rem]"
+      aria-live="polite"
+    ></p>
+
+    <div
+      id="camp-conteudo"
+      class="flex-1 min-h-0 overflow-y-auto"
+      role="region"
+      aria-label="Campanhas WhatsApp"
+    ></div>
+  </div>
+</section>

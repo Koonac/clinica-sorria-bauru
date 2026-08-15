@@ -1,0 +1,4 @@
+# Sessões e cache do WhatsApp Web.js
+sessions/
+.wwebjs_auth/
+.wwebjs_cache/

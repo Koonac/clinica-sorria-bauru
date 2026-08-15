@@ -1,0 +1,174 @@
+<!--vekta-pagina
+{ "titulo": "Galeria", "icone": "lucide:images", "ordem": 35 }
+-->
+<section
+  id="aba-galeria"
+  class="hidden flex flex-col h-full min-h-0 overflow-hidden"
+>
+  <div class="flex flex-1 min-h-0 flex-col lg:flex-row">
+    <!-- Grade de mídia -->
+    <div
+      class="flex-1 min-w-0 min-h-0 overflow-y-auto pt-8.5 px-10 pb-10 max-md:px-4 max-md:pt-5 max-md:pb-7"
+    >
+      <header
+        class="flex items-end justify-between gap-6 mb-6.5 max-md:flex-col max-md:items-start max-md:gap-2"
+      >
+        <div>
+          <p
+            class="font-mono text-xs uppercase tracking-widest text-vekta mb-1.5"
+          >
+            imagens e vídeos produzidos
+          </p>
+          <h1 class="font-display text-3xl font-semibold tracking-tight">
+            Galeria
+          </h1>
+        </div>
+        <p
+          id="galeria-resumo"
+          class="text-cinza text-sm max-w-95 text-right max-md:text-left"
+        ></p>
+      </header>
+
+      <div id="galeria-filtros" class="flex gap-2 flex-wrap mb-5"></div>
+      <div id="galeria-acoes" class="hidden flex-wrap items-center gap-2 mb-4"></div>
+      <div id="galeria-caminho" class="hidden items-center gap-2 mb-4"></div>
+      <div
+        id="galeria-grade"
+        class="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3.5"
+      ></div>
+
+      <div id="galeria-vazia" class="hidden text-center py-16 px-6 text-cinza">
+        <h2 class="font-display text-xl text-tinta mb-2">
+          Nada por aqui ainda
+        </h2>
+        <p class="text-base mb-5">
+          Peça uma peça visual no chat do designer à direita.
+        </p>
+        <button
+          type="button"
+          id="galeria-focar-chat"
+          class="inline-flex items-center gap-2 px-4 py-2 border border-linha rounded-full bg-superficie text-sm font-medium text-tinta transition-colors hover:border-cinza-claro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta"
+        >
+          Pedir uma peça
+        </button>
+      </div>
+    </div>
+
+    <!-- Chat exclusivo da galeria (canal "galeria" → skill designer) -->
+    <aside
+      id="galeria-chat"
+      class="flex flex-col shrink-0 border-l border-linha bg-superficie min-h-0 w-[min(400px,100%)] max-lg:w-full max-lg:max-h-[42vh] max-lg:border-l-0 max-lg:border-t"
+    >
+      <header
+        class="shrink-0 flex items-center justify-between gap-2 px-3 h-12 border-b border-linha"
+      >
+        <div class="flex items-center gap-2 min-w-0">
+          <iconify-icon
+            noobserver
+            icon="lucide:palette"
+            class="text-[16px] text-vekta shrink-0"
+            aria-hidden="true"
+          ></iconify-icon>
+          <div class="min-w-0">
+            <p
+              class="font-display text-sm font-semibold tracking-tight truncate"
+            >
+              Chat designer
+            </p>
+            <p class="font-mono text-[10px] text-vekta truncate">
+              peças visuais
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          id="gchat-nova"
+          title="Nova conversa"
+          aria-label="Nova conversa"
+          class="inline-flex items-center justify-center w-8 h-8 rounded-md text-cinza transition-colors hover:bg-fundo hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta"
+        >
+          <iconify-icon
+            noobserver
+            icon="lucide:plus"
+            class="text-[16px]"
+            aria-hidden="true"
+          ></iconify-icon>
+        </button>
+      </header>
+
+      <div id="gchat-rolagem" class="flex-1 overflow-y-auto px-3 min-h-0">
+        <div id="gchat-mensagens" class="min-h-full flex flex-col gap-3 py-3">
+          <div
+            id="gchat-boasvindas"
+            class="flex-1 flex flex-col items-center justify-center text-center px-4 text-cinza"
+          >
+            <iconify-icon
+              noobserver
+              icon="lucide:sparkles"
+              class="text-[28px] text-vekta mb-2"
+              aria-hidden="true"
+            ></iconify-icon>
+            <h2 class="font-display text-base text-tinta mb-1">
+              Peça uma arte
+            </h2>
+            <p class="text-sm">Posts, carrosséis, stories, criativos…</p>
+          </div>
+        </div>
+      </div>
+
+      <form
+        id="gchat-form"
+        class="relative shrink-0 flex flex-col gap-1.5 mx-2.5 mb-2.5 mt-1 bg-fundo border border-linha rounded-2xl pl-2 py-2 pr-1.5 transition-colors focus-within:border-vekta"
+      >
+        <div id="gchat-anexos" class="hidden flex-wrap gap-2 px-2"></div>
+        <div class="flex gap-1.5 items-end">
+          <input
+            type="file"
+            id="gchat-arquivo"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            multiple
+            class="hidden"
+          />
+          <button
+            type="button"
+            id="gchat-anexar"
+            title="Anexar imagem de referência"
+            aria-label="Anexar imagem"
+            class="inline-flex items-center justify-center w-9 h-9 shrink-0 rounded-full text-cinza transition-colors hover:bg-superficie hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta"
+          >
+            <iconify-icon
+              noobserver
+              icon="lucide:paperclip"
+              class="text-[17px]"
+              aria-hidden="true"
+            ></iconify-icon>
+          </button>
+          <textarea
+            id="gchat-entrada"
+            rows="1"
+            placeholder="Ex.: post quadrado de lançamento…"
+            autocomplete="off"
+            class="flex-1 border-0 resize-none bg-transparent font-sans text-sm text-tinta max-h-36 leading-normal py-2 focus:outline-none"
+          ></textarea>
+          <button
+            type="submit"
+            id="gchat-enviar"
+            title="Enviar"
+            aria-label="Enviar"
+            data-modo="enviar"
+            class="chat-btn-enviar inline-flex items-center justify-center rounded-full bg-vekta border border-vekta text-white w-9 h-9 shrink-0 transition-colors hover:bg-vekta-escuro hover:border-vekta-escuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45 disabled:cursor-default"
+          >
+            <iconify-icon
+              id="gchat-enviar-icone"
+              noobserver
+              icon="lucide:arrow-up"
+              class="text-[17px] block"
+              aria-hidden="true"
+            ></iconify-icon>
+            <span id="gchat-enviar-stop" hidden class="block w-3 h-3 rounded-[2px] bg-current" aria-hidden="true"></span>
+          </button>
+        </div>
+      </form>
+    </aside>
+  </div>
+</section>

@@ -1,0 +1,220 @@
+<!--vekta-pagina
+{ "titulo": "Site", "icone": "lucide:globe", "ordem": 45 }
+-->
+<section
+  id="aba-site"
+  class="hidden flex flex-col h-full min-h-0 overflow-hidden"
+>
+  <div class="flex flex-1 min-h-0 flex-col lg:flex-row">
+    <!-- Preview do site -->
+    <div class="flex-1 min-w-0 min-h-0 flex flex-col overflow-hidden">
+      <header
+        class="shrink-0 flex items-center justify-between gap-4 px-6 h-12 border-b border-linha max-md:px-4"
+      >
+        <div class="min-w-0">
+          <p
+            class="font-mono text-[10px] uppercase tracking-widest text-vekta truncate"
+            id="site-caminho"
+          ></p>
+          <h1 class="font-display text-base font-semibold tracking-tight truncate">
+            Site
+          </h1>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            id="site-recarregar"
+            title="Recarregar preview"
+            aria-label="Recarregar preview"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-linha rounded-full bg-superficie text-xs font-medium text-tinta transition-colors hover:border-cinza-claro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45"
+          >
+            <iconify-icon
+              noobserver
+              icon="lucide:refresh-cw"
+              class="text-[14px]"
+              aria-hidden="true"
+            ></iconify-icon>
+            Recarregar
+          </button>
+          <button
+            type="button"
+            id="site-rebuild"
+            hidden
+            title="Rodar npm run build"
+            aria-label="Rebuild do site"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-vekta border border-vekta text-white text-xs font-medium transition-colors hover:bg-vekta-escuro hover:border-vekta-escuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45"
+          >
+            <iconify-icon
+              id="site-rebuild-icone"
+              noobserver
+              icon="lucide:hammer"
+              class="text-[14px]"
+              aria-hidden="true"
+            ></iconify-icon>
+            Rebuild
+          </button>
+        </div>
+      </header>
+
+      <div class="relative flex-1 min-h-0 bg-fundo">
+        <iframe
+          id="site-frame"
+          class="hidden absolute inset-0 w-full h-full border-0 bg-white"
+          title="Preview do site"
+          referrerpolicy="no-referrer-when-downgrade"
+        ></iframe>
+
+        <div
+          id="site-vazio"
+          class="absolute inset-0 flex flex-col items-center justify-center text-center px-6 text-cinza"
+        >
+          <iconify-icon
+            noobserver
+            icon="lucide:globe"
+            class="text-[36px] text-vekta mb-3"
+            aria-hidden="true"
+          ></iconify-icon>
+          <h2 class="font-display text-xl text-tinta mb-2">
+            Site não configurado
+          </h2>
+          <p id="site-vazio-msg" class="text-sm max-w-md">
+            Defina <code class="font-mono text-xs">VEKTA_SITE_DIR</code> em
+            <code class="font-mono text-xs">interface/.env</code> apontando para
+            a pasta com o <code class="font-mono text-xs">index.html</code> do
+            site (ex.: <code class="font-mono text-xs">…/web/dist</code>).
+          </p>
+        </div>
+
+        <div
+          id="site-build-status"
+          hidden
+          class="absolute bottom-3 left-3 right-3 sm:right-auto sm:max-w-md rounded-lg border border-linha bg-superficie/95 backdrop-blur px-3 py-2 text-xs text-cinza shadow-sm"
+        ></div>
+      </div>
+    </div>
+
+    <!-- Chat exclusivo do site (canal "site") -->
+    <aside
+      id="site-chat"
+      class="flex flex-col shrink-0 border-l border-linha bg-superficie min-h-0 w-[min(400px,100%)] max-lg:w-full max-lg:max-h-[42vh] max-lg:border-l-0 max-lg:border-t"
+    >
+      <header
+        class="shrink-0 flex items-center justify-between gap-2 px-3 h-12 border-b border-linha"
+      >
+        <div class="flex items-center gap-2 min-w-0">
+          <iconify-icon
+            noobserver
+            icon="lucide:code-2"
+            class="text-[16px] text-vekta shrink-0"
+            aria-hidden="true"
+          ></iconify-icon>
+          <div class="min-w-0">
+            <p
+              class="font-display text-sm font-semibold tracking-tight truncate"
+            >
+              Chat do site
+            </p>
+            <p class="font-mono text-[10px] text-vekta truncate">
+              alterações no site
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          id="schat-nova"
+          title="Nova conversa"
+          aria-label="Nova conversa"
+          class="inline-flex items-center justify-center w-8 h-8 rounded-md text-cinza transition-colors hover:bg-fundo hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta"
+        >
+          <iconify-icon
+            noobserver
+            icon="lucide:plus"
+            class="text-[16px]"
+            aria-hidden="true"
+          ></iconify-icon>
+        </button>
+      </header>
+
+      <div id="schat-rolagem" class="flex-1 overflow-y-auto px-3 min-h-0">
+        <div id="schat-mensagens" class="min-h-full flex flex-col gap-3 py-3">
+          <div
+            id="schat-boasvindas"
+            class="flex-1 flex flex-col items-center justify-center text-center px-4 text-cinza"
+          >
+            <iconify-icon
+              noobserver
+              icon="lucide:sparkles"
+              class="text-[28px] text-vekta mb-2"
+              aria-hidden="true"
+            ></iconify-icon>
+            <h2 class="font-display text-base text-tinta mb-1">
+              Ajuste o site
+            </h2>
+            <p class="text-sm">
+              Layout, copy embutida, seções, integrações…
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <form
+        id="schat-form"
+        class="relative shrink-0 flex flex-col gap-1.5 mx-2.5 mb-2.5 mt-1 bg-fundo border border-linha rounded-2xl pl-2 py-2 pr-1.5 transition-colors focus-within:border-vekta"
+      >
+        <div id="schat-anexos" class="hidden flex-wrap gap-2 px-2"></div>
+        <div class="flex gap-1.5 items-end">
+          <input
+            type="file"
+            id="schat-arquivo"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            multiple
+            class="hidden"
+          />
+          <button
+            type="button"
+            id="schat-anexar"
+            title="Anexar imagem de referência"
+            aria-label="Anexar imagem"
+            class="inline-flex items-center justify-center w-9 h-9 shrink-0 rounded-full text-cinza transition-colors hover:bg-superficie hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta"
+          >
+            <iconify-icon
+              noobserver
+              icon="lucide:paperclip"
+              class="text-[17px]"
+              aria-hidden="true"
+            ></iconify-icon>
+          </button>
+          <textarea
+            id="schat-entrada"
+            rows="1"
+            placeholder="Ex.: mudar a cor do hero…"
+            autocomplete="off"
+            class="flex-1 border-0 resize-none bg-transparent font-sans text-sm text-tinta max-h-36 leading-normal py-2 focus:outline-none"
+          ></textarea>
+          <button
+            type="submit"
+            id="schat-enviar"
+            title="Enviar"
+            aria-label="Enviar"
+            data-modo="enviar"
+            class="chat-btn-enviar inline-flex items-center justify-center rounded-full bg-vekta border border-vekta text-white w-9 h-9 shrink-0 transition-colors hover:bg-vekta-escuro hover:border-vekta-escuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45 disabled:cursor-default"
+          >
+            <iconify-icon
+              id="schat-enviar-icone"
+              noobserver
+              icon="lucide:arrow-up"
+              class="text-[17px] block"
+              aria-hidden="true"
+            ></iconify-icon>
+            <span
+              id="schat-enviar-stop"
+              hidden
+              class="block w-3 h-3 rounded-[2px] bg-current"
+              aria-hidden="true"
+            ></span>
+          </button>
+        </div>
+      </form>
+    </aside>
+  </div>
+</section>

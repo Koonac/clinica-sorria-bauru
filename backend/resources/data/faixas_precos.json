@@ -1,0 +1,196 @@
+{
+  "faixas": [
+    {
+      "id": "prc-001",
+      "categoria": "moveis_planejados",
+      "categoria_label": "Móveis Planejados",
+      "produto": "Cozinha planejada completa",
+      "parametros": {
+        "ambiente": "cozinha",
+        "metragem_m2_min": 6,
+        "metragem_m2_max": 12,
+        "acabamento": "standard"
+      },
+      "preco_min": 12000,
+      "preco_max": 28000,
+      "moeda": "BRL",
+      "unidade": "projeto",
+      "prazo_dias_uteis": "25–45",
+      "observacoes": "Inclui projeto 3D e instalação. Não inclui eletrodomésticos.",
+      "imagens": [
+        "https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&w=1200&q=80"
+      ]
+    },
+    {
+      "id": "prc-002",
+      "categoria": "moveis_planejados",
+      "categoria_label": "Móveis Planejados",
+      "produto": "Guarda-roupa casal planejado",
+      "parametros": {
+        "ambiente": "quarto",
+        "largura_m_min": 2,
+        "largura_m_max": 3.5,
+        "acabamento": "premium"
+      },
+      "preco_min": 6500,
+      "preco_max": 14500,
+      "moeda": "BRL",
+      "unidade": "projeto",
+      "prazo_dias_uteis": "20–35",
+      "observacoes": "Portas com amortecedor e gavetas telescópicas.",
+      "imagens": [
+        "https://images.unsplash.com/photo-1595428774223-ef52624120d2?auto=format&fit=crop&w=1200&q=80"
+      ]
+    },
+    {
+      "id": "prc-003",
+      "categoria": "moveis_planejados",
+      "categoria_label": "Móveis Planejados",
+      "produto": "Home office / home theater",
+      "parametros": {
+        "ambiente": "sala",
+        "metragem_m2_min": 3,
+        "metragem_m2_max": 8,
+        "acabamento": "standard"
+      },
+      "preco_min": 4800,
+      "preco_max": 11000,
+      "moeda": "BRL",
+      "unidade": "projeto",
+      "prazo_dias_uteis": "18–30",
+      "observacoes": "Passagem de cabos e iluminação embutida sob consulta.",
+      "imagens": [
+        "https://images.unsplash.com/photo-1615874959474-d609969a20ed?auto=format&fit=crop&w=1200&q=80"
+      ]
+    },
+    {
+      "id": "prc-004",
+      "categoria": "protecao_veicular",
+      "categoria_label": "Proteção Veicular",
+      "produto": "Plano essencial (furto/roubo + colisão)",
+      "parametros": {
+        "tipo_veiculo": "carro",
+        "faixa_fipe_min": 30000,
+        "faixa_fipe_max": 80000,
+        "cobertura": "essencial"
+      },
+      "preco_min": 189,
+      "preco_max": 349,
+      "moeda": "BRL",
+      "unidade": "mensal",
+      "prazo_dias_uteis": "adesão em até 2 dias úteis",
+      "observacoes": "Cota participativa a partir de 5%. Assistência 24h básica inclusa.",
+      "imagens": [
+        "https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?auto=format&fit=crop&w=1200&q=80"
+      ]
+    },
+    {
+      "id": "prc-005",
+      "categoria": "protecao_veicular",
+      "categoria_label": "Proteção Veicular",
+      "produto": "Plano completo (terceiros + vidros + carro reserva)",
+      "parametros": {
+        "tipo_veiculo": "carro",
+        "faixa_fipe_min": 50000,
+        "faixa_fipe_max": 150000,
+        "cobertura": "completo"
+      },
+      "preco_min": 289,
+      "preco_max": 520,
+      "moeda": "BRL",
+      "unidade": "mensal",
+      "prazo_dias_uteis": "adesão em até 2 dias úteis",
+      "observacoes": "Carro reserva por até 7 dias. Vidros e faróis inclusos.",
+      "imagens": [
+        "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1200&q=80"
+      ]
+    },
+    {
+      "id": "prc-006",
+      "categoria": "protecao_veicular",
+      "categoria_label": "Proteção Veicular",
+      "produto": "Plano moto",
+      "parametros": {
+        "tipo_veiculo": "moto",
+        "faixa_fipe_min": 8000,
+        "faixa_fipe_max": 45000,
+        "cobertura": "essencial"
+      },
+      "preco_min": 79,
+      "preco_max": 159,
+      "moeda": "BRL",
+      "unidade": "mensal",
+      "prazo_dias_uteis": "adesão em até 2 dias úteis",
+      "observacoes": "Cobertura furto/roubo e colisão. Guincho até 100 km.",
+      "imagens": [
+        "https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1200&q=80"
+      ]
+    },
+    {
+      "id": "prc-007",
+      "categoria": "energia_solar",
+      "categoria_label": "Energia Solar",
+      "produto": "Sistema residencial 3–4 kWp",
+      "parametros": {
+        "tipo": "residencial",
+        "consumo_kwh_mes_min": 250,
+        "consumo_kwh_mes_max": 450,
+        "potencia_kwp_min": 3,
+        "potencia_kwp_max": 4
+      },
+      "preco_min": 14500,
+      "preco_max": 22000,
+      "moeda": "BRL",
+      "unidade": "sistema",
+      "prazo_dias_uteis": "30–60",
+      "observacoes": "Inclui painéis, inversor, estrutura e instalação. Homologação na concessionária sob consulta.",
+      "imagens": [
+        "https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&w=1200&q=80"
+      ]
+    },
+    {
+      "id": "prc-008",
+      "categoria": "energia_solar",
+      "categoria_label": "Energia Solar",
+      "produto": "Sistema residencial 5–7 kWp",
+      "parametros": {
+        "tipo": "residencial",
+        "consumo_kwh_mes_min": 450,
+        "consumo_kwh_mes_max": 800,
+        "potencia_kwp_min": 5,
+        "potencia_kwp_max": 7
+      },
+      "preco_min": 24000,
+      "preco_max": 38000,
+      "moeda": "BRL",
+      "unidade": "sistema",
+      "prazo_dias_uteis": "35–70",
+      "observacoes": "Estimativa com payback típico de 3–5 anos, conforme tarifa local.",
+      "imagens": [
+        "https://images.unsplash.com/photo-1508514177221-188b1cf16e9d?auto=format&fit=crop&w=1200&q=80"
+      ]
+    },
+    {
+      "id": "prc-009",
+      "categoria": "energia_solar",
+      "categoria_label": "Energia Solar",
+      "produto": "Sistema comercial 15–25 kWp",
+      "parametros": {
+        "tipo": "comercial",
+        "consumo_kwh_mes_min": 1500,
+        "consumo_kwh_mes_max": 3500,
+        "potencia_kwp_min": 15,
+        "potencia_kwp_max": 25
+      },
+      "preco_min": 72000,
+      "preco_max": 125000,
+      "moeda": "BRL",
+      "unidade": "sistema",
+      "prazo_dias_uteis": "45–90",
+      "observacoes": "Projeto sob medida; valor final após visita técnica.",
+      "imagens": [
+        "https://images.unsplash.com/photo-1466611653911-95081537e5b7?auto=format&fit=crop&w=1200&q=80"
+      ]
+    }
+  ]
+}

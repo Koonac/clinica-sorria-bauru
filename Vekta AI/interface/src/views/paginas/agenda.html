@@ -1,0 +1,142 @@
+<!--vekta-pagina
+{ "titulo": "Agenda", "icone": "lucide:calendar", "ordem": 58 }
+-->
+<section
+  id="aba-agenda"
+  class="hidden flex flex-col h-full min-h-0 overflow-hidden"
+>
+  <div
+    class="flex-1 min-h-0 overflow-y-auto pt-6 px-10 pb-10 max-md:px-4 max-md:pt-4 max-md:pb-7"
+  >
+    <header class="flex items-end justify-between gap-4 mb-5 max-md:flex-col max-md:items-start">
+      <div>
+        <p class="font-mono text-xs uppercase tracking-widest text-vekta mb-1.5">
+          google calendar
+        </p>
+        <h1 class="font-display text-3xl font-semibold tracking-tight">
+          Agenda
+        </h1>
+      </div>
+      <div id="ag-acoes" class="hidden flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          id="ag-hoje"
+          class="inline-flex items-center gap-2 px-4 py-2 border border-linha rounded-full bg-superficie text-sm font-medium text-tinta transition-colors hover:border-cinza-claro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45"
+        >
+          Hoje
+        </button>
+        <button
+          type="button"
+          id="ag-novo"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-vekta border border-vekta text-white text-sm font-medium transition-colors hover:bg-vekta-escuro hover:border-vekta-escuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45"
+        >
+          <iconify-icon
+            noobserver
+            icon="lucide:plus"
+            class="text-[15px]"
+            aria-hidden="true"
+          ></iconify-icon>
+          Novo evento
+        </button>
+        <button
+          type="button"
+          id="ag-atualizar"
+          class="inline-flex items-center gap-2 px-4 py-2 border border-linha rounded-full bg-superficie text-sm font-medium text-tinta transition-colors hover:border-cinza-claro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45"
+          title="Atualizar"
+          aria-label="Atualizar"
+        >
+          <iconify-icon
+            noobserver
+            icon="lucide:refresh-cw"
+            class="text-[15px]"
+            aria-hidden="true"
+          ></iconify-icon>
+          <span class="max-sm:hidden">Atualizar</span>
+        </button>
+      </div>
+    </header>
+
+    <div id="ag-setup" class="hidden text-center py-16 px-6 text-cinza">
+      <iconify-icon
+        noobserver
+        icon="lucide:calendar-off"
+        class="text-4xl text-vekta mb-4"
+        aria-hidden="true"
+      ></iconify-icon>
+      <h2 class="font-display text-xl text-tinta mb-2">
+        Google Calendar ainda não configurado
+      </h2>
+      <p class="text-base mb-3 max-w-xl mx-auto">
+        Ative a Calendar API no Google Cloud, gere um refresh token com scope
+        <code
+          class="bg-vekta-suave text-vekta px-1.5 py-0.5 rounded-md font-mono text-[0.9em]"
+          >calendar</code
+        >
+        e defina no
+        <code
+          class="bg-vekta-suave text-vekta px-1.5 py-0.5 rounded-md font-mono text-[0.9em]"
+          >interface/.env</code
+        >:
+      </p>
+      <ul
+        class="text-left inline-block text-sm space-y-1.5 mb-2 font-mono text-tinta"
+      >
+        <li>GOOGLE_CLIENT_ID</li>
+        <li>GOOGLE_CLIENT_SECRET</li>
+        <li>GOOGLE_CALENDAR_REFRESH_TOKEN</li>
+      </ul>
+      <p class="text-sm text-cinza-claro mt-3">
+        Opcional:
+        <code class="font-mono text-[0.9em]">GOOGLE_CALENDAR_CALENDAR_ID</code>
+        (default <code class="font-mono text-[0.9em]">primary</code>).
+      </p>
+    </div>
+
+    <div id="ag-painel" class="hidden">
+      <div
+        class="flex items-center justify-between gap-3 mb-4 flex-wrap"
+      >
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            id="ag-mes-ant"
+            class="inline-flex items-center justify-center w-9 h-9 rounded-full border border-linha bg-superficie text-tinta transition-colors hover:border-cinza-claro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta"
+            title="Mês anterior"
+            aria-label="Mês anterior"
+          >
+            <iconify-icon
+              noobserver
+              icon="lucide:chevron-left"
+              class="text-lg"
+              aria-hidden="true"
+            ></iconify-icon>
+          </button>
+          <h2
+            id="ag-mes-titulo"
+            class="font-display text-xl font-semibold tracking-tight min-w-[10rem] text-center"
+          ></h2>
+          <button
+            type="button"
+            id="ag-mes-prox"
+            class="inline-flex items-center justify-center w-9 h-9 rounded-full border border-linha bg-superficie text-tinta transition-colors hover:border-cinza-claro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta"
+            title="Próximo mês"
+            aria-label="Próximo mês"
+          >
+            <iconify-icon
+              noobserver
+              icon="lucide:chevron-right"
+              class="text-lg"
+              aria-hidden="true"
+            ></iconify-icon>
+          </button>
+        </div>
+        <p id="ag-status" class="text-sm text-cinza"></p>
+      </div>
+
+      <div
+        id="ag-grade"
+        class="bg-superficie border border-linha rounded-2xl overflow-hidden shadow-sm"
+      ></div>
+    </div>
+  </div>
+</section>

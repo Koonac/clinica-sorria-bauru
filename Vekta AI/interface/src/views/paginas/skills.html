@@ -1,0 +1,19 @@
+<!--vekta-pagina
+{ "titulo": "Skills", "icone": "lucide:puzzle", "ordem": 50, "grupo": "config", "descricao": "Especialistas acionados pelo Vekta" }
+-->
+<section id="aba-skills" class="hidden h-full overflow-y-auto pt-8.5 px-10 pb-10 max-md:px-4 max-md:pt-5 max-md:pb-7">
+  <header class="flex items-end justify-between gap-6 mb-6.5 max-md:flex-col max-md:items-start max-md:gap-2">
+    <div>
+      <p class="font-mono text-xs uppercase tracking-widest text-vekta mb-1.5">especialistas acionados pelo Vekta</p>
+      <h1 class="font-display text-3xl font-semibold tracking-tight">Skills</h1>
+    </div>
+    <p id="skills-resumo" class="text-cinza text-sm max-w-95 text-right max-md:text-left"></p>
+  </header>
+
+  <div id="skills-vazio" class="hidden text-center py-16 px-6 text-cinza">
+    <h2 class="font-display text-xl text-tinta mb-2">Nenhuma skill instalada</h2>
+    <p class="text-base">Skills vivem em <code class="bg-vekta-suave text-vekta px-1.5 py-0.5 rounded-md font-mono text-[0.9em]">.claude/skills/</code>, uma pasta por skill.</p>
+  </div>
+
+  <div id="skills-grade" class="grid grid-cols-1 lg:grid-cols-2 gap-4.5"></div>
+</section>

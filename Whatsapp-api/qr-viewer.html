@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Web API - QR Code Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #25D366;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .qr-section {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .qr-code {
+            border: 2px solid #25D366;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 300px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.connecting {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .instructions {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .instructions ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 5px 0;
+        }
+        button {
+            background-color: #25D366;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #128C7E;
+        }
+        .api-info {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 WhatsApp Web API</h1>
+        
+        <div class="api-info">
+            <h3>🔗 Endpoints da API:</h3>
+            <ul>
+                <li><strong>POST /api/whatsapp/connect</strong> - Criar conexão</li>
+                <li><strong>GET /api/whatsapp/qrcode/:sessionId</strong> - Obter QR Code</li>
+                <li><strong>GET /api/whatsapp/status/:sessionId</strong> - Verificar status</li>
+                                 <li><strong>POST /api/whatsapp/send/:sessionId</strong> - Enviar mensagem</li>
+            </ul>
+        </div>
+
+                 <div class="qr-section">
+             <h2>🔐 Conectar WhatsApp</h2>
+             <button onclick="createConnection()">Criar Conexão</button>
+             <button onclick="getQRCode()">Obter QR Code</button>
+             <button onclick="checkStatus()">Verificar Status</button>
+         </div>
+
+         <div class="qr-section" id="send-message-section" style="display: none;">
+             <h2>📤 Enviar Mensagem</h2>
+             <div style="margin: 20px 0;">
+                 <label for="phoneNumber" style="display: block; margin-bottom: 5px; font-weight: bold;">Número de Telefone:</label>
+                 <input type="text" id="phoneNumber" placeholder="Ex: 5511999999999" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 15px;">
+                 
+                 <label for="messageText" style="display: block; margin-bottom: 5px; font-weight: bold;">Mensagem:</label>
+                 <textarea id="messageText" placeholder="Digite sua mensagem aqui..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; height: 100px; margin-bottom: 15px; resize: vertical;"></textarea>
+                 
+                 <button onclick="sendMessage()" style="background-color: #25D366; color: white; border: none; padding: 12px 24px; border-radius: 5px; cursor: pointer; font-size: 16px;">
+                     📤 Enviar Mensagem
+                 </button>
+                 <p style="margin-top: 10px; font-size: 12px; color: #666;">
+                     💡 Dica: Use Ctrl+Enter no campo de mensagem para enviar rapidamente
+                 </p>
+             </div>
+         </div>
+
+        <div id="status" class="status connecting" style="display: none;">
+            Aguardando conexão...
+        </div>
+
+        <div id="qr-container" class="qr-section" style="display: none;">
+            <h3>📱 QR Code para Conectar</h3>
+            <div class="qr-code">
+                <img id="qr-image" src="" alt="QR Code" style="max-width: 100%;">
+            </div>
+            <p><strong>QR Code:</strong> <span id="qr-text"></span></p>
+        </div>
+
+        <div class="instructions">
+            <h3>📝 Instruções:</h3>
+                         <ol>
+                 <li>Clique em "Criar Conexão" para iniciar uma nova sessão</li>
+                 <li>Clique em "Obter QR Code" para visualizar o código QR</li>
+                 <li>Abra o WhatsApp no seu celular</li>
+                 <li>Vá em Configurações > Dispositivos Vinculados</li>
+                 <li>Escaneie o QR Code exibido</li>
+                 <li>Clique em "Verificar Status" para acompanhar a conexão</li>
+                 <li>Após conectado, use a seção "Enviar Mensagem" para testar o envio</li>
+             </ol>
+        </div>
+
+        <div id="result" style="margin-top: 20px;"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api';
+        let currentSessionId = null;
+
+        async function createConnection() {
+            try {
+                const sessionId = 'session-' + Date.now();
+                // const sessionId = 'session-1756849498238';
+                currentSessionId = sessionId;
+                
+                const response = await fetch(`${API_BASE}/whatsapp/connect`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Basic ' + btoa('admin:123456')
+                    },
+                    body: JSON.stringify({ sessionId })
+                });
+                
+                const data = await response.json();
+                showResult('Conexão criada', data);
+                showStatus('Conectando...', 'connecting');
+                
+            } catch (error) {
+                showResult('Erro ao criar conexão', { error: error.message });
+            }
+        }
+
+        async function getQRCode() {
+            if (!currentSessionId) {
+                showResult('Erro', { error: 'Crie uma conexão primeiro' });
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/whatsapp/qrcode/${currentSessionId}`, {
+                    headers: {
+                        'Authorization': 'Basic ' + btoa('admin:123456')
+                    }
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('qr-image').src = data.qrImage;
+                    document.getElementById('qr-text').textContent = data.qr.substring(0, 50) + '...';
+                    document.getElementById('qr-container').style.display = 'block';
+                    showResult('QR Code obtido', data);
+                } else {
+                    showResult('Erro ao obter QR Code', data);
+                }
+                
+            } catch (error) {
+                showResult('Erro ao obter QR Code', { error: error.message });
+            }
+        }
+
+        async function checkStatus() {
+             if (!currentSessionId) {
+                 showResult('Erro', { error: 'Crie uma conexão primeiro' });
+                 return;
+             }
+
+             try {
+                 const response = await fetch(`${API_BASE}/whatsapp/status/${currentSessionId}`, {
+                     headers: {
+                         'Authorization': 'Basic ' + btoa('admin:123456')
+                     }
+                 });
+                 const data = await response.json();
+                 
+                 if (data.success) {
+                     const statusClass = data.status === 'connected' ? 'connected' : 'connecting';
+                     const statusText = data.status === 'connected' ? 'Conectado!' : 'Conectando...';
+                     showStatus(statusText, statusClass);
+                     showResult('Status da conexão', data);
+                     
+                     // Mostrar seção de envio de mensagem se estiver conectado
+                     if (data.status === 'connected') {
+                         document.getElementById('send-message-section').style.display = 'block';
+                     }
+                 } else {
+                     showResult('Erro ao verificar status', data);
+                 }
+                 
+             } catch (error) {
+                 showResult('Erro ao verificar status', { error: error.message });
+             }
+         }
+
+         async function sendMessage() {
+             if (!currentSessionId) {
+                 showResult('Erro', { error: 'Crie uma conexão primeiro' });
+                 return;
+             }
+
+             const phoneNumber = document.getElementById('phoneNumber').value.trim();
+             const messageText = document.getElementById('messageText').value.trim();
+
+             if (!phoneNumber) {
+                 showResult('Erro', { error: 'Digite um número de telefone' });
+                 return;
+             }
+
+             if (!messageText) {
+                 showResult('Erro', { error: 'Digite uma mensagem' });
+                 return;
+             }
+
+             try {
+                 const response = await fetch(`${API_BASE}/whatsapp/send/${currentSessionId}`, {
+                     method: 'POST',
+                     headers: {
+                         'Content-Type': 'application/json',
+                         'Authorization': 'Basic ' + btoa('admin:123456')
+                     },
+                     body: JSON.stringify({
+                         to: phoneNumber,
+                         message: messageText
+                     })
+                 });
+                 
+                 const data = await response.json();
+                 
+                 if (data.success) {
+                     showResult('✅ Mensagem enviada com sucesso!', data);
+                     // Limpar campos após envio bem-sucedido
+                     document.getElementById('phoneNumber').value = '';
+                     document.getElementById('messageText').value = '';
+                 } else {
+                     showResult('❌ Erro ao enviar mensagem', data);
+                 }
+                 
+             } catch (error) {
+                 showResult('Erro ao enviar mensagem', { error: error.message });
+             }
+         }
+
+         function showStatus(text, className) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = text;
+            statusDiv.className = `status ${className}`;
+            statusDiv.style.display = 'block';
+        }
+
+                 function showResult(title, data) {
+             const resultDiv = document.getElementById('result');
+             resultDiv.innerHTML = `
+                 <h3>${title}</h3>
+                 <pre>${JSON.stringify(data, null, 2)}</pre>
+             `;
+         }
+
+         // Adicionar evento para enviar mensagem com Ctrl+Enter
+         document.addEventListener('DOMContentLoaded', function() {
+             const messageTextarea = document.getElementById('messageText');
+             if (messageTextarea) {
+                 messageTextarea.addEventListener('keydown', function(e) {
+                     if (e.ctrlKey && e.key === 'Enter') {
+                         e.preventDefault();
+                         sendMessage();
+                     }
+                 });
+             }
+         });
+    </script>
+</body>
+</html>

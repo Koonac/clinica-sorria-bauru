@@ -1,0 +1,34 @@
+# Unit template — preenchido por deploy/host/setup-vekta-host.sh
+# Paths sem espaço (usa symlink vekta-ai → "Vekta AI").
+#
+# Upstream nginx: 127.0.0.1:4680
+
+[Unit]
+Description=Vekta AI Interface (Node + Claude CLI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__VEKTA_USER__
+Group=__VEKTA_GROUP__
+WorkingDirectory=__VEKTA_INTERFACE_DIR__
+
+EnvironmentFile=-/etc/default/vekta-ai
+EnvironmentFile=-__VEKTA_ROOT__/.env
+
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=4680
+Environment=HOME=__VEKTA_HOME__
+Environment=PATH=__VEKTA_PATH__
+Environment=DISPLAY=:99
+
+ExecStart=__VEKTA_RUN_SCRIPT__
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,238 @@
+<!--vekta-pagina
+{ "titulo": "Tráfego", "icone": "lucide:chart-column", "ordem": 56 }
+-->
+<section
+  id="aba-trafego"
+  class="hidden flex flex-col h-full min-h-0 overflow-hidden"
+>
+  <div class="flex flex-1 min-h-0 flex-col lg:flex-row">
+    <!-- Painel de dados -->
+    <div
+      class="flex-1 min-w-0 min-h-0 overflow-y-auto pt-6 px-10 pb-10 max-md:px-4 max-md:pt-4 max-md:pb-7"
+    >
+      <header class="flex items-center justify-between gap-4 mb-5">
+        <div
+          id="tf-subabas"
+          class="flex gap-2 flex-wrap min-w-0"
+          role="tablist"
+          aria-label="Seções de Tráfego"
+        ></div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            id="tf-gerar-analise"
+            class="hidden shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-vekta border border-vekta text-white text-sm font-medium transition-colors hover:bg-vekta-escuro hover:border-vekta-escuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45"
+            title="Gerar análise no chat"
+            aria-label="Gerar análise"
+          >
+            <iconify-icon
+              noobserver
+              icon="lucide:sparkles"
+              class="text-[15px]"
+              aria-hidden="true"
+            ></iconify-icon>
+            <span class="max-sm:hidden">Gerar análise</span>
+          </button>
+          <button
+            type="button"
+            id="tf-atualizar"
+            class="shrink-0 inline-flex items-center gap-2 px-4 py-2 border border-linha rounded-full bg-superficie text-sm font-medium text-tinta transition-colors hover:border-cinza-claro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45"
+            title="Atualizar"
+            aria-label="Atualizar"
+          >
+            <iconify-icon
+              noobserver
+              icon="lucide:refresh-cw"
+              class="text-[15px]"
+              aria-hidden="true"
+            ></iconify-icon>
+            <span class="max-sm:hidden">Atualizar</span>
+          </button>
+        </div>
+      </header>
+
+      <div id="tf-setup-meta" class="hidden text-center py-16 px-6 text-cinza">
+        <iconify-icon
+          noobserver
+          icon="lucide:megaphone"
+          class="text-4xl text-vekta mb-4"
+          aria-hidden="true"
+        ></iconify-icon>
+        <h2 class="font-display text-xl text-tinta mb-2">
+          Meta Ads ainda não conectado
+        </h2>
+        <p class="text-base mb-3 max-w-xl mx-auto">
+          Adicione o produto Marketing API no App Dashboard da Meta, gere um
+          token com permissão
+          <code
+            class="bg-vekta-suave text-vekta px-1.5 py-0.5 rounded-md font-mono text-[0.9em]"
+            >ads_read</code
+          >
+          e defina
+          <code
+            class="bg-vekta-suave text-vekta px-1.5 py-0.5 rounded-md font-mono text-[0.9em]"
+            >META_ADS_ACCESS_TOKEN</code
+          >
+          e
+          <code
+            class="bg-vekta-suave text-vekta px-1.5 py-0.5 rounded-md font-mono text-[0.9em]"
+            >META_AD_ACCOUNT_ID</code
+          >
+          (<code
+            class="bg-vekta-suave text-vekta px-1.5 py-0.5 rounded-md font-mono text-[0.9em]"
+            >act_…</code
+          >) em
+          <code
+            class="bg-vekta-suave text-vekta px-1.5 py-0.5 rounded-md font-mono text-[0.9em]"
+            >interface/.env</code
+          >.
+        </p>
+        <p class="text-sm text-cinza-claro">
+          Não reutilize o token do Instagram. Reinicie a interface depois de
+          salvar.
+        </p>
+      </div>
+
+      <div id="tf-setup-google" class="hidden text-center py-16 px-6 text-cinza">
+        <iconify-icon
+          noobserver
+          icon="lucide:chrome"
+          class="text-4xl text-vekta mb-4"
+          aria-hidden="true"
+        ></iconify-icon>
+        <h2 class="font-display text-xl text-tinta mb-2">
+          Google Ads ainda não conectado
+        </h2>
+        <p class="text-sm text-cinza-claro">
+          O developer token fica em Ads → Centro da API. Reinicie a interface
+          depois de salvar.
+        </p>
+      </div>
+
+      <div id="tf-conteudo" class="hidden">
+        <p id="tf-erro" class="hidden text-sm text-alerta mb-4" role="alert"></p>
+        <div id="tf-painel-meta" role="tabpanel"></div>
+        <div id="tf-painel-google" class="hidden" role="tabpanel"></div>
+      </div>
+    </div>
+
+    <!-- Chat exclusivo de Tráfego (canal "trafego") — oculto até "Gerar análise" -->
+    <aside
+      id="tf-chat"
+      class="hidden flex flex-col shrink-0 border-l border-linha bg-superficie min-h-0 w-[min(400px,100%)] max-lg:w-full max-lg:max-h-[42vh] max-lg:border-l-0 max-lg:border-t"
+      hidden
+    >
+      <header
+        class="shrink-0 flex items-center justify-between gap-2 px-3 h-12 border-b border-linha"
+      >
+        <div class="flex items-center gap-2 min-w-0">
+          <iconify-icon
+            noobserver
+            icon="lucide:sparkles"
+            class="text-[16px] text-vekta shrink-0"
+            aria-hidden="true"
+          ></iconify-icon>
+          <div class="min-w-0">
+            <p
+              class="font-display text-sm font-semibold tracking-tight truncate"
+            >
+              Chat de tráfego
+            </p>
+            <p class="font-mono text-[10px] text-vekta truncate">
+              análises de campanhas
+            </p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            id="tchat-nova"
+            title="Nova conversa"
+            aria-label="Nova conversa"
+            class="inline-flex items-center justify-center w-8 h-8 rounded-md text-cinza transition-colors hover:bg-fundo hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta"
+          >
+            <iconify-icon
+              noobserver
+              icon="lucide:plus"
+              class="text-[16px]"
+              aria-hidden="true"
+            ></iconify-icon>
+          </button>
+          <button
+            type="button"
+            id="tchat-fechar"
+            title="Fechar chat"
+            aria-label="Fechar chat"
+            class="inline-flex items-center justify-center w-8 h-8 rounded-md text-cinza transition-colors hover:bg-fundo hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta"
+          >
+            <iconify-icon
+              noobserver
+              icon="lucide:x"
+              class="text-[16px]"
+              aria-hidden="true"
+            ></iconify-icon>
+          </button>
+        </div>
+      </header>
+
+      <div id="tchat-rolagem" class="flex-1 overflow-y-auto px-3 min-h-0">
+        <div id="tchat-mensagens" class="min-h-full flex flex-col gap-3 py-3">
+          <div
+            id="tchat-boasvindas"
+            class="flex-1 flex flex-col items-center justify-center text-center px-4 text-cinza"
+          >
+            <iconify-icon
+              noobserver
+              icon="lucide:megaphone"
+              class="text-[28px] text-vekta mb-2"
+              aria-hidden="true"
+            ></iconify-icon>
+            <h2 class="font-display text-base text-tinta mb-1">
+              Análise de tráfego
+            </h2>
+            <p class="text-sm">
+              Use “Gerar análise” ou pergunte sobre as campanhas.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <form
+        id="tchat-form"
+        class="relative shrink-0 flex flex-col gap-1.5 mx-2.5 mb-2.5 mt-1 bg-fundo border border-linha rounded-2xl pl-2 py-2 pr-1.5 transition-colors focus-within:border-vekta"
+      >
+        <div class="flex gap-1.5 items-end">
+          <textarea
+            id="tchat-entrada"
+            rows="1"
+            placeholder="Ex.: o que melhorar no CPC?"
+            autocomplete="off"
+            class="flex-1 border-0 resize-none bg-transparent font-sans text-sm text-tinta max-h-36 leading-normal py-2 px-2 focus:outline-none"
+          ></textarea>
+          <button
+            type="submit"
+            id="tchat-enviar"
+            title="Enviar"
+            aria-label="Enviar"
+            data-modo="enviar"
+            class="chat-btn-enviar inline-flex items-center justify-center rounded-full bg-vekta border border-vekta text-white w-9 h-9 shrink-0 transition-colors hover:bg-vekta-escuro hover:border-vekta-escuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45 disabled:cursor-default"
+          >
+            <iconify-icon
+              id="tchat-enviar-icone"
+              noobserver
+              icon="lucide:arrow-up"
+              class="text-[17px] block"
+              aria-hidden="true"
+            ></iconify-icon>
+            <span
+              id="tchat-enviar-stop"
+              hidden
+              class="block w-3 h-3 rounded-[2px] bg-current"
+              aria-hidden="true"
+            ></span>
+          </button>
+        </div>
+      </form>
+    </aside>
+  </div>
+</section>

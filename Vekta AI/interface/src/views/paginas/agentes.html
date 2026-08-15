@@ -1,0 +1,19 @@
+<!--vekta-pagina
+{ "titulo": "Agents", "icone": "lucide:bot", "ordem": 40, "grupo": "config", "descricao": "Especialistas com autonomia própria" }
+-->
+<section id="aba-agentes" class="hidden h-full overflow-y-auto pt-8.5 px-10 pb-10 max-md:px-4 max-md:pt-5 max-md:pb-7">
+  <header class="flex items-end justify-between gap-6 mb-6.5 max-md:flex-col max-md:items-start max-md:gap-2">
+    <div>
+      <p class="font-mono text-xs uppercase tracking-widest text-vekta mb-1.5">especialistas com autonomia própria</p>
+      <h1 class="font-display text-3xl font-semibold tracking-tight">Agents</h1>
+    </div>
+    <p id="agentes-resumo" class="text-cinza text-sm max-w-95 text-right max-md:text-left"></p>
+  </header>
+
+  <div id="agentes-vazio" class="hidden text-center py-16 px-6 text-cinza">
+    <h2 class="font-display text-xl text-tinta mb-2">Nenhum agent instalado</h2>
+    <p class="text-base">Agents vivem em <code class="bg-vekta-suave text-vekta px-1.5 py-0.5 rounded-md font-mono text-[0.9em]">.claude/agents/</code> e são delegados pelo CLAUDE.md raiz.</p>
+  </div>
+
+  <div id="agentes-grade" class="grid grid-cols-1 lg:grid-cols-2 gap-4.5"></div>
+</section>

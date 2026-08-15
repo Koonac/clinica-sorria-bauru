@@ -1,0 +1,163 @@
+<!--vekta-pagina
+{ "titulo": "Financeiro", "icone": "lucide:wallet", "ordem": 62 }
+-->
+<section
+  id="aba-financeiro"
+  class="hidden flex flex-col h-full min-h-0 overflow-hidden"
+>
+  <div
+    class="flex flex-col flex-1 min-h-0 pt-6 px-10 pb-6 max-md:px-4 max-md:pt-4 max-md:pb-4"
+  >
+    <header
+      class="shrink-0 flex items-end justify-between gap-4 mb-5 max-md:flex-col max-md:items-start"
+    >
+      <div>
+        <p class="font-mono text-xs uppercase tracking-widest text-vekta mb-1.5">
+          gestão
+        </p>
+        <h1 class="font-display text-3xl font-semibold tracking-tight">
+          Financeiro
+        </h1>
+      </div>
+      <div id="fin-acoes" class="hidden flex flex-wrap items-center gap-2">
+        <div
+          class="inline-flex items-center rounded-full border border-linha bg-superficie p-1"
+          role="tablist"
+          aria-label="Visualização do financeiro"
+        >
+          <button
+            type="button"
+            id="fin-ver-dashboard"
+            role="tab"
+            class="px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors"
+          >
+            Dashboard
+          </button>
+          <button
+            type="button"
+            id="fin-ver-pagar"
+            role="tab"
+            class="px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors"
+          >
+            A pagar
+          </button>
+          <button
+            type="button"
+            id="fin-ver-receber"
+            role="tab"
+            class="px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors"
+          >
+            A receber
+          </button>
+          <button
+            type="button"
+            id="fin-ver-contas"
+            role="tab"
+            class="px-3.5 py-1.5 rounded-full text-sm font-medium transition-colors"
+          >
+            Plano de contas
+          </button>
+        </div>
+        <button
+          type="button"
+          id="fin-novo"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-vekta border border-vekta text-white text-sm font-medium transition-colors hover:bg-vekta-escuro hover:border-vekta-escuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45"
+        >
+          <iconify-icon
+            noobserver
+            icon="lucide:plus"
+            class="text-[15px]"
+            aria-hidden="true"
+          ></iconify-icon>
+          <span id="fin-novo-rotulo">Novo lançamento</span>
+        </button>
+        <button
+          type="button"
+          id="fin-atualizar"
+          class="inline-flex items-center gap-2 px-4 py-2 border border-linha rounded-full bg-superficie text-sm font-medium text-tinta transition-colors hover:border-cinza-claro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45"
+          title="Atualizar"
+          aria-label="Atualizar"
+        >
+          <iconify-icon
+            noobserver
+            icon="lucide:refresh-cw"
+            class="text-[15px]"
+            aria-hidden="true"
+          ></iconify-icon>
+          <span class="max-sm:hidden">Atualizar</span>
+        </button>
+      </div>
+    </header>
+
+    <div id="fin-setup" class="hidden text-center py-16 px-6 text-cinza">
+      <iconify-icon
+        noobserver
+        icon="lucide:plug-zap"
+        class="text-4xl text-vekta mb-4"
+        aria-hidden="true"
+      ></iconify-icon>
+      <h2 class="font-display text-xl text-tinta mb-2">
+        Backend do financeiro ainda não configurado
+      </h2>
+      <p class="text-base mb-3 max-w-xl mx-auto">
+        Suba o backend Laravel, rode
+        <code
+          class="bg-vekta-suave text-vekta px-1.5 py-0.5 rounded-md font-mono text-[0.9em]"
+          >php artisan db:seed --class=FinanceSeeder</code
+        >
+        e defina no
+        <code
+          class="bg-vekta-suave text-vekta px-1.5 py-0.5 rounded-md font-mono text-[0.9em]"
+          >interface/.env</code
+        >:
+      </p>
+      <ul
+        class="text-left inline-block text-sm space-y-1.5 mb-2 font-mono text-tinta"
+      >
+        <li>BACKEND_URL</li>
+        <li>BACKEND_API_TOKEN</li>
+      </ul>
+    </div>
+
+    <div id="fin-painel" class="hidden flex flex-col flex-1 min-h-0">
+      <p id="fin-status" class="shrink-0 text-sm text-cinza mb-3"></p>
+
+      <div class="flex-1 min-h-0 overflow-y-auto">
+        <div id="fin-vista-dashboard" class="hidden flex flex-col gap-4 pb-2">
+          <div
+            id="fin-kpis"
+            class="grid gap-3.5 grid-cols-[repeat(auto-fit,minmax(190px,1fr))]"
+          ></div>
+          <div
+            id="fin-grafico-fluxo"
+            class="bg-superficie border border-linha rounded-2xl shadow-sm overflow-hidden"
+          ></div>
+          <div class="grid gap-4 grid-cols-1 lg:grid-cols-2">
+            <div
+              id="fin-grafico-previsto"
+              class="bg-superficie border border-linha rounded-2xl shadow-sm overflow-hidden"
+            ></div>
+            <div
+              id="fin-grafico-situacao"
+              class="bg-superficie border border-linha rounded-2xl shadow-sm overflow-hidden"
+            ></div>
+          </div>
+          <div class="grid gap-4 grid-cols-1 lg:grid-cols-2">
+            <div
+              id="fin-proximos"
+              class="bg-superficie border border-linha rounded-2xl shadow-sm overflow-hidden"
+            ></div>
+            <div
+              id="fin-por-conta"
+              class="bg-superficie border border-linha rounded-2xl shadow-sm overflow-hidden"
+            ></div>
+          </div>
+        </div>
+
+        <div id="fin-vista-pagar" class="hidden pb-2"></div>
+        <div id="fin-vista-receber" class="hidden pb-2"></div>
+        <div id="fin-vista-contas" class="hidden pb-2"></div>
+      </div>
+    </div>
+  </div>
+</section>

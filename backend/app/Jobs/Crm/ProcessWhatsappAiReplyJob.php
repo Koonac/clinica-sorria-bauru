@@ -1,0 +1,138 @@
+<?php
+
+namespace App\Jobs\Crm;
+
+use App\Models\Crm\Agent;
+use App\Models\Crm\Lead;
+use App\Models\Crm\PipelineStage;
+use App\Models\User;
+use App\Services\Crm\Agent\AgentContext;
+use App\Services\Crm\Agent\WhatsappAgentRunner;
+use App\Services\Crm\WhatsappChatHistory;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Throwable;
+
+class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProcessing
+{
+    use Queueable;
+
+    public int $uniqueFor = 120;
+
+    public function __construct(
+        public int $userId,
+        public string $chatKey,
+    ) {}
+
+    public function uniqueId(): string
+    {
+        return 'whatsapp-ai:'.$this->userId.':'.$this->chatKey;
+    }
+
+    public function handle(WhatsappAgentRunner $runner, WhatsappChatHistory $history): void
+    {
+        $user = User::query()->find($this->userId);
+        if (! $user) {
+            return;
+        }
+
+        $agent = Agent::activeFor($user);
+        if (! $agent || ! $agent->canActivate()) {
+            return;
+        }
+
+        if ($user->whatsapp_status !== 'connected' || ! filled($user->whatsapp_session_id)) {
+            return;
+        }
+
+        [$leadId, $jid] = $this->parseChatKey($this->chatKey);
+
+        $lead = $leadId ? Lead::query()->with('stage')->find($leadId) : null;
+        if ($lead?->isWhatsappAgentPaused()) {
+            return;
+        }
+
+        $latest = $history->latestInbound($user->id, $leadId, $jid);
+        if (! $latest) {
+            return;
+        }
+
+        $body = trim((string) ($latest->body ?? ''));
+        if ($body === '' && ! $latest->has_media) {
+            return;
+        }
+
+        $idempotencyKey = 'wa-ai:replied:'.$latest->id;
+        if (! Cache::add($idempotencyKey, 1, now()->addDay())) {
+            return;
+        }
+
+        if (! $lead && $latest->lead_id) {
+            $lead = Lead::query()->with('stage')->find($latest->lead_id);
+            if ($lead?->isWhatsappAgentPaused()) {
+                return;
+            }
+        }
+
+        $jid = $latest->whatsapp_jid ?: $jid;
+        if (! $jid) {
+            return;
+        }
+
+        $stages = PipelineStage::ofKind('lead')
+            ->where('active', true)
+            ->orderBy('position')
+            ->get(['id', 'name', 'is_lost'])
+            ->map(fn ($s) => [
+                'id' => (int) $s->id,
+                'name' => (string) $s->name,
+                'is_lost' => (bool) $s->is_lost,
+            ])
+            ->all();
+
+        $context = new AgentContext(
+            user: $user,
+            agent: $agent,
+            chatKey: $this->chatKey,
+            jid: $jid,
+            sessionId: (string) $user->whatsapp_session_id,
+            lead: $lead,
+            deal: $latest->deal_id ? $latest->deal()->first() : null,
+            leadStages: $stages,
+        );
+
+        try {
+            $runner->run($context);
+        } catch (Throwable $e) {
+            Cache::forget($idempotencyKey);
+            Log::error('Falha no WhatsApp agent.', [
+                'user_id' => $user->id,
+                'agent_id' => $agent->id,
+                'chat_key' => $this->chatKey,
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * @return array{0: ?int, 1: ?string}
+     */
+    private function parseChatKey(string $chatKey): array
+    {
+        if (str_starts_with($chatKey, 'lead:')) {
+            $id = (int) substr($chatKey, 5);
+
+            return [$id > 0 ? $id : null, null];
+        }
+
+        if (str_starts_with($chatKey, 'jid:')) {
+            return [null, substr($chatKey, 4) ?: null];
+        }
+
+        return [null, $chatKey !== '' ? $chatKey : null];
+    }
+}

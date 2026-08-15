@@ -1,0 +1,16 @@
+node_modules
+npm-debug.log*
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+*.md
+!README.md
+sessions/*
+.cursor
+coverage
+.DS_Store
+Thumbs.db
+qr-viewer.html
+test-*.js

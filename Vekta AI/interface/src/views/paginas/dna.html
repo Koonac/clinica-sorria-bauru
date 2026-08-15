@@ -1,0 +1,30 @@
+<!--vekta-pagina
+{ "titulo": "DNA", "icone": "lucide:dna", "ordem": 30, "grupo": "config", "descricao": "Fonte canônica de contexto da empresa" }
+-->
+<section id="aba-dna" class="hidden h-full overflow-y-auto pt-8.5 px-10 pb-10 max-md:px-4 max-md:pt-5 max-md:pb-7">
+  <header class="flex items-end justify-between gap-6 mb-6.5 max-md:flex-col max-md:items-start max-md:gap-2">
+    <div>
+      <p class="font-mono text-xs uppercase tracking-widest text-vekta mb-1.5">fonte canônica de contexto</p>
+      <h1 class="font-display text-3xl font-semibold tracking-tight">DNA da empresa</h1>
+    </div>
+    <p class="text-cinza text-sm max-w-95 text-right max-md:text-left">Tudo que o Vekta Ai afirma sobre o negócio nasce destes arquivos.</p>
+  </header>
+
+  <div id="dna-vazio" class="hidden text-center py-16 px-6 text-cinza">
+    <div class="orbe-anel orbe-anel--grande relative w-16 h-16 mx-auto mb-4 rounded-full"></div>
+    <h2 class="font-display text-xl text-tinta mb-2">O DNA ainda não foi instalado</h2>
+    <p class="text-base mb-5">O Vekta Ai precisa conhecer a empresa antes de produzir qualquer coisa.<br/>Rode a instalação pelo chat para preencher o contexto.</p>
+    <button id="botao-instalar" class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium bg-vekta border border-vekta text-white transition-colors hover:bg-vekta-escuro hover:border-vekta-escuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta">Instalar pelo chat</button>
+  </div>
+
+  <article id="painel-logos" class="bg-superficie border border-linha rounded-2xl px-5.5 py-5 shadow-sm mb-4.5">
+    <div class="flex items-baseline justify-between gap-3 mb-1">
+      <h2 class="font-display text-lg font-semibold"><code class="font-mono text-vekta">.dna/logos/</code></h2>
+      <span id="contagem-logos" class="font-mono text-xs text-cinza-claro"></span>
+    </div>
+    <p class="text-sm text-cinza mb-3.5">Arquivos finais de logo, já aprovados.</p>
+    <div id="logos-fita" class="flex gap-3.5 flex-wrap"></div>
+  </article>
+
+  <div id="dna-grade" class="grid grid-cols-1 lg:grid-cols-2 gap-4.5 mb-4.5"></div>
+</section>

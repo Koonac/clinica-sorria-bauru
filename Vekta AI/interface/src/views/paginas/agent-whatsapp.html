@@ -1,0 +1,57 @@
+<!--vekta-pagina
+{ "titulo": "Agents", "icone": "lucide:bot", "ordem": 59 }
+-->
+<section
+  id="aba-agent-whatsapp"
+  class="hidden flex flex-col h-full min-h-0 overflow-hidden"
+>
+  <div
+    class="flex flex-col flex-1 min-h-0 pt-6 px-10 pb-6 max-md:px-4 max-md:pt-4 max-md:pb-4"
+  >
+    <header
+      class="shrink-0 flex items-end justify-between gap-4 mb-5 max-md:flex-col max-md:items-start"
+    >
+      <div>
+        <p class="font-mono text-xs uppercase tracking-widest text-vekta mb-1.5">
+          whatsapp
+        </p>
+        <h1 class="font-display text-3xl font-semibold tracking-tight">
+          Agents
+        </h1>
+        <p class="text-sm text-cinza mt-1.5 max-w-xl">
+          Atendimento automático no WhatsApp. Só um agent ativo por vez.
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <p id="awa-status" class="text-sm text-cinza" aria-live="polite"></p>
+        <button
+          type="button"
+          id="awa-novo"
+          class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-vekta text-white text-sm font-medium transition-colors hover:bg-vekta/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta"
+        >
+          <iconify-icon
+            noobserver
+            icon="lucide:plus"
+            class="text-[15px]"
+            aria-hidden="true"
+          ></iconify-icon>
+          Novo agent
+        </button>
+      </div>
+    </header>
+
+    <div id="awa-conteudo" class="flex-1 min-h-0 overflow-y-auto">
+      <div
+        id="awa-grade"
+        class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"
+      ></div>
+      <div id="awa-vazio" class="hidden text-center py-16 px-6 text-cinza">
+        <h2 class="font-display text-xl text-tinta mb-2">Nenhum agent ainda</h2>
+        <p class="text-base max-w-md mx-auto">
+          Crie um agent com system prompt e ative-o para responder o WhatsApp
+          automaticamente (mover cards, agendar e escalar humano).
+        </p>
+      </div>
+    </div>
+  </div>
+</section>

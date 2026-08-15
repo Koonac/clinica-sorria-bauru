@@ -1,0 +1,67 @@
+{
+  "name": "vekta-ai-interface",
+  "version": "1.0.0",
+  "description": "Interface local do Vekta Ai — dashboard, DNA, galeria e chat via Claude CLI",
+  "main": "electron/main.js",
+  "scripts": {
+    "postinstall": "node scripts/copy-vendor-libs.js",
+    "prestart": "npm run css:build && npm run lucide:build",
+    "start": "node src/app.js",
+    "predev": "npm run css:build && npm run lucide:build",
+    "dev": "concurrently -n css,lucide,server -c blue,magenta,green \"npm:css:watch\" \"npm:lucide:watch\" \"npm:dev:server\"",
+    "dev:server": "node --watch --watch-path=src/app.js --watch-path=src/config --watch-path=src/controllers --watch-path=src/routes --watch-path=src/services --watch-path=src/sockets --watch-path=src/middlewares src/app.js",
+    "preelectron": "npm run css:build && npm run lucide:build",
+    "electron": "electron .",
+    "app:dev": "concurrently -n css,lucide,electron -c blue,magenta,cyan \"npm:css:watch\" \"npm:lucide:watch\" \"electron .\"",
+    "dist": "npm run css:build && npm run lucide:build && electron-builder",
+    "css:build": "tailwindcss -i src/styles/tailwind.css -o public/css/tailwind.css --minify",
+    "css:watch": "tailwindcss -i src/styles/tailwind.css -o public/css/tailwind.css --watch",
+    "lucide:build": "node scripts/build-lucide-preload.js",
+    "lucide:watch": "node scripts/build-lucide-preload.js --watch"
+  },
+  "dependencies": {
+    "@iconify-json/lucide": "^1.2.116",
+    "animejs": "^3.2.2",
+    "chart.js": "^4.5.1",
+    "chokidar": "^3.6.0",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.6.0",
+    "express-session": "^1.19.0",
+    "iconify-icon": "^3.0.2",
+    "marked": "^15.0.7",
+    "slim-select": "^4.0.7",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.2",
+    "concurrently": "^9.1.2",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "tailwindcss": "^4.3.2"
+  },
+  "build": {
+    "appId": "ai.vekta.desktop",
+    "productName": "Vekta Ai",
+    "//": "Config provisória — a estratégia de projeto gravável (fonte fora do asar, para o Vekta se auto-modificar na máquina do cliente) é o próximo pilar; por isso asar já vem desligado.",
+    "asar": false,
+    "directories": {
+      "output": "dist-desktop"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "public/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

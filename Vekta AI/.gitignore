@@ -1,0 +1,10 @@
+.env
+/materiais
+/materiais/*
+/saidas
+/saidas/*
+/tarefas.md
+/interface/node_modules
+/interface/package-lock.json
+/interface/public/css/tailwind.css
+/interface/public/vendor

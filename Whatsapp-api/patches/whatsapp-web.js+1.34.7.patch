@@ -1,0 +1,49 @@
+diff --git a/node_modules/whatsapp-web.js/src/Client.js b/node_modules/whatsapp-web.js/src/Client.js
+index 1111111..2222222 100644
+--- a/node_modules/whatsapp-web.js/src/Client.js
++++ b/node_modules/whatsapp-web.js/src/Client.js
+@@ -495,18 +495,41 @@ class Client extends EventEmitter {
+             referer: 'https://whatsapp.com/',
+         });
+ 
+-        await this.inject();
+-
+         this.pupPage.on('framenavigated', async (frame) => {
++            if (frame !== this.pupPage.mainFrame()) {
++                return;
++            }
++
+             if (frame.url().includes('post_logout=1') || this.lastLoggedOut) {
+                 this.emit(Events.DISCONNECTED, 'LOGOUT');
+                 await this.authStrategy.logout();
+                 await this.authStrategy.beforeBrowserInitialized();
+                 await this.authStrategy.afterBrowserInitialized();
+                 this.lastLoggedOut = false;
+             }
+-            await this.inject();
++
++            try {
++                const alreadyInjected = await this.pupPage
++                    .evaluate(() => typeof window.WWebJS !== 'undefined')
++                    .catch(() => false);
++                if (alreadyInjected) {
++                    return;
++                }
++                await this.inject();
++            } catch (error) {
++                const message = error?.message || String(error);
++                if (
++                    message.includes('Execution context was destroyed') ||
++                    message.includes('Target closed') ||
++                    message.includes('Protocol error')
++                ) {
++                    return;
++                }
++                throw error;
++            }
+         });
++
++        await this.inject();
+     }
+ 
+     /**

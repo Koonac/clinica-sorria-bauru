@@ -1,0 +1,172 @@
+# Stack de PRODUÇÃO: Backend Laravel (CRM próprio) + WhatsApp (interno)
+# A interface Vekta AI roda no HOST via systemd (não neste compose).
+# TLS e domínios ficam no nginx do HOST.
+#
+# Domínios / portas:
+#   https://ai.vektaai.com.br   → 127.0.0.1:4680  (systemd: vekta-ai)
+#   Backend API (loopback)     → 127.0.0.1:8080  (interface: BACKEND_URL)
+#   wwebjs                     → NÃO publicado (só vekta-network)
+#
+# Pré-requisitos:
+#   1. cp .env.example .env  (e preencha)
+#   2. cp backend/.env.example backend/.env  (APP_KEY, DB_PASSWORD, etc.)
+#   3. Whatsapp-api/.env
+#   4. DNS A/AAAA de ai.vektaai.com.br → IP do servidor
+#   5. Server blocks em deploy/nginx/ ativados no nginx do host
+#   6. Interface no host: bash deploy/host/setup-vekta-host.sh
+#      (BACKEND_URL=http://127.0.0.1:8080 + BACKEND_API_TOKEN)
+#
+# Uso:
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   bash vekta-deploy.sh
+
+name: vekta-prod
+
+services:
+  # --- Backend (Laravel API — CRM próprio) ---
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-vekta_ai}"
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d vekta_ai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - vekta-network
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    command: ["app"]
+    env_file:
+      - ./backend/.env
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      # URL interna: wwebjs chama webhooks neste host
+      APP_URL: http://backend:8000
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: "${POSTGRES_DB:-vekta_ai}"
+      DB_USERNAME: "${POSTGRES_USER:-postgres}"
+      DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      WHATSAPP_API_URL: http://wwebjs:3000
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+      OPENROUTER_AGENT_MODEL: "${OPENROUTER_AGENT_MODEL:-openai/gpt-4o-mini}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      GOOGLE_CALENDAR_REFRESH_TOKEN: "${GOOGLE_CALENDAR_REFRESH_TOKEN:-}"
+      GOOGLE_CALENDAR_CALENDAR_ID: "${GOOGLE_CALENDAR_CALENDAR_ID:-primary}"
+      GOOGLE_CALENDAR_TIMEZONE: "${GOOGLE_CALENDAR_TIMEZONE:-America/Sao_Paulo}"
+      QUEUE_CONNECTION: database
+      CACHE_STORE: database
+      SESSION_DRIVER: database
+    ports:
+      # Só loopback — interface no host usa BACKEND_URL=http://127.0.0.1:8080
+      - "127.0.0.1:8080:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      wwebjs:
+        condition: service_started
+    volumes:
+      - backend-storage:/var/www/html/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/up >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - vekta-network
+
+  backend-queue:
+    build: ./backend
+    restart: unless-stopped
+    command: ["queue"]
+    env_file:
+      - ./backend/.env
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: http://backend:8000
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: "${POSTGRES_DB:-vekta_ai}"
+      DB_USERNAME: "${POSTGRES_USER:-postgres}"
+      DB_PASSWORD: "${POSTGRES_PASSWORD}"
+      WHATSAPP_API_URL: http://wwebjs:3000
+      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+      OPENROUTER_AGENT_MODEL: "${OPENROUTER_AGENT_MODEL:-openai/gpt-4o-mini}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      GOOGLE_CALENDAR_REFRESH_TOKEN: "${GOOGLE_CALENDAR_REFRESH_TOKEN:-}"
+      GOOGLE_CALENDAR_CALENDAR_ID: "${GOOGLE_CALENDAR_CALENDAR_ID:-primary}"
+      GOOGLE_CALENDAR_TIMEZONE: "${GOOGLE_CALENDAR_TIMEZONE:-America/Sao_Paulo}"
+      QUEUE_CONNECTION: database
+      CACHE_STORE: database
+      SESSION_DRIVER: database
+    depends_on:
+      postgres:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    volumes:
+      - backend-storage:/var/www/html/storage
+    networks:
+      - vekta-network
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    # Evita crash em loop: Failed to unlink /tmp/mongodb-27017.sock (Operation not permitted)
+    tmpfs:
+      - /tmp
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - vekta-network
+
+  wwebjs:
+    build: ./Whatsapp-api
+    restart: unless-stopped
+    # SEM ports: — não expor no host / nginx
+    env_file:
+      - ./Whatsapp-api/.env
+    environment:
+      PORT: "3000"
+      MONGODB_URI: mongodb://mongo:27017/whatsapp-sessions
+      NODE_ENV: production
+    depends_on:
+      mongo:
+        condition: service_healthy
+    volumes:
+      - sessions_data:/app/sessions
+      - ./Whatsapp-api/.env:/app/.env:ro
+    networks:
+      - vekta-network
+
+networks:
+  vekta-network:
+    name: vekta-network
+
+volumes:
+  postgres-data:
+  backend-storage:
+  mongo_data:
+  sessions_data:

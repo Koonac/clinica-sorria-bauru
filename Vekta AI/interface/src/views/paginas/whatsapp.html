@@ -1,0 +1,190 @@
+<!--vekta-pagina
+{ "titulo": "WhatsApp", "icone": "lucide:message-circle", "ordem": 59.5 }
+-->
+<section
+  id="aba-whatsapp"
+  class="hidden flex flex-col h-full min-h-0 overflow-hidden"
+>
+  <div
+    class="flex flex-col flex-1 min-h-0 pt-6 px-10 pb-6 max-md:px-4 max-md:pt-4 max-md:pb-4"
+  >
+    <header
+      class="shrink-0 flex items-end justify-between gap-4 mb-5 max-md:flex-col max-md:items-start"
+    >
+      <div>
+        <p class="font-mono text-xs uppercase tracking-widest text-vekta mb-1.5">
+          conversas
+        </p>
+        <h1 class="font-display text-3xl font-semibold tracking-tight">
+          WhatsApp
+        </h1>
+        <p class="text-sm text-cinza mt-1.5 max-w-xl">
+          Inbox de conversas. Conecte o WhatsApp nas configurações do CRM.
+        </p>
+      </div>
+      <p id="wa-status" class="text-sm text-cinza" aria-live="polite"></p>
+    </header>
+
+    <p
+      id="wa-inbox-aviso"
+      class="hidden shrink-0 mb-3 text-sm text-alerta rounded-xl border border-alerta/30 bg-alerta/10 px-3 py-2"
+      role="status"
+    ></p>
+
+    <div
+      class="relative flex-1 min-h-0 flex border border-linha rounded-2xl bg-superficie shadow-sm overflow-hidden"
+    >
+      <aside
+        class="w-full max-w-[340px] shrink-0 flex flex-col border-r border-linha min-h-0 max-md:max-w-none max-md:w-[40%] max-sm:w-[42%]"
+      >
+        <div class="shrink-0 p-3 border-b border-linha">
+          <label class="relative block">
+            <span class="sr-only">Buscar conversas</span>
+            <iconify-icon
+              noobserver
+              icon="lucide:search"
+              class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-cinza text-[15px]"
+              aria-hidden="true"
+            ></iconify-icon>
+            <input
+              type="search"
+              id="wa-chats-busca"
+              placeholder="Buscar conversas…"
+              class="w-full rounded-xl border border-linha bg-fundo pl-9 pr-3 py-2 text-sm text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta"
+              autocomplete="off"
+            />
+          </label>
+        </div>
+        <div
+          id="wa-chats-lista"
+          class="flex-1 min-h-0 overflow-y-auto"
+          role="listbox"
+          aria-label="Conversas WhatsApp"
+        ></div>
+      </aside>
+
+      <section
+        class="flex-1 min-w-0 flex flex-col min-h-0 bg-fundo"
+        aria-label="Conversa selecionada"
+      >
+        <header
+          id="wa-chat-header"
+          class="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-linha bg-superficie min-h-[3.5rem]"
+        >
+          <p class="text-sm text-cinza truncate">Selecione uma conversa</p>
+        </header>
+        <div
+          id="wa-chat-mensagens"
+          class="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2 p-4"
+        ></div>
+        <p
+          id="wa-chat-erro"
+          class="hidden shrink-0 px-4 text-xs text-alerta"
+          role="alert"
+        ></p>
+        <form
+          id="wa-chat-form"
+          class="shrink-0 flex flex-col gap-2 px-4 py-3 border-t border-linha bg-superficie"
+        >
+          <div
+            id="wa-chat-anexo-preview"
+            class="hidden items-center gap-2 rounded-xl border border-linha bg-fundo px-3 py-2"
+          >
+            <img
+              id="wa-chat-anexo-thumb"
+              alt=""
+              class="h-12 w-12 rounded-lg object-cover shrink-0"
+            />
+            <p
+              id="wa-chat-anexo-nome"
+              class="flex-1 min-w-0 text-xs text-cinza truncate"
+            ></p>
+            <button
+              type="button"
+              id="wa-chat-anexo-remover"
+              class="inline-flex items-center justify-center w-8 h-8 rounded-full text-cinza hover:bg-superficie hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta"
+              aria-label="Remover imagem"
+            >
+              <iconify-icon
+                noobserver
+                icon="lucide:x"
+                class="text-[16px]"
+                aria-hidden="true"
+              ></iconify-icon>
+            </button>
+          </div>
+          <div class="flex items-end gap-2">
+            <input
+              type="file"
+              id="wa-chat-anexo"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              class="sr-only"
+            />
+            <button
+              type="button"
+              id="wa-chat-anexo-btn"
+              disabled
+              class="inline-flex items-center justify-center w-11 h-11 rounded-full border border-linha text-cinza hover:bg-fundo hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45 shrink-0"
+              aria-label="Anexar imagem"
+              title="Anexar imagem"
+            >
+              <iconify-icon
+                noobserver
+                icon="lucide:image"
+                class="text-[18px]"
+                aria-hidden="true"
+              ></iconify-icon>
+            </button>
+            <label class="flex-1 min-w-0">
+              <span class="sr-only">Mensagem</span>
+              <textarea
+                id="wa-chat-input"
+                rows="1"
+                placeholder="Escrever mensagem…"
+                disabled
+                class="w-full rounded-xl border border-linha bg-fundo px-3 py-2.5 text-sm text-tinta min-h-[2.75rem] max-h-28 resize-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45"
+              ></textarea>
+            </label>
+            <button
+              type="submit"
+              id="wa-chat-enviar"
+              disabled
+              class="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-vekta border border-vekta text-white text-sm font-medium transition-colors hover:bg-vekta-escuro hover:border-vekta-escuro focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta disabled:opacity-45 shrink-0"
+            >
+              Enviar
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <aside
+        id="wa-painel-crm"
+        class="hidden w-full max-w-[320px] shrink-0 flex flex-col border-l border-linha min-h-0 bg-superficie max-md:absolute max-md:inset-y-0 max-md:right-0 max-md:z-10 max-md:shadow-lg"
+        aria-label="Informações do lead ou negócio"
+      >
+        <div
+          class="shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b border-linha"
+        >
+          <p class="text-sm font-medium text-tinta">Detalhes</p>
+          <button
+            type="button"
+            id="wa-painel-fechar"
+            class="inline-flex items-center justify-center w-8 h-8 rounded-full text-cinza hover:bg-fundo hover:text-tinta focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vekta"
+            aria-label="Fechar painel"
+          >
+            <iconify-icon
+              noobserver
+              icon="lucide:x"
+              class="text-[16px]"
+              aria-hidden="true"
+            ></iconify-icon>
+          </button>
+        </div>
+        <div
+          id="wa-painel-conteudo"
+          class="flex-1 min-h-0 overflow-y-auto p-4 space-y-4"
+        ></div>
+      </aside>
+    </div>
+  </div>
+</section>

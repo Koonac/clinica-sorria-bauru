@@ -1,0 +1,16 @@
+node_modules
+npm-debug.log*
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+dist-desktop
+*.md
+!README.md
+.DS_Store
+Thumbs.db
+electron
+coverage
+.cursor
+!docker-entrypoint.sh

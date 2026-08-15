@@ -1,0 +1,1689 @@
+/* ============================================================
+   Vekta Ai Interface
+   Tokens de marca (@theme) e toda a marcação vivem em index.html,
+   como classes Tailwind. Este arquivo só guarda o que utilitários
+   não expressam: @keyframes e o estilo do HTML bruto que o
+   marked.js injeta via innerHTML (não dá para anotar com classes).
+   ============================================================ */
+
+@keyframes pulsinho {
+  0%, 100% { opacity: 0.25; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-3px); }
+}
+@keyframes glow-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.65; }
+  50% { transform: scale(1.22); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+
+/* ---------- Scrollbar com glow leve (global) ---------- */
+* {
+  scrollbar-width: auto;
+  scrollbar-color: color-mix(in srgb, var(--color-vekta) 45%, transparent) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-vekta) 40%, transparent);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  box-shadow:
+    0 0 6px color-mix(in srgb, var(--color-vekta) 35%, transparent),
+    0 0 12px color-mix(in srgb, var(--color-vekta) 18%, transparent);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-vekta) 65%, transparent);
+  background-clip: padding-box;
+  box-shadow:
+    0 0 8px color-mix(in srgb, var(--color-vekta) 50%, transparent),
+    0 0 16px color-mix(in srgb, var(--color-vekta) 28%, transparent);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Página alojada no modal de Configurações (DNA / Agents / Skills) */
+.config-modal-pagina {
+  display: block !important;
+  height: 100%;
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem 1.75rem;
+}
+
+.config-modal-pagina > header {
+  margin-bottom: 1.25rem;
+}
+
+.config-modal-pagina > header h1 {
+  font-size: 1.5rem;
+}
+
+/* ---------- Cursor personalizado (desktop / pointer fino) ---------- */
+@media (pointer: fine) {
+  body.cursor-ativo,
+  body.cursor-ativo * {
+    cursor: none !important;
+  }
+}
+
+.cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 99999;
+  opacity: 0;
+  will-change: transform;
+  transition: opacity 0.2s ease;
+}
+
+body.cursor-ativo .cursor.cursor-visivel {
+  opacity: 1;
+}
+
+.cursor-corpo {
+  position: relative;
+  width: 0;
+  height: 0;
+  transition: transform 0.08s ease;
+}
+
+.cursor-braco {
+  position: absolute;
+  background: rgba(238, 240, 244, 0.55);
+  transition: background 0.12s ease, width 0.12s ease, height 0.12s ease, top 0.12s ease, left 0.12s ease, right 0.12s ease, bottom 0.12s ease;
+}
+
+.cursor-braco-n,
+.cursor-braco-s {
+  width: 1px;
+  height: 6px;
+  left: -0.5px;
+}
+
+.cursor-braco-e,
+.cursor-braco-w {
+  width: 6px;
+  height: 1px;
+  top: -0.5px;
+}
+
+.cursor-braco-n { top: -10px; }
+.cursor-braco-s { top: 4px; }
+.cursor-braco-e { left: 4px; }
+.cursor-braco-w { left: -10px; }
+
+.cursor-vekta {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  margin: -1.5px 0 0 -1.5px;
+  background: var(--color-vekta);
+  border-radius: 50%;
+  transition: transform 0.1s ease, opacity 0.1s ease, width 0.1s ease, height 0.1s ease, margin 0.1s ease, border-radius 0.1s ease;
+}
+
+.cursor[data-hover] .cursor-braco {
+  background: var(--color-vekta);
+}
+
+.cursor[data-hover] .cursor-braco-n { height: 9px; top: -13px; }
+.cursor[data-hover] .cursor-braco-s { height: 9px; top: 4px; }
+.cursor[data-hover] .cursor-braco-e { width: 9px; left: 4px; }
+.cursor[data-hover] .cursor-braco-w { width: 9px; left: -13px; }
+
+.cursor[data-hover] .cursor-vekta {
+  transform: scale(1.4);
+}
+
+.cursor[data-texto] .cursor-braco-n,
+.cursor[data-texto] .cursor-braco-s,
+.cursor[data-texto] .cursor-braco-e,
+.cursor[data-texto] .cursor-braco-w {
+  opacity: 0;
+}
+
+.cursor[data-texto] .cursor-vekta {
+  width: 1.5px;
+  height: 18px;
+  margin: -9px 0 0 -0.75px;
+  border-radius: 1px;
+  transform: none;
+}
+
+.cursor[data-click] .cursor-corpo {
+  transform: scale(0.82);
+}
+
+.cursor[data-click] .cursor-vekta {
+  transform: scale(1.6);
+}
+
+.cursor[data-hover][data-click] .cursor-vekta {
+  transform: scale(1.2);
+}
+
+/* ---------- Anel-logo: círculo minimalista com glow (marca do Vekta) ----------
+   Glow quase só para fora; o centro fica escuro como o fundo (ver referência). */
+.orbe-anel::before,
+.orbe-anel::after {
+  content: '';
+  position: absolute;
+  border-radius: inherit;
+}
+
+.orbe-anel::before {
+  inset: 0;
+  border: 3px solid var(--color-vekta);
+  box-shadow:
+    0 0 8px 1px color-mix(in srgb, var(--color-vekta) 70%, transparent),
+    0 0 20px 4px color-mix(in srgb, var(--color-vekta) 35%, transparent),
+    inset 0 0 8px 1px color-mix(in srgb, var(--color-vekta) 55%, transparent),
+    inset 0 0 14px 2px color-mix(in srgb, var(--color-vekta) 28%, transparent);
+}
+
+.orbe-anel::after {
+  inset: -55%;
+  z-index: -1;
+  background: radial-gradient(
+    circle,
+    transparent 32%,
+    color-mix(in srgb, var(--color-vekta) 24%, transparent) 46%,
+    transparent 68%
+  );
+  filter: blur(10px);
+}
+
+.orbe-anel--grande::before {
+  border-width: 4px;
+  box-shadow:
+    0 0 12px 2px color-mix(in srgb, var(--color-vekta) 70%, transparent),
+    0 0 28px 6px color-mix(in srgb, var(--color-vekta) 35%, transparent),
+    inset 0 0 12px 2px color-mix(in srgb, var(--color-vekta) 55%, transparent),
+    inset 0 0 22px 3px color-mix(in srgb, var(--color-vekta) 28%, transparent);
+}
+
+.orbe-anel--grande::after {
+  filter: blur(14px);
+}
+
+/* ---------- Caixa do chat: glow grande e estático, só no primeiro contato
+   (removido em JS assim que a conversa já tem conteúdo — ver chat.js) ---------- */
+.chat-caixa {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-vekta) 26%, transparent),
+    0 0 90px 22px color-mix(in srgb, var(--color-vekta) 32%, transparent),
+    0 0 170px 46px color-mix(in srgb, var(--color-vekta) 16%, transparent),
+    0 20px 50px -10px color-mix(in srgb, var(--color-vekta) 35%, transparent);
+  transition: box-shadow 0.4s ease, border-color 0.25s ease;
+}
+
+.chat-caixa:focus-within {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-vekta) 48%, transparent),
+    0 0 100px 26px color-mix(in srgb, var(--color-vekta) 38%, transparent),
+    0 0 190px 50px color-mix(in srgb, var(--color-vekta) 20%, transparent),
+    0 22px 54px -8px color-mix(in srgb, var(--color-vekta) 42%, transparent);
+}
+
+/* ---------- Anel girando na borda do input enquanto o Vekta pensa/escreve ----------
+   Anima o ângulo do próprio conic-gradient (não um transform:rotate no elemento):
+   o input é retangular, então girar a forma inteira do anel mascarado desalinha
+   as bordas da máscara com a caixa real — daí só o ângulo do brilho gira, a
+   máscara/forma do anel fica sempre fixa e colada na borda. */
+@property --anel-angulo {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.chat-caixa--pensando {
+  position: relative;
+}
+
+.chat-caixa--pensando::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 4px;
+  background: conic-gradient(from var(--anel-angulo), transparent 0deg, color-mix(in srgb, var(--color-vekta) 95%, transparent) 40deg, transparent 100deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: anel-girar 1.6s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes anel-girar {
+  to { --anel-angulo: 360deg; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-caixa--pensando::before { animation: none; opacity: 0.7; }
+}
+
+/* ---------- Glow ambiente atrás do conteúdo (desktop / pointer fino) ----------
+   Fica sob sidebar/main: só aparece no fundo entre os cards, sem tingir a UI. */
+#rail,
+#paginas {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- Sidebar lateral (desktop colapsável + drawer mobile) ---------- */
+#rail {
+  z-index: 20;
+  width: 15rem; /* 240px */
+  transition: width 0.2s ease, transform 0.2s ease;
+}
+
+#rail[data-recolhida] {
+  width: 4.5rem; /* 72px */
+}
+
+#rail[data-recolhida] .rail-marca,
+#rail[data-recolhida] .rail-rotulo {
+  display: none;
+}
+
+#rail[data-recolhida] .rail-topo {
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 0.75rem 0.5rem;
+  gap: 0.5rem;
+  min-height: auto;
+}
+
+#rail[data-recolhida] #orbe {
+  margin-inline: auto;
+}
+
+#rail[data-recolhida] #nav-abas {
+  align-items: center;
+}
+
+#rail[data-recolhida] #nav-abas button,
+#rail[data-recolhida] #botao-sair {
+  justify-content: center;
+  padding-inline: 0.75rem;
+}
+
+#rail[data-recolhida] .rail-rodape > div {
+  flex-direction: column;
+  align-items: center;
+}
+
+#rail[data-recolhida] #botao-sair {
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+}
+
+/* Menu mobile: sidebar fora da tela; abre como drawer */
+@media (max-width: 767px) {
+  #topo-mobile {
+    z-index: 25;
+  }
+
+  body.menu-mobile-aberto .botao-menu-icone-abrir {
+    display: none;
+  }
+
+  body.menu-mobile-aberto .botao-menu-icone-fechar {
+    display: inline-block;
+  }
+
+  #rail {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: min(18rem, calc(100vw - 3rem));
+    height: 100%;
+    max-height: 100dvh;
+    transform: translateX(-100%);
+    box-shadow: none;
+  }
+
+  #rail[data-menu-aberto] {
+    transform: translateX(0);
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.4);
+  }
+
+  /* No mobile a sidebar nunca fica no modo “só ícones” */
+  #rail[data-recolhida] {
+    width: min(18rem, calc(100vw - 3rem));
+  }
+
+  #rail[data-recolhida] .rail-marca {
+    display: flex;
+  }
+
+  #rail[data-recolhida] .rail-rotulo {
+    display: revert;
+  }
+
+  #rail[data-recolhida] .rail-topo {
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 1rem;
+    gap: 0.75rem;
+    min-height: 4.5rem;
+  }
+
+  #rail[data-recolhida] #nav-abas {
+    align-items: stretch;
+  }
+
+  #rail[data-recolhida] #nav-abas button,
+  #rail[data-recolhida] #botao-sair {
+    justify-content: flex-start;
+    padding-inline: 0.875rem;
+  }
+
+  #rail[data-recolhida] .rail-rodape > div {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  #rail[data-recolhida] #botao-sair {
+    flex: 1;
+    width: auto;
+    height: auto;
+    padding: 0.625rem 0.875rem;
+  }
+
+  #menu-overlay {
+    z-index: 15;
+  }
+
+  #rail {
+    z-index: 20;
+  }
+
+  /* Main ocupa o espaço abaixo do header mobile */
+  #paginas {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  body.menu-mobile-aberto {
+    overflow: hidden;
+  }
+}
+
+.cursor-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  will-change: transform, opacity;
+  transition: opacity 0.5s ease;
+}
+
+.cursor-glow::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 220px;
+  height: 220px;
+  margin: -110px 0 0 -110px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--color-vekta) 22%, transparent) 0%,
+    color-mix(in srgb, var(--color-vekta) 10%, transparent) 40%,
+    transparent 70%
+  );
+  filter: blur(28px);
+  animation: glow-pulse 2.6s ease-in-out infinite;
+}
+
+body.cursor-ativo .cursor-glow.cursor-visivel {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor-glow { transition: none; }
+  .cursor-glow::before { animation: none; opacity: 0.85; }
+}
+
+/* ---------- Markdown renderizado pelo marked.js ---------- */
+/* Tinta suavizada: evita o contraste tinta-pura × fundo-quase-preto que cansa a leitura longa. */
+.markdown {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: color-mix(in srgb, var(--color-tinta) 55%, var(--color-cinza));
+}
+.markdown h1, .markdown h2, .markdown h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 14px 0 6px;
+  color: color-mix(in srgb, var(--color-tinta) 78%, var(--color-cinza));
+}
+.markdown h1 { font-size: 1.125rem; }
+.markdown h2 { font-size: 1rem; }
+.markdown h3 { font-size: 0.9375rem; }
+.markdown h1:first-child, .markdown h2:first-child, .markdown h3:first-child, .markdown p:first-child { margin-top: 0; }
+.markdown p, .markdown ul, .markdown ol { margin: 6px 0; }
+.markdown ul, .markdown ol { padding-left: 22px; }
+.markdown ul { list-style: disc; }
+.markdown ol { list-style: decimal; }
+.markdown li { margin: 2px 0; }
+.markdown strong, .markdown b {
+  color: color-mix(in srgb, var(--color-tinta) 82%, var(--color-cinza));
+  font-weight: 600;
+}
+.markdown a { color: var(--color-vekta); }
+.markdown a:hover { color: color-mix(in srgb, var(--color-vekta) 75%, white); }
+.markdown pre {
+  background: var(--color-superficie);
+  color: color-mix(in srgb, var(--color-tinta) 48%, var(--color-cinza));
+  border: 1px solid var(--color-linha);
+  padding: 12px 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 0.75rem;
+  line-height: 1.55;
+  margin: 10px 0;
+}
+.markdown :not(pre) > code {
+  font-family: var(--font-mono);
+  background: var(--color-superficie);
+  color: color-mix(in srgb, var(--color-tinta) 62%, var(--color-cinza));
+  border: 1px solid var(--color-linha);
+  padding: 0 5px;
+  border-radius: 5px;
+  font-size: 0.88em;
+}
+.markdown pre code { background: none; border: 0; padding: 0; font-family: var(--font-mono); color: inherit; }
+.markdown blockquote {
+  border-left: 3px solid color-mix(in srgb, var(--color-vekta) 35%, transparent);
+  padding-left: 12px;
+  color: var(--color-cinza);
+  margin: 8px 0;
+}
+.markdown table { border-collapse: collapse; margin: 10px 0; font-size: 0.875rem; display: block; overflow-x: auto; }
+.markdown th, .markdown td { border: 1px solid var(--color-linha); padding: 5px 10px; text-align: left; }
+.markdown th {
+  background: var(--color-superficie);
+  font-weight: 600;
+  color: color-mix(in srgb, var(--color-tinta) 72%, var(--color-cinza));
+}
+.markdown hr { border: 0; border-top: 1px solid var(--color-linha); margin: 14px 0; }
+.markdown img { max-width: 100%; border-radius: 8px; }
+
+/* Leitura de .md na Visão geral: painel um pouco menos “buraco preto”. */
+#ide-corpo .markdown {
+  max-width: 52rem;
+  padding: 4px 2px 24px;
+}
+
+/* ---------- Workspace IDE (Visão geral) ---------- */
+#paginas > [id^="aba-"] {
+  width: 100%;
+}
+
+body.ide-resizing {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+body.ide-resizing iframe,
+body.ide-resizing img,
+body.ide-resizing video {
+  pointer-events: none;
+}
+
+.ide-explorer .group\/pasta > summary:hover {
+  background: color-mix(in srgb, var(--color-fundo) 80%, transparent);
+}
+
+/* Só o details imediato: group-open/pasta casava com qualquer ancestral aberto */
+.ide-explorer .group\/pasta[open] > summary > .ide-arvore-chevron {
+  rotate: 90deg;
+}
+
+.ide-explorer .group\/pasta[open] > summary > .ide-arvore-folder-fechada {
+  display: none;
+}
+
+.ide-explorer .group\/pasta[open] > summary > .ide-arvore-folder-aberta {
+  display: inline-block;
+}
+
+/* Arquivos criados/alterados nesta sessão */
+.ide-arquivo-sessao {
+  background: color-mix(in srgb, var(--color-vekta) 6%, transparent);
+}
+
+.ide-arquivo-novo {
+  box-shadow: inset 2px 0 0 var(--color-vekta);
+}
+
+.ide-badge-novo {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-vekta);
+  background: var(--color-vekta-suave);
+  line-height: 1.4;
+}
+
+.ide-arquivo-pulse {
+  animation: ide-arquivo-pulse 1.1s ease-out 1;
+}
+
+@keyframes ide-arquivo-pulse {
+  0% {
+    background: color-mix(in srgb, var(--color-vekta) 28%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+.ide-sessao-item-novo {
+  background: color-mix(in srgb, var(--color-vekta) 10%, transparent);
+}
+
+.ide-sessao-count::before {
+  content: '· ';
+}
+
+/* Chat compartilhado: modo compacto no painel direito da Visão geral */
+.chat-host[data-modo="ide"] {
+  height: 100%;
+}
+
+.chat-host[data-modo="ide"] .chat-cabecalho {
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0;
+  padding: 0 0.75rem;
+  height: 2.5rem;
+  border-bottom: 1px solid var(--color-linha);
+}
+
+.chat-host[data-modo="ide"] .chat-eyebrow {
+  display: none;
+}
+
+.chat-host[data-modo="ide"] .chat-titulo h1 {
+  font-size: 0.875rem;
+  letter-spacing: -0.01em;
+}
+
+.chat-host[data-modo="ide"] .chat-btn-nova {
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border-radius: 0.375rem;
+  justify-content: center;
+}
+
+.chat-host[data-modo="ide"] .chat-btn-nova-texto {
+  display: none;
+}
+
+.chat-host[data-modo="ide"] .chat-btn-nova-icone {
+  display: block;
+}
+
+.chat-host[data-modo="ide"] #botao-historico {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.375rem;
+}
+
+.chat-host[data-modo="ide"] #botao-historico iconify-icon {
+  font-size: 15px;
+}
+
+.chat-host[data-modo="ide"] #chat-sessao {
+  font-size: 10px;
+}
+
+.chat-host[data-modo="ide"] #chat-limites {
+  display: none !important;
+}
+
+.chat-host[data-modo="ide"] .chat-corpo {
+  min-height: 0;
+}
+
+.chat-host[data-modo="ide"] #chat-rolagem {
+  margin-left: 0;
+  margin-right: 0;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+.chat-host[data-modo="ide"] #chat-mensagens {
+  max-width: none;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.chat-host[data-modo="ide"] #chat-boasvindas {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.chat-host[data-modo="ide"] #chat-boasvindas .orbe-anel--grande {
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 0.75rem;
+}
+
+.chat-host[data-modo="ide"] #chat-boasvindas h2 {
+  font-size: 1rem;
+}
+
+.chat-host[data-modo="ide"] #chat-boasvindas p {
+  font-size: 0.875rem;
+}
+
+.chat-host[data-modo="ide"] #chat-composer {
+  max-width: none;
+  margin: 0.25rem 0.625rem 0.625rem;
+  gap: 0.25rem;
+}
+
+.chat-host[data-modo="ide"] #chat-form {
+  max-width: none;
+  margin: 0;
+  padding: 0.5rem 0.375rem 0.5rem 0.5rem;
+  border-radius: 1rem;
+  background: var(--color-fundo);
+  gap: 0.375rem;
+}
+
+.chat-host[data-modo="ide"] #chat-entrada {
+  font-size: 0.875rem;
+  max-height: 9rem;
+}
+
+.chat-host[data-modo="ide"] #chat-anexar,
+.chat-host[data-modo="ide"] #chat-microfone,
+.chat-host[data-modo="ide"] #chat-enviar {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+/* Botão enviar → cancelar (estilo stop, como no Gemini) */
+#chat-enviar[data-modo="cancelar"],
+#gchat-enviar[data-modo="cancelar"] {
+  background: color-mix(in srgb, var(--color-tinta) 18%, var(--color-superficie));
+  border-color: color-mix(in srgb, var(--color-tinta) 28%, var(--color-linha));
+  color: var(--color-tinta);
+  opacity: 1;
+  cursor: pointer;
+}
+
+#chat-enviar[data-modo="cancelar"]:hover,
+#gchat-enviar[data-modo="cancelar"]:hover {
+  background: color-mix(in srgb, var(--color-tinta) 28%, var(--color-superficie));
+  border-color: color-mix(in srgb, var(--color-tinta) 40%, var(--color-linha));
+}
+
+.chat-host[data-modo="ide"] #chat-drop-overlay {
+  border-radius: 1rem;
+}
+
+/* ---------- Perguntas interativas (vekta-pergunta) ---------- */
+.chat-pergunta {
+  position: relative;
+  padding: 1rem 1.1rem 1.1rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-vekta) 45%, var(--color-linha));
+  background:
+    linear-gradient(145deg,
+      color-mix(in srgb, var(--color-vekta) 14%, var(--color-superficie)) 0%,
+      var(--color-superficie) 55%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-vekta) 12%, transparent),
+    0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+.chat-pergunta::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.75rem;
+  bottom: 0.75rem;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--color-vekta);
+}
+
+.chat-pergunta-badge {
+  background: var(--color-vekta-suave);
+  color: var(--color-vekta);
+}
+
+.chat-pergunta-opcao {
+  border-color: var(--color-linha);
+  background: color-mix(in srgb, var(--color-fundo) 70%, transparent);
+}
+
+.chat-pergunta-opcao:hover:not(:disabled) {
+  border-color: var(--color-vekta);
+  background: var(--color-vekta-suave);
+}
+
+.chat-pergunta-indice {
+  background: var(--color-fundo);
+  border: 1px solid var(--color-linha);
+  color: var(--color-cinza);
+}
+
+.chat-pergunta-opcao:hover:not(:disabled) .chat-pergunta-indice,
+.chat-pergunta-opcao[data-sel] .chat-pergunta-indice,
+.chat-pergunta-opcao[data-escolhida] .chat-pergunta-indice {
+  border-color: var(--color-vekta);
+  background: var(--color-vekta);
+  color: #fff;
+}
+
+.chat-pergunta-opcao[data-sel] {
+  border-color: var(--color-vekta);
+  background: var(--color-vekta-suave);
+}
+
+.chat-pergunta-opcao[data-sel] .chat-pergunta-check {
+  color: var(--color-vekta);
+}
+
+.chat-pergunta-opcao[data-escolhida] {
+  border-color: var(--color-vekta);
+  background: var(--color-vekta-suave);
+}
+
+.chat-pergunta-opcao[data-escolhida] .chat-pergunta-check {
+  color: var(--color-vekta);
+}
+
+.chat-pergunta-opcao[data-nao-escolhida] {
+  opacity: 0.4;
+}
+
+.chat-pergunta[data-respondido] {
+  border-color: color-mix(in srgb, var(--color-vekta) 28%, var(--color-linha));
+  box-shadow: none;
+}
+
+.chat-pergunta-confirmada {
+  margin-top: 0.15rem;
+}
+
+/* ---------- Arquivos baixáveis (vekta-arquivo) ---------- */
+.chat-arquivo {
+  position: relative;
+  padding: 1rem 1.1rem 1.1rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-vekta) 45%, var(--color-linha));
+  background:
+    linear-gradient(145deg,
+      color-mix(in srgb, var(--color-vekta) 14%, var(--color-superficie)) 0%,
+      var(--color-superficie) 55%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-vekta) 12%, transparent),
+    0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+.chat-arquivo::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.75rem;
+  bottom: 0.75rem;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--color-vekta);
+}
+
+.chat-arquivo-badge {
+  background: var(--color-vekta-suave);
+  color: var(--color-vekta);
+}
+
+.chat-arquivo-caminho {
+  display: block;
+  padding: 0.45rem 0.65rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--color-fundo) 80%, transparent);
+  border: 1px solid var(--color-linha);
+}
+
+.chat-arquivo-preview {
+  border: 1px solid var(--color-linha);
+}
+
+/* ---------- Skeleton shimmer (CRM, Instagram, …) ---------- */
+@keyframes ig-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton,
+.ig-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-linha) 0%,
+    color-mix(in srgb, var(--color-cinza-claro) 35%, var(--color-linha)) 45%,
+    var(--color-linha) 90%
+  );
+  background-size: 200% 100%;
+  animation: ig-shimmer 1.35s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .ig-skeleton {
+    animation: none;
+    background: var(--color-linha);
+  }
+}
+
+/* Moldura estilo feed — maior, mais legível no desktop */
+.ig-phone {
+  width: 100%;
+  max-width: 42rem;
+  margin-inline: auto;
+  border: 1px solid var(--color-linha);
+  border-radius: 1.5rem;
+  background: var(--color-superficie);
+  overflow: hidden;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+}
+
+@media (min-width: 1024px) {
+  .ig-phone {
+    max-width: 36rem;
+  }
+}
+
+/* Anel de stories (estilo Instagram) */
+.ig-story-ring {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    135deg,
+    #f09433 0%,
+    #e6683c 25%,
+    #dc2743 50%,
+    #cc2366 75%,
+    #bc1888 100%
+  );
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.ig-story-ring:hover {
+  transform: scale(1.03);
+}
+
+.ig-story-ring:focus-visible {
+  outline: 2px solid var(--color-vekta);
+  outline-offset: 3px;
+}
+
+.ig-story-ring > .ig-avatar-img,
+.ig-story-ring > .ig-avatar-fallback {
+  border: 3px solid var(--color-superficie);
+}
+
+.ig-story-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.92);
+  padding: 1rem;
+}
+
+.ig-story-viewer__frame {
+  position: relative;
+  width: min(100%, 26rem);
+  height: min(92vh, 48rem);
+  border-radius: 1rem;
+  overflow: hidden;
+  background: #000;
+  user-select: none;
+}
+
+.ig-story-viewer__progress {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  z-index: 3;
+  display: flex;
+  gap: 0.25rem;
+}
+
+.ig-story-viewer__bar {
+  flex: 1;
+  height: 2px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.35);
+  overflow: hidden;
+}
+
+.ig-story-viewer__bar-fill {
+  height: 100%;
+  width: 0%;
+  background: #fff;
+  border-radius: inherit;
+}
+
+.ig-story-viewer__bar.is-done .ig-story-viewer__bar-fill {
+  width: 100%;
+}
+
+.ig-story-viewer__bar.is-active .ig-story-viewer__bar-fill {
+  transition: none;
+  animation: ig-story-progress linear forwards;
+}
+
+@keyframes ig-story-progress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+.ig-story-viewer__header {
+  position: absolute;
+  top: 1.25rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #fff;
+  pointer-events: none;
+}
+
+.ig-story-viewer__header button {
+  pointer-events: auto;
+  margin-left: auto;
+}
+
+.ig-story-viewer__media {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ig-story-viewer__media img,
+.ig-story-viewer__media video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.ig-story-viewer__nav {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+}
+
+.ig-story-viewer__nav button {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+/* ---------- Automação DM / flow builder ---------- */
+.ig-flow-layout {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) 260px;
+  gap: 12px;
+  min-height: 480px;
+}
+
+.ig-flow-layout--page {
+  min-height: 0;
+  flex: 1;
+  height: 100%;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.ig-flow-layout--page .ig-flow-props {
+  max-height: none;
+  height: 100%;
+}
+
+.ig-flow-page-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  margin: 0 !important;
+  overflow: hidden;
+}
+
+.ig-flow-page-panel > .ig-flow-layout--page {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.ig-fluxos-raiz {
+  min-height: 0;
+  display: flex;
+  gap: 12px;
+}
+
+.ig-fluxos-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid var(--color-linha, #3f3f46);
+  border-radius: 16px;
+  background: var(--color-superficie, #27272a);
+}
+
+.ig-fluxos-main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+@media (max-width: 960px) {
+  .ig-flow-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .ig-fluxos-raiz {
+    flex-direction: column;
+  }
+
+  .ig-fluxos-sidebar {
+    width: 100%;
+    max-height: 160px;
+  }
+}
+
+.ig-flow-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ig-flow-palette__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-linha, #3f3f46);
+  border-radius: 12px;
+  background: var(--color-superficie, #27272a);
+  color: var(--color-tinta, #f4f4f5);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.ig-flow-palette__item:hover {
+  border-color: var(--color-vekta, #0e8a76);
+}
+
+.ig-flow-canvas {
+  position: relative;
+  border: 1px solid color-mix(in srgb, var(--color-vekta, #0e8a76) 22%, #3f3f46);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.07) 1px, transparent 0) 0 0 / 20px 20px,
+    linear-gradient(160deg, #2a3038 0%, #232830 55%, #1e2329 100%);
+  overflow: hidden;
+  min-height: 460px;
+}
+
+.ig-flow-canvas--page {
+  min-height: 0;
+  height: 100%;
+  flex: 1;
+}
+
+.ig-flow-canvas.is-panning,
+.ig-flow-canvas.is-panning * {
+  cursor: grabbing !important;
+}
+
+.ig-flow-stage {
+  position: relative;
+  width: 100%;
+  height: 460px;
+  outline: none;
+  overflow: hidden;
+  cursor: grab;
+}
+
+.ig-flow-canvas--page .ig-flow-stage {
+  height: 100%;
+}
+
+.ig-flow-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4000px;
+  height: 3000px;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.ig-flow-edges {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  overflow: visible;
+}
+
+.ig-flow-edge-label {
+  font-size: 10px;
+  fill: #a1a1aa;
+}
+
+.ig-flow-nodes {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.ig-flow-node {
+  position: absolute;
+  width: 188px;
+  background: color-mix(in srgb, var(--color-superficie, #3f3f46) 92%, #fff 8%);
+  border: 1px solid #52525b;
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  cursor: grab;
+  user-select: none;
+  padding-bottom: 10px;
+  pointer-events: auto;
+}
+
+.ig-flow-node.is-selected,
+.ig-flow-node.is-linking {
+  border-color: var(--color-vekta, #0e8a76);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--color-vekta, #0e8a76) 35%, transparent),
+    0 4px 14px rgba(0, 0, 0, 0.28);
+}
+
+.ig-flow-node.is-linking {
+  outline: 2px dashed color-mix(in srgb, var(--color-vekta, #0e8a76) 70%, transparent);
+  outline-offset: 3px;
+}
+
+.ig-flow-node.is-drop-target {
+  border-color: var(--color-vekta, #0e8a76);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--color-vekta, #0e8a76) 45%, transparent),
+    0 4px 14px rgba(0, 0, 0, 0.28);
+}
+
+.ig-flow-canvas.is-linking,
+.ig-flow-canvas:has(.ig-flow-handle:active) {
+  cursor: crosshair;
+}
+
+.ig-flow-node__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-vekta, #0e8a76);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.ig-flow-node__body {
+  padding: 0 12px 6px;
+  font-size: 12px;
+  color: var(--color-tinta, #e4e4e7);
+  line-height: 1.35;
+  min-height: 32px;
+}
+
+/* Porta de entrada (esquerda) — alvo visual ao conectar */
+.ig-flow-port-in {
+  position: absolute;
+  left: -7px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #52525b;
+  border: 2px solid #a1a1aa;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.ig-flow-node__handles {
+  position: absolute;
+  right: -7px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 4;
+}
+
+.ig-flow-handle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: var(--color-vekta, #0e8a76);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-vekta, #0e8a76) 50%, #000);
+  color: transparent;
+  font-size: 0;
+  cursor: crosshair;
+  flex-shrink: 0;
+  z-index: 4;
+}
+
+.ig-flow-handle:hover,
+.ig-flow-handle.is-active {
+  transform: scale(1.25);
+  background: #12a88f;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--color-vekta, #0e8a76) 40%, transparent),
+    0 0 10px color-mix(in srgb, var(--color-vekta, #0e8a76) 55%, transparent);
+}
+
+.ig-flow-handle__label {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: #18181b;
+  color: #e4e4e7;
+  border: 1px solid #52525b;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.ig-flow-handle[data-handle="default"] .ig-flow-handle__label {
+  display: none;
+}
+
+.ig-flow-props {
+  border: 1px solid var(--color-linha, #3f3f46);
+  border-radius: 16px;
+  background: var(--color-superficie, #27272a);
+  padding: 14px;
+  overflow-y: auto;
+  max-height: 460px;
+}
+
+.ig-flow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ig-flow-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--color-linha, #3f3f46);
+  border-radius: 12px;
+  background: var(--color-fundo, #18181b);
+  color: var(--color-tinta, #f4f4f5);
+  font-size: 13px;
+}
+
+.ig-flow-list-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ig-flow-list-item__open {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.ig-flow-list-item.is-active {
+  border-color: var(--color-vekta, #0e8a76);
+  background: color-mix(in srgb, var(--color-vekta, #0e8a76) 12%, transparent);
+}
+
+.ig-flow-hints {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+
+.ig-flow-hints__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+/* Botão de exclusão (vermelho sólido) */
+.btn-excluir {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 0.375rem;
+  border: 1px solid #dc2626;
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.25;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.btn-excluir:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.btn-excluir:focus-visible {
+  outline: 2px solid #dc2626;
+  outline-offset: 2px;
+}
+
+.btn-excluir:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Galeria — seleção múltipla */
+.galeria-card {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.galeria-card.is-selected {
+  border-color: var(--color-vekta, #0e8a76);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-vekta, #0e8a76) 55%, transparent);
+}
+
+.galeria-card__check {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.galeria-card:hover .galeria-card__check,
+.galeria-card.is-selected .galeria-card__check,
+.galeria-card__check:focus-visible,
+#aba-galeria.is-modo-selecao .galeria-card__check {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .galeria-card__check {
+    opacity: 1;
+  }
+}
+
+.galeria-card__check.is-on {
+  opacity: 1;
+  background: var(--color-vekta, #0e8a76);
+  border-color: var(--color-vekta, #0e8a76);
+}
+
+.galeria-card__abrir {
+  pointer-events: none;
+}
+
+.galeria-card__abrir img,
+.galeria-card__abrir video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ---------- CRM: cards selecionados (MultiDrag Ctrl/Cmd) ---------- */
+.crm-card-selecionado {
+  outline: 2px solid var(--color-vekta);
+  outline-offset: 2px;
+  border-color: color-mix(in srgb, var(--color-vekta) 55%, transparent) !important;
+  box-shadow: 0 0 0 3px var(--color-vekta-suave);
+}
+
+/* ============================================================
+   Slim Select — tema Vekta
+   A base vem de /vendor/slimselect.css (carregada antes deste arquivo).
+   Aqui só remapeamos as variáveis --ss-* para os tokens de marca e
+   ajustamos o que a lib não expõe por variável.
+   Componente: src/views/componentes/select.js
+   ============================================================ */
+:root {
+  --ss-primary-color: var(--color-vekta);
+  --ss-bg-color: var(--color-fundo);
+  --ss-font-color: var(--color-tinta);
+  --ss-placeholder-color: var(--color-cinza-claro);
+  --ss-disabled-color: var(--color-cinza-claro);
+  --ss-border-color: var(--color-linha);
+  --ss-highlight-color: var(--color-vekta-suave);
+  --ss-focus-color: var(--color-vekta);
+  --ss-success-color: var(--color-vekta);
+  --ss-error-color: var(--color-alerta);
+  --ss-main-height: 38px;
+  --ss-content-height: 280px;
+  --ss-border-radius: 0.75rem; /* casa com o rounded-xl dos inputs */
+  --ss-spacing-l: 12px;
+  --ss-spacing-m: 8px;
+  --ss-spacing-s: 5px;
+  --ss-animation-timing: 0.16s;
+}
+
+/* Gatilho: mesma silhueta dos inputs de texto do projeto */
+.ss-main {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  padding: 0 0.75rem;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.ss-main:hover:not(.ss-disabled) {
+  border-color: var(--color-cinza-claro);
+}
+.ss-main:focus,
+.ss-main.ss-dir-above,
+.ss-main.ss-dir-below {
+  border-color: var(--color-vekta);
+  box-shadow: 0 0 0 3px var(--color-vekta-suave);
+  outline: none;
+}
+.ss-main .ss-values .ss-single {
+  color: var(--color-tinta);
+}
+.ss-main .ss-values .ss-placeholder {
+  color: var(--color-cinza-claro);
+}
+.ss-main .ss-arrow path {
+  stroke: var(--color-cinza);
+  stroke-width: 20;
+}
+.ss-main.ss-disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Dropdown: superfície elevada, igual aos painéis/modais.
+   A lib copia as classes do <select> para o painel também, então o padding de
+   input (px-3 py-2) precisa ser zerado aqui — quem espaça é a lista. */
+.ss-content {
+  background-color: var(--color-superficie);
+  border-color: var(--color-linha);
+  border-radius: 0.75rem;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+  overflow: hidden;
+  padding: 0;
+}
+.ss-content .ss-search {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--color-linha);
+  background-color: var(--color-superficie);
+}
+.ss-content .ss-search input {
+  background-color: var(--color-fundo);
+  border: 1px solid var(--color-linha);
+  border-radius: 0.625rem;
+  color: var(--color-tinta);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  min-height: 34px;
+  padding: 0 0.625rem;
+}
+.ss-content .ss-search input::placeholder {
+  color: var(--color-cinza-claro);
+}
+.ss-content .ss-search input:focus {
+  border-color: var(--color-vekta);
+  box-shadow: 0 0 0 2px var(--color-vekta-suave);
+  outline: none;
+}
+/* A lib usa input[type=search]; o botão nativo de limpar do Chromium
+   aparece azul e ignora o tema. */
+.ss-content .ss-search input::-webkit-search-cancel-button {
+  appearance: none;
+  display: none;
+}
+.ss-content .ss-list .ss-option {
+  border-radius: 0.5rem;
+  color: var(--color-tinta);
+  font-size: 0.875rem;
+  margin: 2px var(--ss-spacing-s);
+  padding: 0.5rem 0.625rem;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.ss-content .ss-list .ss-option:not(.ss-disabled):hover,
+.ss-content .ss-list .ss-option.ss-highlighted {
+  background-color: var(--color-vekta-suave);
+  color: var(--color-tinta);
+}
+/* Mesma especificidade da base (que também usa :not(.ss-disabled)), para vencer no cascade */
+.ss-content .ss-list .ss-option:not(.ss-disabled).ss-selected {
+  background-color: var(--color-vekta);
+  color: #fff;
+}
+.ss-content .ss-list .ss-option.ss-disabled {
+  color: var(--color-cinza-claro);
+}
+.ss-content .ss-list .ss-optgroup .ss-optgroup-label {
+  color: var(--color-cinza);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ss-content .ss-list .ss-search-highlight {
+  background-color: transparent;
+  color: var(--color-vekta);
+  font-weight: 600;
+}
+/* Estado "nada encontrado" */
+.ss-content .ss-list .ss-searching,
+.ss-content .ss-list > div:only-child:not(.ss-option):not(.ss-optgroup) {
+  color: var(--color-cinza-claro);
+  font-size: 0.875rem;
+  padding: 0.75rem;
+  text-align: center;
+}
+
+
+

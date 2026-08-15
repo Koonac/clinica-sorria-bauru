@@ -1,0 +1,1330 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "WhatsApp Web API",
+    "description": "API para integração com WhatsApp Web utilizando whatsapp-web.js. Permite conexão de múltiplos usuários, envio de mensagens e gerenciamento de sessões.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "WhatsApp Web API",
+      "description": "Microserviço para integração com WhatsApp"
+    },
+    "license": {
+      "name": "ISC"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Servidor de desenvolvimento"
+    },
+    {
+      "url": "https://api.whatsapp-web.com",
+      "description": "Servidor de produção"
+    }
+  ],
+  "security": [
+    {
+      "basicAuth": []
+    }
+  ],
+  "paths": {
+    "/api/whatsapp/connect": {
+      "post": {
+        "tags": ["Conexões"],
+        "summary": "Criar nova conexão WhatsApp",
+        "description": "Inicia uma nova sessão do WhatsApp Web para um usuário específico. Retorna informações sobre a sessão criada.",
+        "operationId": "createConnection",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["sessionId", "data"],
+                "properties": {
+                  "sessionId": {
+                    "type": "string",
+                    "description": "Identificador único da sessão do usuário",
+                    "example": "user123"
+                  },
+                  "data": {
+                    "type": "object",
+                    "required": ["notifications_url", "messages_url"],
+                    "description": "Dados de configuração da sessão (extensível para campos futuros)",
+                    "properties": {
+                      "notifications_url": {
+                        "type": "string",
+                        "description": "URL para receber eventos de ciclo de vida (qr_code, authenticated, ready, disconnected, error, loading_screen)",
+                        "example": "https://meu-app.com/webhooks/notifications"
+                      },
+                      "messages_url": {
+                        "type": "string",
+                        "description": "URL para receber mensagens recebidas (event: message)",
+                        "example": "https://meu-app.com/webhooks/messages"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Conexão criada com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "sessionId": {
+                      "type": "string",
+                      "example": "user123"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Conexão criada com sucesso"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados inválidos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "sessionId é obrigatório"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Erro interno do servidor"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/whatsapp/qrcode/{sessionId}": {
+      "get": {
+        "tags": ["QR Code"],
+        "summary": "Obter QR Code de uma sessão",
+        "description": "Retorna o QR Code necessário para autenticar a sessão do WhatsApp Web.",
+        "operationId": "getQRCode",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "description": "Identificador da sessão",
+            "schema": {
+              "type": "string"
+            },
+            "example": "user123"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "QR Code gerado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "sessionId": {
+                      "type": "string",
+                      "example": "user123"
+                    },
+                    "qr": {
+                      "type": "string",
+                      "description": "String do QR Code gerado pelo WhatsApp",
+                      "example": "2@abc123..."
+                    },
+                    "qrImage": {
+                      "type": "string",
+                      "description": "QR Code em formato base64 (data URL)",
+                      "example": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2024-01-15T10:30:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "sessionId não fornecido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "sessionId é obrigatório"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sessão não encontrada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Sessão não encontrada"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Erro interno do servidor"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/whatsapp/status/{sessionId}": {
+      "get": {
+        "tags": ["Status"],
+        "summary": "Verificar status da conexão",
+        "description": "Retorna o status atual da conexão WhatsApp para uma sessão específica.",
+        "operationId": "getConnectionStatus",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "description": "Identificador da sessão",
+            "schema": {
+              "type": "string"
+            },
+            "example": "user123"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status da conexão",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "sessionId": {
+                      "type": "string",
+                      "example": "user123"
+                    },
+                    "status": {
+                      "$ref": "#/components/schemas/ConnectionStatus"
+                    },
+                    "info": {
+                      "type": "object",
+                      "nullable": true,
+                      "description": "Informações do cliente WhatsApp quando conectado"
+                    },
+                    "isBusiness": {
+                      "type": "boolean",
+                      "description": "True se a sessão conectada for WhatsApp Business (Conn.platform smba/smbi)",
+                      "example": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "sessionId não fornecido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "sessionId é obrigatório"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sessão não encontrada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Sessão não encontrada"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Erro interno do servidor"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/whatsapp/send/{sessionId}": {
+      "post": {
+        "tags": ["Mensagens"],
+        "summary": "Enviar mensagem",
+        "description": "Envia texto e/ou imagem para um destinatário usando uma sessão autenticada. Para imagem, envie `media` com `mimetype` (image/*), `data` (base64) e opcionalmente `filename`. `message` vira legenda quando há mídia.",
+        "operationId": "sendMessage",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "description": "Identificador da sessão",
+            "schema": {
+              "type": "string"
+            },
+            "example": "user123"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["to"],
+                "properties": {
+                  "to": {
+                    "type": "string",
+                    "description": "JID do destinatário no WhatsApp (ex.: 5511999999999@c.us). Preferir o `jid` do webhook de message. Passado diretamente para client.getChatById().",
+                    "example": "5511999999999@c.us"
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Texto da mensagem, ou legenda quando `media` está presente",
+                    "example": "Olá! Esta é uma mensagem de teste."
+                  },
+                  "media": {
+                    "type": "object",
+                    "description": "Imagem em base64 (apenas image/*)",
+                    "properties": {
+                      "mimetype": {
+                        "type": "string",
+                        "example": "image/jpeg"
+                      },
+                      "data": {
+                        "type": "string",
+                        "description": "Conteúdo base64 (com ou sem prefixo data:)"
+                      },
+                      "filename": {
+                        "type": "string",
+                        "example": "foto.jpg"
+                      }
+                    },
+                    "required": ["mimetype", "data"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mensagem enviada com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "messageId": {
+                      "type": "string",
+                      "description": "ID da mensagem enviada",
+                      "example": "3EB0C767D82B0A78"
+                    },
+                    "to": {
+                      "type": "string",
+                      "description": "JID do destinatário usado no envio",
+                      "example": "5511999999999@c.us"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Olá! Esta é uma mensagem de teste."
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2024-01-15T10:30:00Z"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados inválidos ou sessão não autenticada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "sessionId, to e message são obrigatórios"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Erro interno do servidor"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/whatsapp/disconnect/{sessionId}": {
+      "delete": {
+        "tags": ["Conexões"],
+        "summary": "Desconectar cliente",
+        "description": "Desconecta e remove uma sessão específica do WhatsApp Web.",
+        "operationId": "disconnectClient",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "description": "Identificador da sessão a ser desconectada",
+            "schema": {
+              "type": "string"
+            },
+            "example": "user123"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cliente desconectado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "sessionId": {
+                      "type": "string",
+                      "example": "user123"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Cliente desconectado com sucesso"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "sessionId não fornecido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "sessionId é obrigatório"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sessão não encontrada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Sessão não encontrada"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Erro interno do servidor"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/whatsapp/connections": {
+      "get": {
+        "tags": ["Conexões"],
+        "summary": "Listar todas as conexões",
+        "description": "Retorna uma lista de todas as sessões ativas e suas informações.",
+        "operationId": "listConnections",
+        "responses": {
+          "200": {
+            "description": "Lista de conexões",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "connections": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sessionId": {
+                            "type": "string",
+                            "example": "user123"
+                          },
+                          "status": {
+                            "$ref": "#/components/schemas/ConnectionStatus"
+                          },
+                          "info": {
+                            "type": "object",
+                            "nullable": true,
+                            "description": "Informações do cliente WhatsApp quando conectado"
+                          }
+                        }
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Número total de conexões",
+                      "example": 3
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno do servidor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Erro interno do servidor"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/whatsapp/labels/{sessionId}": {
+      "get": {
+        "tags": ["Labels"],
+        "summary": "Listar etiquetas/listas",
+        "description": "Retorna todas as labels (etiquetas/listas) da conta WhatsApp Business conectada na sessão.",
+        "operationId": "listLabels",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "user123"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de labels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "sessionId": {
+                      "type": "string",
+                      "example": "user123"
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Label"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Sessão não conectada ou conta sem suporte a labels",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cliente não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Labels"],
+        "summary": "Criar etiqueta/lista",
+        "description": "Cria uma nova label no WhatsApp Business. Requer conta Business. Usa API interna do WhatsApp Web (evaluate).",
+        "operationId": "createLabel",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "user123"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Nome da label",
+                    "example": "Clientes VIP"
+                  },
+                  "color": {
+                    "description": "Cor opcional (índice da paleta ou valor aceito pelo WhatsApp Web). Se omitido, usa a próxima cor disponível.",
+                    "example": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Label criada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "sessionId": {
+                      "type": "string",
+                      "example": "user123"
+                    },
+                    "label": {
+                      "$ref": "#/components/schemas/Label"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados inválidos ou conta não Business",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cliente não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/whatsapp/labels/{sessionId}/{labelId}/contacts": {
+      "post": {
+        "tags": ["Labels"],
+        "summary": "Vincular contato à etiqueta/lista",
+        "description": "Adiciona a label ao chat sem remover as demais labels já vinculadas (merge + SET do wwebjs).",
+        "operationId": "linkLabelContact",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "user123"
+          },
+          {
+            "name": "labelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["to"],
+                "properties": {
+                  "to": {
+                    "type": "string",
+                    "description": "JID do chat (ex.: 5511999999999@c.us)",
+                    "example": "5511999999999@c.us"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contato vinculado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "sessionId": {
+                      "type": "string",
+                      "example": "user123"
+                    },
+                    "to": {
+                      "type": "string",
+                      "example": "5511999999999@c.us"
+                    },
+                    "labelId": {
+                      "type": "string",
+                      "example": "1"
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Label"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados inválidos ou falha no WhatsApp",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cliente não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Labels"],
+        "summary": "Remover contato da etiqueta/lista",
+        "description": "Remove a label do chat preservando as demais labels do contato.",
+        "operationId": "unlinkLabelContact",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "user123"
+          },
+          {
+            "name": "labelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "1"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["to"],
+                "properties": {
+                  "to": {
+                    "type": "string",
+                    "description": "JID do chat (ex.: 5511999999999@c.us)",
+                    "example": "5511999999999@c.us"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contato removido da label",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "sessionId": {
+                      "type": "string",
+                      "example": "user123"
+                    },
+                    "to": {
+                      "type": "string",
+                      "example": "5511999999999@c.us"
+                    },
+                    "labelId": {
+                      "type": "string",
+                      "example": "1"
+                    },
+                    "labels": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Label"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados inválidos ou falha no WhatsApp",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Cliente não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string",
+            "description": "Descrição do erro"
+          }
+        }
+      },
+      "ConnectionStatus": {
+        "type": "string",
+        "enum": ["connecting", "connected", "disconnected"],
+        "description": "Status em memória do cliente WhatsApp"
+      },
+      "Label": {
+        "type": "object",
+        "description": "Etiqueta/lista do WhatsApp Business (Label no wwebjs)",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "1"
+          },
+          "name": {
+            "type": "string",
+            "example": "Clientes VIP"
+          },
+          "hexColor": {
+            "type": "string",
+            "example": "#00a5f4"
+          }
+        }
+      },
+      "ConnectionCreatedResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "sessionId": {
+            "type": "string",
+            "example": "user123"
+          },
+          "message": {
+            "type": "string",
+            "example": "Conexão WhatsApp criada com sucesso"
+          }
+        }
+      },
+      "WwebjsEvent": {
+        "type": "string",
+        "enum": [
+          "qr_code",
+          "authenticated",
+          "ready",
+          "disconnected",
+          "error",
+          "loading_screen",
+          "message"
+        ],
+        "description": "Tipo de evento enviado via webhook. O evento loading_screen está documentado mas ainda não é disparado pelo microserviço."
+      },
+      "WebhookMessageMedia": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "mimetype": {
+            "type": "string",
+            "example": "image/jpeg"
+          },
+          "data": {
+            "type": "string",
+            "description": "Conteúdo da mídia em base64 puro",
+            "example": "iVBORw0KGgo..."
+          },
+          "filename": {
+            "type": "string",
+            "nullable": true,
+            "example": "photo.jpg"
+          },
+          "filesize": {
+            "type": "integer",
+            "nullable": true,
+            "example": 12345
+          }
+        }
+      },
+      "WebhookPayloadData": {
+        "type": "object",
+        "nullable": true,
+        "description": "Dados do webhook. No evento message, jid/phone_number/contact_name vêm de message.getContact() (whatsapp-web.js).",
+        "properties": {
+          "qr": {
+            "type": "string",
+            "description": "QR Code em base64 (data URL). Obrigatório quando event é qr_code.",
+            "example": "data:image/png;base64,iVBORw0KGgo..."
+          },
+          "jid": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 255,
+            "description": "Identificador primário do contato (JID serializado). Origem: contact.id._serialized via message.getContact() (evento message).",
+            "example": "5511999999999@c.us"
+          },
+          "phone_number": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "Número de telefone limpo. Quando o JID é @c.us, usa contact.id.user (contact.number pode ser LID interno). No evento ready, é o número da sessão conectada.",
+            "example": "5511999999999"
+          },
+          "isBusiness": {
+            "type": "boolean",
+            "description": "True se a sessão for WhatsApp Business (Conn.platform smba/smbi). Presente no evento ready e no GET /status.",
+            "example": true
+          },
+          "contact_name": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 255,
+            "description": "Nome do contato: contact.name (agenda) || contact.pushname (perfil) || notifyName (evento message).",
+            "example": "João Silva"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 1000,
+            "description": "Motivo de desconexão, progresso de carregamento ou mensagem de erro. No evento message, use body."
+          },
+          "body": {
+            "type": "string",
+            "description": "Texto ou legenda da mensagem recebida (evento message)",
+            "example": "Olá!"
+          },
+          "has_media": {
+            "type": "boolean",
+            "description": "Indica se a mensagem recebida contém mídia (evento message)",
+            "example": false
+          },
+          "is_view_once": {
+            "type": "boolean",
+            "description": "Indica se a mensagem é de visualização única (evento message)",
+            "example": false
+          },
+          "is_group": {
+            "type": "boolean",
+            "description": "Indica se a mensagem foi enviada em um grupo (evento message)",
+            "example": false
+          },
+          "is_broadcast": {
+            "type": "boolean",
+            "description": "Indica se a mensagem é de lista de transmissão, status ou newsletter (evento message)",
+            "example": false
+          },
+          "message_id": {
+            "type": "string",
+            "description": "ID serializado da mensagem no WhatsApp (evento message)",
+            "example": "true_5511999999999@c.us_3EB0ABCDEF"
+          },
+          "type": {
+            "type": "string",
+            "description": "Tipo da mensagem no WhatsApp (evento message)",
+            "example": "chat"
+          },
+          "timestamp": {
+            "type": "integer",
+            "description": "Unix timestamp de criação da mensagem (evento message)",
+            "example": 1718123456
+          },
+          "media": {
+            "$ref": "#/components/schemas/WebhookMessageMedia"
+          },
+          "media_error": {
+            "type": "string",
+            "nullable": true,
+            "description": "Erro ao baixar mídia, quando has_media é true e media é null (evento message)",
+            "example": "download_failed"
+          },
+          "labels": {
+            "type": "array",
+            "description": "Labels (etiquetas/listas) do chat da mensagem via client.getChatLabels(message.from). Vazio se conta não Business ou se falhar a leitura.",
+            "items": {
+              "$ref": "#/components/schemas/Label"
+            }
+          }
+        },
+        "example": {
+          "jid": "5511999999999@c.us",
+          "phone_number": "5511999999999",
+          "contact_name": "João Silva",
+          "body": "Olá!",
+          "has_media": false,
+          "is_view_once": false,
+          "is_group": false,
+          "message_id": "true_5511999999999@c.us_3EB0ABCDEF",
+          "type": "chat",
+          "timestamp": 1718123456,
+          "labels": [
+            {
+              "id": "1",
+              "name": "Clientes VIP",
+              "hexColor": "#00a5f4"
+            }
+          ]
+        }
+      },
+      "WebhookPayload": {
+        "type": "object",
+        "required": ["event"],
+        "description": "Envelope POST enviado aos webhooks (notifications_url / messages_url).",
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/WwebjsEvent"
+          },
+          "session_id": {
+            "type": "string",
+            "maxLength": 255,
+            "nullable": true,
+            "example": "user123"
+          },
+          "data": {
+            "$ref": "#/components/schemas/WebhookPayloadData"
+          }
+        },
+        "example": {
+          "event": "message",
+          "session_id": "user123",
+          "data": {
+            "jid": "5511999999999@c.us",
+            "phone_number": "5511999999999",
+            "contact_name": "João Silva",
+            "body": "Olá!",
+            "has_media": false,
+            "is_view_once": false,
+            "is_group": false,
+            "message_id": "true_5511999999999@c.us_3EB0ABCDEF",
+            "type": "chat",
+            "timestamp": 1718123456,
+            "labels": [
+              {
+                "id": "1",
+                "name": "Clientes VIP",
+                "hexColor": "#00a5f4"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "basicAuth": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Basic Auth (BASIC_AUTH_USERNAME / BASIC_AUTH_PASSWORD)"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Conexões",
+      "description": "Operações relacionadas ao gerenciamento de conexões WhatsApp"
+    },
+    {
+      "name": "QR Code",
+      "description": "Operações relacionadas à geração e obtenção de QR Codes"
+    },
+    {
+      "name": "Status",
+      "description": "Operações para verificar o status das conexões"
+    },
+    {
+      "name": "Mensagens",
+      "description": "Operações para envio de mensagens"
+    },
+    {
+      "name": "Labels",
+      "description": "Etiquetas/listas do WhatsApp Business (requer conta Business)"
+    }
+  ],
+  "externalDocs": {
+    "description": "Documentação do whatsapp-web.js",
+    "url": "https://github.com/pedroslopez/whatsapp-web.js"
+  }
+}
+
