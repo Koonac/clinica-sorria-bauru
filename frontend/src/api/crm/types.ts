@@ -75,6 +75,18 @@ export type Activity = {
   user?: CrmUserRef | null
 }
 
+export type WhatsappAttendanceSegment = {
+  id: number
+  lead_id: number
+  mode: 'ai' | 'human'
+  user_id?: number | null
+  started_at: string
+  ended_at?: string | null
+  duration_seconds?: number | null
+  source?: string | null
+  user?: CrmUserRef | null
+}
+
 export type Lead = {
   id: number
   title: string
@@ -105,6 +117,7 @@ export type Lead = {
   source?: Source | null
   stage?: PipelineStage | null
   activities?: Activity[]
+  attendance_segments?: WhatsappAttendanceSegment[]
   tasks?: CrmTask[]
   next_pending_task?: CrmTask | null
 }

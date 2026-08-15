@@ -20,7 +20,7 @@ class PauseWhatsappAgentForLead
      */
     public function handle(Lead $lead, User $user, string $source, Connection $connection, ?string $body = null): bool
     {
-        $result = $this->pauseWithResume->handle($lead, $connection);
+        $result = $this->pauseWithResume->handle($lead, $connection, $user->id, 'human_reply');
 
         if ($result['was_paused']) {
             return false;

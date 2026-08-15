@@ -2,6 +2,7 @@
 
 namespace App\Services\Crm\Agent;
 
+use App\Models\Crm\Connection;
 use App\Models\Crm\PipelineStage;
 use App\Models\Crm\WhatsappMessage;
 use App\Services\Crm\OpenRouterAgentClient;
@@ -104,6 +105,7 @@ class WhatsappAgentRunner
             self::HISTORY_LIMIT,
         );
 
+        $aiName = trim((string) ($context->connection->ai_display_name ?? ''));
         $chatMessages = [];
         foreach ($history as $msg) {
             /** @var WhatsappMessage $msg */
@@ -112,6 +114,14 @@ class WhatsappAgentRunner
                 if ($msg->has_media) {
                     $body = '[mídia]';
                 } else {
+                    continue;
+                }
+            }
+            // Histórico outbound já vem com assinatura do sistema; remove para o
+            // modelo não aprender a repetir o nome no texto de enviar_resposta.
+            if ($msg->direction === 'outbound' && $aiName !== '') {
+                $body = Connection::stripAiDisplayNamePrefix($body, $aiName);
+                if ($body === '') {
                     continue;
                 }
             }
@@ -167,6 +177,7 @@ Você é o agent de atendimento WhatsApp "{$context->agent->name}".
 Regras de operação (obrigatórias):
 - Fale com o lead SOMENTE pela tool enviar_resposta. Texto livre / comentários NÃO são enviados ao WhatsApp.
 - enviar_resposta deve conter apenas mensagem natural ao cliente (tom humano). Proibido: resumo interno, status de CRM, "mensagem enviada", "aguardar resposta do lead", "o lead já está no estágio…", checklists de qualificação, narrar tools usadas.
+- Não inclua seu nome, assinatura ou prefixo no início da mensagem — o sistema adiciona automaticamente.
 - Depois de mover_lead / criar_agendamento / escalar_humano, se precisar avisar o cliente, chame enviar_resposta com uma confirmação curta e humana — não mande relatório operacional.
 - Use as tools para agir; não invente stage_id fora da lista abaixo.
 - Antes de oferecer horários ao lead, chame listar_horarios_disponiveis e ofereça só o que ela retornar (sem inventar).

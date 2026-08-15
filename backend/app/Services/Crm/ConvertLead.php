@@ -4,7 +4,6 @@ namespace App\Services\Crm;
 
 use App\Models\Crm\Activity;
 use App\Models\Crm\Connection;
-use App\Models\Crm\Contact;
 use App\Models\Crm\Deal;
 use App\Models\Crm\Lead;
 use App\Models\Crm\Organization;
@@ -14,7 +13,10 @@ use Illuminate\Validation\ValidationException;
 
 class ConvertLead
 {
-    public function __construct(private SyncWhatsappLabels $labelSync) {}
+    public function __construct(
+        private SyncWhatsappLabels $labelSync,
+        private EnsureContactForLead $ensureContact,
+    ) {}
 
     /**
      * Converte um lead em deal, criando/reaproveitando contato e organização.
@@ -33,7 +35,7 @@ class ConvertLead
         $jid = $lead->whatsapp_jid;
 
         $deal = DB::transaction(function () use ($lead, $attrs, $userId, &$jid) {
-            $contact = $this->resolveContact($lead);
+            $contact = $this->ensureContact->handle($lead);
             $organization = $this->resolveOrganization($lead);
 
             if ($organization && ! $contact->organization_id) {
@@ -122,29 +124,6 @@ class ConvertLead
         return Connection::withoutGlobalScopes()
             ->where('clinic_id', $clinicId)
             ->first();
-    }
-
-    private function resolveContact(Lead $lead): Contact
-    {
-        if ($lead->contact_id) {
-            return Contact::findOrFail($lead->contact_id);
-        }
-
-        if ($lead->whatsapp_jid) {
-            $existente = Contact::where('whatsapp_jid', $lead->whatsapp_jid)->first();
-            if ($existente) {
-                return $existente;
-            }
-        }
-
-        return Contact::create([
-            'name' => $lead->name,
-            'email' => $lead->email,
-            'mobile' => $lead->mobile,
-            'whatsapp_jid' => $lead->whatsapp_jid,
-            'instagram' => $lead->instagram,
-            'organization_id' => $lead->organization_id,
-        ]);
     }
 
     private function resolveOrganization(Lead $lead): ?Organization

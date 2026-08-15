@@ -21,7 +21,7 @@ class FinalizeWhatsappConversationForLead
                 'owner_id' => null,
             ])->save();
 
-            $updated = $this->resumer->handle($lead->fresh() ?? $lead);
+            $updated = $this->resumer->handle($lead->fresh() ?? $lead, 'finalize');
 
             Activity::create([
                 'type' => 'note',

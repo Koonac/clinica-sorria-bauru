@@ -8,11 +8,16 @@ use App\Models\Crm\Deal;
 use App\Models\Crm\Lead;
 use App\Models\Crm\PipelineStage;
 use App\Models\Crm\Source;
+use App\Models\Crm\WhatsappAttendanceSegment;
 use App\Models\User;
 
 class WhatsappLeadResolver
 {
-    public function __construct(private SyncWhatsappLabels $labelSync) {}
+    public function __construct(
+        private SyncWhatsappLabels $labelSync,
+        private EnsureContactForLead $ensureContact,
+        private TrackWhatsappAttendanceSegment $attendance,
+    ) {}
 
     /**
      * Localiza lead/deal/contato pelo JID (ou telefone) ou cria um lead novo.
@@ -120,6 +125,14 @@ class WhatsappLeadResolver
             'clinic_id' => $connection->clinic_id,
         ]);
 
+        $contact = $this->ensureContact->handle($lead);
+        $this->attendance->handle(
+            $lead->fresh() ?? $lead,
+            WhatsappAttendanceSegment::MODE_AI,
+            null,
+            'lead_created',
+        );
+
         if ($stageId && $jid !== '') {
             $stage = PipelineStage::find($stageId);
             if ($stage) {
@@ -128,9 +141,9 @@ class WhatsappLeadResolver
         }
 
         return [
-            'lead' => $lead,
+            'lead' => $lead->fresh(),
             'deal' => null,
-            'contact' => null,
+            'contact' => $contact->fresh(),
         ];
     }
 

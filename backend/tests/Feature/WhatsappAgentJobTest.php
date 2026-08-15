@@ -182,6 +182,63 @@ class WhatsappAgentJobTest extends TestCase
         $this->assertNull($lead->fresh()->whatsapp_agent_paused_at);
     }
 
+    public function test_enviar_resposta_nao_duplica_ai_display_name(): void
+    {
+        Http::fake([
+            'openrouter.ai/*' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'role' => 'assistant',
+                        'content' => null,
+                        'tool_calls' => [[
+                            'id' => 'call_1',
+                            'type' => 'function',
+                            'function' => [
+                                'name' => 'enviar_resposta',
+                                'arguments' => json_encode([
+                                    'texto' => "Isabella\n\nPerfeito! Você gostaria de realizar a depilação a laser?",
+                                ], JSON_UNESCAPED_UNICODE),
+                            ],
+                        ]],
+                    ],
+                ]],
+            ], 200),
+            'whatsapp.test/*' => Http::response([
+                'success' => true,
+                'to' => '5511999990000@c.us',
+                'messageId' => 'out-dup-1',
+            ], 200),
+        ]);
+
+        [$user, $connection] = $this->userConectado();
+        $connection->forceFill(['ai_display_name' => 'Isabella'])->save();
+        $this->agentAtivo($user, ['name' => 'Isabella']);
+        $lead = Lead::create([
+            'title' => 'L',
+            'name' => 'Ana',
+            'mobile' => '5511999990000',
+            'whatsapp_jid' => '5511999990000@c.us',
+            'owner_id' => $user->id,
+        ]);
+        $this->inbound($user, $connection, $lead, 'Quero depilação');
+
+        $job = new ProcessWhatsappAiReplyJob($connection->id, 'lead:'.$lead->id);
+        $this->runAiJob($job);
+
+        $outbound = WhatsappMessage::query()
+            ->where('direction', 'outbound')
+            ->where('lead_id', $lead->id)
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($outbound);
+        $this->assertSame(
+            "*_Isabella_*\n\nPerfeito! Você gostaria de realizar a depilação a laser?",
+            $outbound->body
+        );
+        $this->assertSame(1, substr_count(strtolower((string) $outbound->body), 'isabella'));
+    }
+
     public function test_tool_mover_lead_e_escalar_humano(): void
     {
         $stage = PipelineStage::ofKind('lead')->where('active', true)->orderBy('position')->skip(1)->first()

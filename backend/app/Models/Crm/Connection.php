@@ -65,6 +65,44 @@ class Connection extends Model
     }
 
     /**
+     * Prefixa o nome de exibição da IA no corpo outbound (WhatsApp),
+     * removendo assinaturas duplicadas que o modelo possa ter incluído.
+     */
+    public function applyAiDisplayNamePrefix(string $texto): string
+    {
+        $aiName = trim((string) ($this->ai_display_name ?? ''));
+        if ($aiName === '') {
+            return $texto;
+        }
+
+        $texto = self::stripAiDisplayNamePrefix($texto, $aiName);
+
+        return '*_'.$aiName."_*\n\n".$texto;
+    }
+
+    /**
+     * Remove assinatura do nome da IA no início do texto (plain ou markdown WhatsApp).
+     */
+    public static function stripAiDisplayNamePrefix(string $texto, string $aiName): string
+    {
+        $aiName = trim($aiName);
+        if ($aiName === '') {
+            return ltrim($texto);
+        }
+
+        $quoted = preg_quote($aiName, '/');
+        $pattern = '/^(?:\*_'.$quoted.'_\*|\*\*'.$quoted.'\*\*|\*'.$quoted.'\*|_'.$quoted.'_|'.$quoted.')\s*(?:\n+|$)/iu';
+
+        $previous = null;
+        while ($previous !== $texto && preg_match($pattern, $texto) === 1) {
+            $previous = $texto;
+            $texto = (string) preg_replace($pattern, '', $texto, 1);
+        }
+
+        return ltrim($texto);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toPublicArray(): array

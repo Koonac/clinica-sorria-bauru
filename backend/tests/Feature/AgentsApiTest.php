@@ -163,6 +163,52 @@ class AgentsApiTest extends TestCase
             'type' => 'note',
             'subject' => 'Conversa finalizada',
         ]);
+
+        $this->assertDatabaseHas('whatsapp_attendance_segments', [
+            'lead_id' => $lead->id,
+            'mode' => 'ai',
+            'source' => 'finalize',
+        ]);
+    }
+
+    public function test_assume_lead_cria_segmento_humano_por_usuario(): void
+    {
+        $user = $this->autenticar();
+        $lead = Lead::create([
+            'title' => 'Lead',
+            'name' => 'Maria',
+            'owner_id' => null,
+            'whatsapp_agent_paused_at' => null,
+        ]);
+
+        $this->app->make(\App\Services\Crm\TrackWhatsappAttendanceSegment::class)->handle(
+            $lead,
+            \App\Models\Crm\WhatsappAttendanceSegment::MODE_AI,
+            null,
+            'lead_created',
+        );
+
+        $this->travel(10)->seconds();
+
+        $this->patchJson("/api/v1/crm/leads/{$lead->id}", [
+            'owner_id' => $user->id,
+        ])->assertOk();
+
+        $this->assertDatabaseHas('whatsapp_attendance_segments', [
+            'lead_id' => $lead->id,
+            'mode' => 'human',
+            'user_id' => $user->id,
+            'source' => 'assume',
+        ]);
+
+        $aiClosed = \App\Models\Crm\WhatsappAttendanceSegment::query()
+            ->where('lead_id', $lead->id)
+            ->where('mode', 'ai')
+            ->whereNotNull('ended_at')
+            ->first();
+
+        $this->assertNotNull($aiClosed);
+        $this->assertGreaterThanOrEqual(10, (int) $aiClosed->duration_seconds);
     }
 
     public function test_nao_acessa_agent_de_outro_user(): void

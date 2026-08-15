@@ -38,7 +38,7 @@ class CrmApiTest extends TestCase
         $this->getJson('/api/v1/crm/pipeline')->assertUnauthorized();
     }
 
-    public function test_cria_lead_com_dados_de_pessoa_no_proprio_lead(): void
+    public function test_cria_lead_com_contato_vinculado(): void
     {
         $this->autenticar();
 
@@ -54,9 +54,27 @@ class CrmApiTest extends TestCase
             ->assertJsonPath('data.title', 'João da Silva')
             ->assertJsonPath('data.status', 'new');
 
+        $leadId = (int) $resposta->json('data.id');
+        $contactId = (int) $resposta->json('data.contact_id');
+        $this->assertGreaterThan(0, $contactId);
+
         $this->assertDatabaseHas('leads', [
+            'id' => $leadId,
             'name' => 'João da Silva',
-            'contact_id' => null,
+            'contact_id' => $contactId,
+        ]);
+
+        $this->assertDatabaseHas('contacts', [
+            'id' => $contactId,
+            'name' => 'João da Silva',
+            'whatsapp_jid' => '5514997387369@s.whatsapp.net',
+        ]);
+
+        $this->assertDatabaseHas('whatsapp_attendance_segments', [
+            'lead_id' => $leadId,
+            'mode' => 'ai',
+            'user_id' => null,
+            'source' => 'lead_created',
         ]);
     }
 

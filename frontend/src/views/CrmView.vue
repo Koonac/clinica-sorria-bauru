@@ -2,27 +2,19 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '@/api/client'
-import { listContacts } from '@/api/crm/contacts'
 import { updateDeal } from '@/api/crm/deals'
 import { moveLead } from '@/api/crm/leads'
 import { getPipeline, listStages, reorderStages } from '@/api/crm/pipeline'
 import { listSources } from '@/api/crm/sources'
-import { getLeadsPorDia } from '@/api/crm/stats'
-import { listLeads } from '@/api/crm/leads'
 import type {
-  Contact,
   Deal,
   Lead,
-  LeadsPorDiaPoint,
   PipelineKind,
   PipelineStage,
   Source,
 } from '@/api/crm/types'
 import Button from '@/components/Buttons/Button.vue'
 import PageView from '@/components/Layout/PageView.vue'
-import ContactDetailModal from '@/components/Modals/ContactDetailModal.vue'
-import CrmContactsPanel from '@/components/crm/CrmContactsPanel.vue'
-import CrmDashboardPanel from '@/components/crm/CrmDashboardPanel.vue'
 import CrmKanbanBoard from '@/components/crm/CrmKanbanBoard.vue'
 import LeadFormModal from '@/components/Modals/LeadFormModal.vue'
 import LostReasonModal from '@/components/Modals/LostReasonModal.vue'
@@ -31,23 +23,21 @@ import QuickTaskModal from '@/components/Modals/QuickTaskModal.vue'
 import RecordDetailModal from '@/components/Modals/RecordDetailModal.vue'
 import StageFormModal from '@/components/Modals/StageFormModal.vue'
 
-type CrmTab = 'dashboard' | 'leads' | 'negocios' | 'contatos'
+type CrmTab = 'leads' | 'negocios'
 
 const route = useRoute()
 const router = useRouter()
 
 const tabs: { id: CrmTab; label: string }[] = [
-  { id: 'dashboard', label: 'Dashboard' },
   { id: 'leads', label: 'Leads' },
   { id: 'negocios', label: 'Negócios' },
-  { id: 'contatos', label: 'Contatos' },
 ]
 
 const tab = computed<CrmTab>({
   get() {
-    const q = String(route.query.tab || 'dashboard')
-    if (q === 'leads' || q === 'negocios' || q === 'contatos' || q === 'dashboard') return q
-    return 'dashboard'
+    const q = String(route.query.tab || 'leads')
+    if (q === 'leads' || q === 'negocios') return q
+    return 'leads'
   },
   set(value) {
     void router.replace({ query: { ...route.query, tab: value } })
@@ -57,23 +47,14 @@ const tab = computed<CrmTab>({
 const sources = ref<Source[]>([])
 const leadStages = ref<PipelineStage[]>([])
 const dealStages = ref<PipelineStage[]>([])
-const contacts = ref<Contact[]>([])
-const contactTotal = ref(0)
-const convertedTotal = ref(0)
-const leadsPorDia = ref<LeadsPorDiaPoint[]>([])
 
-const loadingDash = ref(true)
 const loadingLeads = ref(true)
 const loadingDeals = ref(true)
-const loadingContacts = ref(true)
-const errorDash = ref('')
 const errorLeads = ref('')
 const errorDeals = ref('')
-const errorContacts = ref('')
 
 const searchLeads = ref('')
 const searchDeals = ref('')
-const searchContacts = ref('')
 
 const leadFormOpen = ref(false)
 const stageFormOpen = ref(false)
@@ -82,8 +63,6 @@ const editingStage = ref<PipelineStage | null>(null)
 const detailOpen = ref(false)
 const detailKind = ref<'lead' | 'deal'>('lead')
 const detailId = ref<number | null>(null)
-const contactOpen = ref(false)
-const selectedContact = ref<Contact | null>(null)
 const quickTaskOpen = ref(false)
 const quickNoteOpen = ref(false)
 const quickLeadId = ref<number | null>(null)
@@ -103,30 +82,6 @@ async function loadSources() {
     sources.value = await listSources()
   } catch {
     sources.value = []
-  }
-}
-
-async function loadDashboard() {
-  loadingDash.value = true
-  errorDash.value = ''
-  try {
-    const [contactsPage, pipelineDeal, pipelineLead, serie, converted] = await Promise.all([
-      listContacts(),
-      getPipeline({ kind: 'deal' }),
-      getPipeline({ kind: 'lead' }),
-      getLeadsPorDia(30),
-      listLeads({ status: 'converted' }),
-    ])
-    contactTotal.value = contactsPage.total
-    dealStages.value = pipelineDeal
-    leadStages.value = pipelineLead
-    leadsPorDia.value = serie.data
-    convertedTotal.value = converted.total
-  } catch (error) {
-    errorDash.value =
-      error instanceof ApiError ? error.message : 'Não foi possível carregar o dashboard.'
-  } finally {
-    loadingDash.value = false
   }
 }
 
@@ -162,33 +117,25 @@ async function loadDealsPipeline(options?: { silent?: boolean }) {
   }
 }
 
-async function loadContactsList() {
-  loadingContacts.value = true
-  errorContacts.value = ''
-  try {
-    const page = await listContacts({
-      search: searchContacts.value.trim() || undefined,
-    })
-    contacts.value = page.data
-    contactTotal.value = page.total
-  } catch (error) {
-    errorContacts.value =
-      error instanceof ApiError ? error.message : 'Não foi possível carregar os contatos.'
-  } finally {
-    loadingContacts.value = false
-  }
-}
-
 async function loadCurrentTab() {
-  if (tab.value === 'dashboard') await loadDashboard()
-  else if (tab.value === 'leads') await loadLeadsPipeline()
-  else if (tab.value === 'negocios') await loadDealsPipeline()
-  else await loadContactsList()
+  if (tab.value === 'leads') await loadLeadsPipeline()
+  else await loadDealsPipeline()
 }
 
 watch(tab, () => {
   void loadCurrentTab()
 })
+
+watch(
+  () => route.query.tab,
+  () => {
+    const q = String(route.query.tab || '')
+    if (q === 'dashboard' || q === 'contatos') {
+      void router.replace({ query: { ...route.query, tab: 'leads' } })
+    }
+  },
+  { immediate: true },
+)
 
 onMounted(() => {
   void loadSources()
@@ -199,7 +146,6 @@ onMounted(() => {
     .catch(() => undefined)
   void loadCurrentTab()
 })
-
 function openDetail(kind: 'lead' | 'deal', id: number) {
   detailKind.value = kind
   detailId.value = id
@@ -358,19 +304,8 @@ function openEditStage(kind: PipelineKind, stage: PipelineStage) {
         </button>
       </div>
 
-      <CrmDashboardPanel
-        v-if="tab === 'dashboard'"
-        :loading="loadingDash"
-        :error="errorDash"
-        :contact-total="contactTotal"
-        :lead-stages="leadStages"
-        :deal-stages="dealStages"
-        :converted-total="convertedTotal"
-        :leads-por-dia="leadsPorDia"
-      />
-
       <CrmKanbanBoard
-        v-else-if="tab === 'leads'"
+        v-if="tab === 'leads'"
         kind="lead"
         :stages="leadStages"
         :loading="loadingLeads"
@@ -396,7 +331,7 @@ function openEditStage(kind: PipelineKind, stage: PipelineStage) {
       />
 
       <CrmKanbanBoard
-        v-else-if="tab === 'negocios'"
+        v-else
         kind="deal"
         :stages="dealStages"
         :loading="loadingDeals"
@@ -418,20 +353,6 @@ function openEditStage(kind: PipelineKind, stage: PipelineStage) {
           quickDealId = $event.dealId ?? null;
           quickLeadId = null;
           quickNoteOpen = true
-        "
-      />
-
-      <CrmContactsPanel
-        v-else
-        :contacts="contacts"
-        :loading="loadingContacts"
-        :error="errorContacts"
-        :search="searchContacts"
-        @update:search="searchContacts = $event"
-        @search="loadContactsList"
-        @open="
-          selectedContact = $event;
-          contactOpen = true
         "
       />
     </div>
@@ -456,7 +377,6 @@ function openEditStage(kind: PipelineKind, stage: PipelineStage) {
         loadDealsPipeline()
       "
     />
-    <ContactDetailModal v-model:open="contactOpen" :contact="selectedContact" />
     <QuickTaskModal
       v-model:open="quickTaskOpen"
       :lead-id="quickLeadId"

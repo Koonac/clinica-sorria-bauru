@@ -16,12 +16,19 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Início',
     icon: 'lucide:home',
     to: { name: 'home' },
+    roles: ['admin'],
   },
   {
     name: 'crm',
     label: 'CRM',
     icon: 'lucide:kanban',
     to: { name: 'crm' },
+  },
+  {
+    name: 'contacts',
+    label: 'Contatos',
+    icon: 'lucide:book-user',
+    to: { name: 'contacts' },
   },
   {
     name: 'agenda',
@@ -34,6 +41,13 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'WhatsApp',
     icon: 'lucide:message-circle',
     to: { name: 'whatsapp' },
+  },
+  {
+    name: 'services',
+    label: 'Serviços',
+    icon: 'lucide:stethoscope',
+    to: { name: 'services' },
+    roles: ['admin'],
   },
   {
     name: 'agents',

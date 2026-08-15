@@ -12,8 +12,10 @@ import {
   Tooltip,
   Filler,
 } from 'chart.js'
+import type { AttendanceStats } from '@/api/crm/stats'
 import { formatMoney, isTerminalStage, type LeadsPorDiaPoint, type PipelineStage } from '@/api/crm/types'
 import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
+import { formatDurationSeconds } from '@/utils/crmFormat'
 
 Chart.register(
   CategoryScale,
@@ -35,6 +37,7 @@ const props = defineProps<{
   dealStages: PipelineStage[]
   convertedTotal: number
   leadsPorDia: LeadsPorDiaPoint[]
+  attendance: AttendanceStats | null
 }>()
 
 const chartCanvas = ref<HTMLCanvasElement | null>(null)
@@ -69,6 +72,32 @@ const kpis = computed(() => [
   },
   { label: 'Perdidos', value: String(perdidos.value.length) },
 ])
+
+const attendanceKpis = computed(() => {
+  const a = props.attendance
+  if (!a) return []
+  return [
+    { label: 'Tempo com IA', value: formatDurationSeconds(a.total_ai_seconds) },
+    { label: 'Tempo com humanos', value: formatDurationSeconds(a.total_human_seconds) },
+    {
+      label: 'Média por atendimento humano',
+      value: formatDurationSeconds(a.avg_human_seconds),
+    },
+    {
+      label: 'Em atendimento agora',
+      value: `IA ${a.open_ai} · Humano ${a.open_human}`,
+    },
+  ]
+})
+
+const aiHumanShare = computed(() => {
+  const a = props.attendance
+  if (!a) return { aiPct: 0, humanPct: 0 }
+  const total = a.total_ai_seconds + a.total_human_seconds
+  if (total <= 0) return { aiPct: 0, humanPct: 0 }
+  const aiPct = Math.round((a.total_ai_seconds / total) * 100)
+  return { aiPct, humanPct: 100 - aiPct }
+})
 
 const funnelSteps = computed(() => {
   const stages = props.leadStages.filter((s) => !s.is_lost)
@@ -194,6 +223,80 @@ onBeforeUnmount(() => {
           <p class="mt-2 text-xl font-semibold text-brand-ink">{{ kpi.value }}</p>
         </article>
       </div>
+
+      <section v-if="attendance" class="space-y-3">
+        <h3 class="text-sm font-semibold text-brand-ink">
+          Tempo de atendimento
+          <span class="font-normal text-brand-ink/45">({{ attendance.dias }}d)</span>
+        </h3>
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <article
+            v-for="kpi in attendanceKpis"
+            :key="kpi.label"
+            class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-4"
+          >
+            <p class="text-[0.7rem] font-medium tracking-wider text-brand-ink/45 uppercase">
+              {{ kpi.label }}
+            </p>
+            <p class="mt-2 text-xl font-semibold text-brand-ink">{{ kpi.value }}</p>
+          </article>
+        </div>
+
+        <div class="rounded-2xl border border-brand-ink/10 bg-white p-4">
+          <p class="text-xs font-medium tracking-wide text-brand-ink/45 uppercase">
+            Distribuição IA × humano
+          </p>
+          <div class="mt-3 flex h-3 overflow-hidden rounded-full bg-brand-ink/5">
+            <div
+              class="h-full bg-brand-cyan transition-all"
+              :style="{ width: `${aiHumanShare.aiPct}%` }"
+              :title="`IA ${aiHumanShare.aiPct}%`"
+            />
+            <div
+              class="h-full bg-brand-blue transition-all"
+              :style="{ width: `${aiHumanShare.humanPct}%` }"
+              :title="`Humano ${aiHumanShare.humanPct}%`"
+            />
+          </div>
+          <div class="mt-2 flex flex-wrap gap-4 text-xs text-brand-ink/55">
+            <span>IA {{ aiHumanShare.aiPct }}%</span>
+            <span>Humano {{ aiHumanShare.humanPct }}%</span>
+          </div>
+        </div>
+
+        <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white">
+          <h4 class="border-b border-brand-ink/10 px-4 py-3 text-sm font-semibold text-brand-ink">
+            Tempo por atendente
+          </h4>
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr
+                class="border-b border-brand-ink/8 text-[0.7rem] tracking-wider text-brand-ink/45 uppercase"
+              >
+                <th class="px-4 py-2.5 font-medium">Atendente</th>
+                <th class="px-4 py-2.5 font-medium">Tempo</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!attendance.by_user.length">
+                <td colspan="2" class="px-4 py-6 text-brand-ink/45">
+                  Nenhum atendimento humano no período.
+                </td>
+              </tr>
+              <tr
+                v-for="row in attendance.by_user"
+                :key="`${row.user_id ?? 'none'}-${row.name}`"
+                class="border-b border-brand-ink/5"
+              >
+                <td class="px-4 py-2.5 text-brand-ink">{{ row.name }}</td>
+                <td class="px-4 py-2.5 text-brand-ink/65">
+                  {{ formatDurationSeconds(row.total_seconds) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <div class="grid gap-4 lg:grid-cols-2">
         <section class="rounded-2xl border border-brand-ink/10 bg-white p-4">

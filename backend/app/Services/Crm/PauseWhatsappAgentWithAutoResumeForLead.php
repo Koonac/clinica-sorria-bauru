@@ -4,18 +4,25 @@ namespace App\Services\Crm;
 
 use App\Models\Crm\Connection;
 use App\Models\Crm\Lead;
+use App\Models\Crm\WhatsappAttendanceSegment;
 use Carbon\CarbonInterface;
 
 class PauseWhatsappAgentWithAutoResumeForLead
 {
+    public function __construct(private TrackWhatsappAttendanceSegment $attendance) {}
+
     /**
      * Pausa o agent e agenda retomada automática com base nas horas da conexão.
      * Renova o prazo se já estiver pausado.
      *
      * @return array{hours: int, resume_at: CarbonInterface, was_paused: bool}
      */
-    public function handle(Lead $lead, Connection $connection): array
-    {
+    public function handle(
+        Lead $lead,
+        Connection $connection,
+        ?int $actorUserId = null,
+        string $source = 'pause',
+    ): array {
         $hours = max(1, min(168, (int) ($connection->whatsapp_agent_auto_resume_hours ?? 24)));
         $resumeAt = now()->addHours($hours);
         $wasPaused = $lead->whatsapp_agent_paused_at !== null;
@@ -24,6 +31,15 @@ class PauseWhatsappAgentWithAutoResumeForLead
             'whatsapp_agent_paused_at' => $lead->whatsapp_agent_paused_at ?? now(),
             'whatsapp_agent_resume_at' => $resumeAt,
         ])->save();
+
+        if (! $wasPaused) {
+            $this->attendance->handle(
+                $lead->fresh() ?? $lead,
+                WhatsappAttendanceSegment::MODE_HUMAN,
+                $lead->owner_id ?? $actorUserId,
+                $source,
+            );
+        }
 
         return [
             'hours' => $hours,

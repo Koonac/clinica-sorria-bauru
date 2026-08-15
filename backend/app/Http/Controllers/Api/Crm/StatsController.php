@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Crm;
 
 use App\Http\Controllers\Controller;
 use App\Models\Crm\Lead;
+use App\Services\Crm\GetAttendanceStats;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -39,6 +40,17 @@ class StatsController extends Controller
             'data' => $serie,
             'dias' => $dias,
             'total' => array_sum(array_column($serie, 'total')),
+        ]);
+    }
+
+    public function attendance(Request $request, GetAttendanceStats $stats): JsonResponse
+    {
+        $dados = $request->validate([
+            'dias' => ['sometimes', 'integer', 'min:7', 'max:90'],
+        ]);
+
+        return response()->json([
+            'data' => $stats->handle((int) ($dados['dias'] ?? 30)),
         ]);
     }
 }

@@ -32,7 +32,7 @@ class ResumeDueWhatsappAgentsCommand extends Command
                 $clinicContext->set($clinic);
             }
 
-            $resumer->handle($lead);
+            $resumer->handle($lead, 'auto_resume');
             $count++;
         }
 

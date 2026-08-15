@@ -90,6 +90,11 @@ class Lead extends Model
         return $this->hasMany(Activity::class);
     }
 
+    public function attendanceSegments(): HasMany
+    {
+        return $this->hasMany(WhatsappAttendanceSegment::class);
+    }
+
     public function tasks(): HasMany
     {
         return $this->hasMany(Task::class);

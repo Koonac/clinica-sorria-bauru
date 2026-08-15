@@ -10,12 +10,15 @@ use App\Http\Requests\Crm\UpdateLeadRequest;
 use App\Models\Crm\Lead;
 use App\Models\Crm\PipelineStage;
 use App\Services\Crm\ConvertLead;
+use App\Services\Crm\EnsureContactForLead;
 use App\Services\Crm\FinalizeWhatsappConversationForLead;
 use App\Services\Crm\MoveLead;
 use App\Services\Crm\PauseWhatsappAgentIndefinitelyForLead;
 use App\Services\Crm\PauseWhatsappAgentWithAutoResumeForLead;
 use App\Services\Crm\ResumeWhatsappAgentForLead;
+use App\Services\Crm\TrackWhatsappAttendanceSegment;
 use App\Services\Crm\UpsertClinicConnection;
+use App\Models\Crm\WhatsappAttendanceSegment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -45,8 +48,11 @@ class LeadController extends Controller
         return response()->json($query->paginate(50));
     }
 
-    public function store(StoreLeadRequest $request): JsonResponse
-    {
+    public function store(
+        StoreLeadRequest $request,
+        EnsureContactForLead $ensureContact,
+        TrackWhatsappAttendanceSegment $attendance,
+    ): JsonResponse {
         $data = $request->validated();
         $data['title'] = $data['title'] ?? $data['name'];
         $data['status'] = $data['status'] ?? 'new';
@@ -59,9 +65,19 @@ class LeadController extends Controller
         }
 
         $lead = Lead::create($data);
+        $ensureContact->handle($lead);
+
+        if (! $lead->isWhatsappAgentPaused()) {
+            $attendance->handle(
+                $lead->fresh() ?? $lead,
+                WhatsappAttendanceSegment::MODE_AI,
+                null,
+                'lead_created',
+            );
+        }
 
         return response()->json(
-            ['data' => $lead->load(['contact', 'source', 'owner', 'stage'])],
+            ['data' => $lead->fresh(['contact', 'source', 'owner', 'stage'])],
             201,
         );
     }
@@ -76,6 +92,7 @@ class LeadController extends Controller
             'stage',
             'convertedDeal.stage',
             'activities' => fn ($q) => $q->latest()->with('user'),
+            'attendanceSegments' => fn ($q) => $q->latest('started_at')->with('user'),
             'tasks' => fn ($q) => $q->orderedByDue()->with('user'),
         ]);
 
@@ -87,6 +104,7 @@ class LeadController extends Controller
         Lead $lead,
         PauseWhatsappAgentWithAutoResumeForLead $pauseWithResume,
         UpsertClinicConnection $upsertConnection,
+        TrackWhatsappAttendanceSegment $attendance,
     ): JsonResponse {
         $data = $request->validated();
         $previousOwnerId = $lead->owner_id;
@@ -99,7 +117,19 @@ class LeadController extends Controller
 
         if ($ownerChanged) {
             $connection = $upsertConnection->handle([], $request->user()?->id);
-            $pauseWithResume->handle($lead->fresh() ?? $lead, $connection);
+            $fresh = $lead->fresh() ?? $lead;
+            $pauseWithResume->handle(
+                $fresh,
+                $connection,
+                (int) $data['owner_id'],
+                $previousOwnerId ? 'transfer' : 'assume',
+            );
+            $attendance->handle(
+                $fresh->fresh() ?? $fresh,
+                WhatsappAttendanceSegment::MODE_HUMAN,
+                (int) $data['owner_id'],
+                $previousOwnerId ? 'transfer' : 'assume',
+            );
         }
 
         return response()->json(['data' => $lead->fresh(['contact', 'organization', 'owner', 'source', 'stage'])]);
@@ -137,9 +167,14 @@ class LeadController extends Controller
         return response()->json(['data' => $resumer->handle($lead)]);
     }
 
-    public function pauseAgent(Lead $lead, PauseWhatsappAgentIndefinitelyForLead $pauser): JsonResponse
-    {
-        return response()->json(['data' => $pauser->handle($lead)]);
+    public function pauseAgent(
+        Request $request,
+        Lead $lead,
+        PauseWhatsappAgentIndefinitelyForLead $pauser,
+    ): JsonResponse {
+        return response()->json([
+            'data' => $pauser->handle($lead, $request->user()?->id, 'pause'),
+        ]);
     }
 
     public function finalizeWhatsapp(

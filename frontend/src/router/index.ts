@@ -33,7 +33,7 @@ const router = createRouter({
           path: '',
           name: 'home',
           component: () => import('@/views/HomeView.vue'),
-          meta: { requiresAuth: true, roles: bothRoles, title: 'Início', icon: 'lucide:home' },
+          meta: { requiresAuth: true, roles: ['admin'], title: 'Início', icon: 'lucide:home' },
         },
         {
           path: 'crm',
@@ -44,6 +44,17 @@ const router = createRouter({
             roles: bothRoles,
             title: 'CRM',
             icon: 'lucide:kanban',
+          },
+        },
+        {
+          path: 'contatos',
+          name: 'contacts',
+          component: () => import('@/views/ContactsView.vue'),
+          meta: {
+            requiresAuth: true,
+            roles: bothRoles,
+            title: 'Contatos',
+            icon: 'lucide:book-user',
           },
         },
         {
@@ -66,6 +77,17 @@ const router = createRouter({
             roles: bothRoles,
             title: 'WhatsApp',
             icon: 'lucide:message-circle',
+          },
+        },
+        {
+          path: 'servicos',
+          name: 'services',
+          component: () => import('@/views/ServicesView.vue'),
+          meta: {
+            requiresAuth: true,
+            roles: ['admin'],
+            title: 'Serviços',
+            icon: 'lucide:stethoscope',
           },
         },
         {
@@ -129,6 +151,10 @@ function routeRoles(to: { matched: { meta: { roles?: AppRole[] } }[] }): AppRole
   return undefined
 }
 
+function defaultAuthenticatedRoute(role: AppRole | undefined): string {
+  return role === 'admin' ? 'home' : 'crm'
+}
+
 router.beforeEach((to) => {
   const auth = useAuthStore()
 
@@ -137,14 +163,14 @@ router.beforeEach((to) => {
   }
 
   if (to.meta.guest && auth.isAuthenticated) {
-    return { name: 'home' }
+    return { name: defaultAuthenticatedRoute(auth.user?.role) }
   }
 
   const roles = routeRoles(to)
   if (roles && auth.isAuthenticated) {
     const role = auth.user?.role
     if (!role || !roles.includes(role)) {
-      return { name: 'home' }
+      return { name: defaultAuthenticatedRoute(role) }
     }
   }
 

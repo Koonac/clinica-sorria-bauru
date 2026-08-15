@@ -46,7 +46,12 @@ class EscalarHumanoTool implements AgentTool
             throw new RuntimeException('Não há lead associado a esta conversa para pausar o agent.');
         }
 
-        $result = $this->pauseWithResume->handle($context->lead, $context->connection);
+        $result = $this->pauseWithResume->handle(
+            $context->lead,
+            $context->connection,
+            $context->lead->owner_id,
+            'escalar',
+        );
 
         Activity::create([
             'type' => 'note',

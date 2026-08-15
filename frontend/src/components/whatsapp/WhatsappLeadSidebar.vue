@@ -3,10 +3,10 @@ import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { ApiError } from '@/api/client'
 import { getLead } from '@/api/crm/leads'
-import type { Lead } from '@/api/crm/types'
+import type { Lead, WhatsappAttendanceSegment } from '@/api/crm/types'
 import Skeleton from '@/components/Feedback/Skeleton.vue'
 import QuickNoteModal from '@/components/Modals/QuickNoteModal.vue'
-import { formatDateTime } from '@/utils/crmFormat'
+import { formatDateTime, formatDurationSeconds } from '@/utils/crmFormat'
 
 const props = defineProps<{
   leadId: number
@@ -32,6 +32,39 @@ const agentLabel = computed(() => {
     return 'Pausado (humano)'
   }
   return 'Ativo'
+})
+
+function segmentSeconds(seg: WhatsappAttendanceSegment): number {
+  if (seg.duration_seconds != null) return seg.duration_seconds
+  if (!seg.ended_at && seg.started_at) {
+    const start = new Date(seg.started_at).getTime()
+    if (!Number.isFinite(start)) return 0
+    return Math.max(0, Math.floor((Date.now() - start) / 1000))
+  }
+  return 0
+}
+
+const attendanceSummary = computed(() => {
+  const segments = lead.value?.attendance_segments || []
+  let aiSeconds = 0
+  const byUser = new Map<string, { name: string; seconds: number }>()
+
+  for (const seg of segments) {
+    const seconds = segmentSeconds(seg)
+    if (seg.mode === 'ai') {
+      aiSeconds += seconds
+      continue
+    }
+    const key = String(seg.user_id ?? 'none')
+    const name = seg.user?.name || 'Sem atendente'
+    const prev = byUser.get(key)
+    byUser.set(key, { name, seconds: (prev?.seconds ?? 0) + seconds })
+  }
+
+  return {
+    aiSeconds,
+    humans: [...byUser.values()].sort((a, b) => b.seconds - a.seconds),
+  }
 })
 
 async function load() {
@@ -136,6 +169,36 @@ watch(
             <dd class="mt-0.5 text-brand-ink">{{ agentLabel }}</dd>
           </div>
         </dl>
+
+        <section class="mt-5">
+          <h4 class="text-[11px] font-medium tracking-wide text-brand-ink/40 uppercase">
+            Tempo de atendimento
+          </h4>
+          <dl class="mt-2 space-y-1.5 text-sm">
+            <div class="flex items-center justify-between gap-2">
+              <dt class="text-brand-ink/55">Agent IA</dt>
+              <dd class="font-medium text-brand-ink">
+                {{ formatDurationSeconds(attendanceSummary.aiSeconds) }}
+              </dd>
+            </div>
+            <div
+              v-for="h in attendanceSummary.humans"
+              :key="h.name"
+              class="flex items-center justify-between gap-2"
+            >
+              <dt class="truncate text-brand-ink/55">{{ h.name }}</dt>
+              <dd class="shrink-0 font-medium text-brand-ink">
+                {{ formatDurationSeconds(h.seconds) }}
+              </dd>
+            </div>
+            <p
+              v-if="!attendanceSummary.aiSeconds && !attendanceSummary.humans.length"
+              class="text-sm text-brand-ink/45"
+            >
+              Sem registros ainda.
+            </p>
+          </dl>
+        </section>
 
         <section class="mt-5">
           <h4 class="text-[11px] font-medium tracking-wide text-brand-ink/40 uppercase">

@@ -18,6 +18,18 @@ export function formatDateTime(iso?: string | null): string {
   }).format(d)
 }
 
+/** Formata segundos em "2h 15m" / "45m" / "12s". */
+export function formatDurationSeconds(seconds?: number | null): string {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) return '—'
+  const total = Math.floor(seconds)
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : `${h}h`
+  if (m > 0) return s > 0 ? `${m}m ${s}s` : `${m}m`
+  return `${s}s`
+}
+
 export function formatDate(iso?: string | null): string {
   if (!iso) return '—'
   const d = new Date(iso)

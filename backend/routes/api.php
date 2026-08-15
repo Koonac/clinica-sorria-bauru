@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\Crm\AgentController;
 use App\Http\Controllers\Api\Crm\AttendantController;
 use App\Http\Controllers\Api\Crm\ClinicController;
 use App\Http\Controllers\Api\Crm\ClinicaController;
+use App\Http\Controllers\Api\Crm\ClinicServiceController;
 use App\Http\Controllers\Api\Crm\ConnectionController;
 use App\Http\Controllers\Api\Crm\ContactController;
 use App\Http\Controllers\Api\Crm\DealController;
@@ -93,7 +94,14 @@ Route::prefix('v1/crm')->middleware(['auth:sanctum', 'clinic'])->group(function 
     Route::get('clinicas', [ClinicaController::class, 'index']);
     Route::get('clinicas/{clinica}', [ClinicaController::class, 'show']);
 
-    Route::get('stats/leads-por-dia', [StatsController::class, 'leadsPorDia']);
+    Route::get('services', [ClinicServiceController::class, 'index']);
+    Route::post('services', [ClinicServiceController::class, 'store']);
+    Route::get('services/{service}', [ClinicServiceController::class, 'show']);
+    Route::patch('services/{service}', [ClinicServiceController::class, 'update']);
+    Route::delete('services/{service}', [ClinicServiceController::class, 'destroy']);
+
+    Route::get('stats/leads-por-dia', [StatsController::class, 'leadsPorDia'])->middleware('role:admin');
+    Route::get('stats/attendance', [StatsController::class, 'attendance'])->middleware('role:admin');
 
     Route::get('activities', [ActivityController::class, 'index']);
     Route::post('activities', [ActivityController::class, 'store']);
