@@ -1,4 +1,5 @@
 const express = require('express');
+const { FEATURES } = require('../config');
 const crmController = require('../controllers/crm.controller');
 
 const router = express.Router();
@@ -62,24 +63,26 @@ router.get('/api/crm/whatsapp/chats', crmController.whatsappChats);
 router.get('/api/crm/whatsapp/messages', crmController.whatsappMessages);
 router.post('/api/crm/whatsapp/send', crmController.whatsappSend);
 
-router.get('/api/crm/campaigns/openrouter-models', crmController.modelosOpenrouterCampanha);
-router.get('/api/crm/campaigns', crmController.listarCampanhas);
-router.post('/api/crm/campaigns', crmController.criarCampanha);
-router.get('/api/crm/campaigns/:id', crmController.obterCampanha);
-router.patch('/api/crm/campaigns/:id', crmController.atualizarCampanha);
-router.post('/api/crm/campaigns/:id/import-csv', crmController.importarCsvCampanha);
-router.post('/api/crm/campaigns/:id/recipients', crmController.criarDestinatarioCampanha);
-router.patch(
-  '/api/crm/campaigns/:id/recipients/:recipientId',
-  crmController.atualizarDestinatarioCampanha,
-);
-router.post(
-  '/api/crm/campaigns/:id/recipients/:recipientId/apply-default',
-  crmController.aplicarPadraoDestinatario,
-);
-router.post('/api/crm/campaigns/:id/generate-messages', crmController.gerarMensagensCampanha);
-router.post('/api/crm/campaigns/:id/start', crmController.iniciarCampanha);
-router.post('/api/crm/campaigns/:id/pause', crmController.pausarCampanha);
-router.post('/api/crm/campaigns/:id/cancel', crmController.cancelarCampanha);
+if (FEATURES.campanhas) {
+  router.get('/api/crm/campaigns/openrouter-models', crmController.modelosOpenrouterCampanha);
+  router.get('/api/crm/campaigns', crmController.listarCampanhas);
+  router.post('/api/crm/campaigns', crmController.criarCampanha);
+  router.get('/api/crm/campaigns/:id', crmController.obterCampanha);
+  router.patch('/api/crm/campaigns/:id', crmController.atualizarCampanha);
+  router.post('/api/crm/campaigns/:id/import-csv', crmController.importarCsvCampanha);
+  router.post('/api/crm/campaigns/:id/recipients', crmController.criarDestinatarioCampanha);
+  router.patch(
+    '/api/crm/campaigns/:id/recipients/:recipientId',
+    crmController.atualizarDestinatarioCampanha,
+  );
+  router.post(
+    '/api/crm/campaigns/:id/recipients/:recipientId/apply-default',
+    crmController.aplicarPadraoDestinatario,
+  );
+  router.post('/api/crm/campaigns/:id/generate-messages', crmController.gerarMensagensCampanha);
+  router.post('/api/crm/campaigns/:id/start', crmController.iniciarCampanha);
+  router.post('/api/crm/campaigns/:id/pause', crmController.pausarCampanha);
+  router.post('/api/crm/campaigns/:id/cancel', crmController.cancelarCampanha);
+}
 
 module.exports = router;

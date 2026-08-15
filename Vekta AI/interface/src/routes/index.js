@@ -1,6 +1,6 @@
 /**
  * Agrega todas as rotas HTTP da interface num único router.
- * CRM, Financeiro, Instagram, Site, Tráfego e Agenda só montam se a feature
+ * CRM, Campanhas, Financeiro, Instagram, Site, Tráfego e Agenda só montam se a feature
  * correspondente estiver true no .env.
  */
 const express = require('express');

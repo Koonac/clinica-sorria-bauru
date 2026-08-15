@@ -1,5 +1,5 @@
 /**
- * Aba Agenda — calendário mensal sincronizado com Google Calendar.
+ * Aba Agenda — calendário mensal (Google Calendar ou agenda local do site).
  */
 import {
   $,
@@ -30,6 +30,7 @@ let mesVisivel = inicioDoMes(new Date());
 let eventos = [];
 let carregando = false;
 let iniciado = false;
+let ultimoProvedor = "local";
 
 function inicioDoMes(d) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -110,15 +111,18 @@ function setStatus(texto) {
   if (no) no.textContent = texto || "";
 }
 
-function mostrarSetup(setup) {
-  $("#ag-setup")?.classList.toggle("hidden", !setup);
-  $("#ag-painel")?.classList.toggle("hidden", setup);
-  $("#ag-acoes")?.classList.toggle("hidden", setup);
+function rotuloProvedor(provedor) {
+  return provedor === "google" ? "google calendar" : "agenda do site";
+}
+
+function aplicarProvedor(provedor) {
+  const origem = $("#ag-origem");
+  if (origem) origem.textContent = rotuloProvedor(provedor);
 }
 
 async function carregarStatus() {
   const status = await api("/api/agenda/status");
-  mostrarSetup(!status.configurado);
+  aplicarProvedor(status.provedor);
   return status;
 }
 
@@ -133,6 +137,10 @@ async function carregarEventos() {
       `/api/agenda/eventos?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`,
     );
     eventos = Array.isArray(dados.eventos) ? dados.eventos : [];
+    if (dados.provedor) {
+      ultimoProvedor = dados.provedor;
+      aplicarProvedor(ultimoProvedor);
+    }
     renderizarGrade();
     setStatus(
       eventos.length === 1
@@ -526,7 +534,7 @@ function abrirModalEvento({ modo, evento, diaIso }) {
             class:
               "font-mono text-[11px] uppercase tracking-wider text-cinza mb-1",
           },
-          "Google Calendar",
+          rotuloProvedor(ultimoProvedor),
         ),
         el(
           "h2",
@@ -601,14 +609,13 @@ export async function iniciar() {
   }
   try {
     const status = await carregarStatus();
-    if (!status.configurado) {
-      setStatus("");
-      return;
-    }
+    ultimoProvedor = status.provedor || "local";
     await carregarEventos();
   } catch (erro) {
-    mostrarSetup(true);
-    setStatus(erro.message || "Falha ao verificar status");
+    aplicarProvedor("local");
+    setStatus(erro.message || "Falha ao carregar a agenda");
+    eventos = [];
+    renderizarGrade();
   }
 }
 

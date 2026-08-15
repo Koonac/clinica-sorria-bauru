@@ -40,7 +40,7 @@ function criarJanela(porta) {
     minWidth: 400,
     minHeight: 560,
     backgroundColor: '#0A0B0F', // mesmo fundo do tema, evita flash branco no load
-    title: 'Vekta Ai',
+    title: 'Sorria Bauru AI',
     icon: ICONE,
     webPreferences: {
       // Renderer carrega uma origem local confiável (nosso próprio server); mantemos

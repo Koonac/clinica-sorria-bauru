@@ -4,6 +4,7 @@
 /saidas
 /saidas/*
 /tarefas.md
+/interface/data
 /interface/node_modules
 /interface/package-lock.json
 /interface/public/css/tailwind.css

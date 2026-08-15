@@ -1,21 +1,39 @@
 /**
- * Endpoints HTTP da aba Agenda (Google Calendar).
+ * Endpoints HTTP da aba Agenda.
+ * Usa Google Calendar quando configurado; senão, agenda local do site.
  */
 const googleCalendar = require('../services/google-calendar.service');
+const localCalendar = require('../services/local-calendar.service');
+
+function usarGoogle() {
+  return googleCalendar.configurado();
+}
+
+function calendario() {
+  return usarGoogle() ? googleCalendar : localCalendar;
+}
 
 function status(_req, res) {
+  const google = usarGoogle();
   res.json({
-    configurado: googleCalendar.configurado(),
-    calendarId: googleCalendar.calendarId(),
+    configurado: true,
+    provedor: google ? 'google' : 'local',
+    calendarId: google ? googleCalendar.calendarId() : 'local',
   });
 }
 
 function responderErro(res, erro) {
   const statusCode =
     erro.status ||
-    (erro.codigo === 'nao_configurado' ? 503 : erro.codigo === 'validacao' ? 400 : 500);
+    (erro.codigo === 'nao_configurado'
+      ? 503
+      : erro.codigo === 'validacao'
+        ? 400
+        : erro.codigo === 'nao_encontrado'
+          ? 404
+          : 500);
   const corpo = {
-    erro: erro.message || 'Falha ao consultar Google Calendar.',
+    erro: erro.message || 'Falha ao consultar a agenda.',
     codigo: erro.codigo || 'erro_interno',
   };
   if (erro.codigo === 'google_erro' && erro.detalhes) {
@@ -34,11 +52,11 @@ function responderErro(res, erro) {
 
 async function listarEventos(req, res) {
   try {
-    const eventos = await googleCalendar.listarEventos({
+    const eventos = await calendario().listarEventos({
       timeMin: req.query.timeMin,
       timeMax: req.query.timeMax,
     });
-    return res.json({ eventos });
+    return res.json({ eventos, provedor: usarGoogle() ? 'google' : 'local' });
   } catch (erro) {
     return responderErro(res, erro);
   }
@@ -46,7 +64,7 @@ async function listarEventos(req, res) {
 
 async function criarEvento(req, res) {
   try {
-    const evento = await googleCalendar.criarEvento(req.body || {});
+    const evento = await calendario().criarEvento(req.body || {});
     return res.status(201).json({ evento });
   } catch (erro) {
     return responderErro(res, erro);
@@ -55,7 +73,7 @@ async function criarEvento(req, res) {
 
 async function atualizarEvento(req, res) {
   try {
-    const evento = await googleCalendar.atualizarEvento(req.params.id, req.body || {});
+    const evento = await calendario().atualizarEvento(req.params.id, req.body || {});
     return res.json({ evento });
   } catch (erro) {
     return responderErro(res, erro);
@@ -64,7 +82,7 @@ async function atualizarEvento(req, res) {
 
 async function excluirEvento(req, res) {
   try {
-    const resultado = await googleCalendar.excluirEvento(req.params.id);
+    const resultado = await calendario().excluirEvento(req.params.id);
     return res.json(resultado);
   } catch (erro) {
     return responderErro(res, erro);

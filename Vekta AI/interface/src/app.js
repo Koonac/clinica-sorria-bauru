@@ -134,7 +134,7 @@ function iniciar({ porta = PORTA, desktopToken = null } = {}) {
       if (!AUTH.usuario || (!AUTH.senha && !AUTH.senhaHash)) {
         console.warn('[auth] Credenciais ausentes no .env — o login web vai rejeitar qualquer tentativa.');
       }
-      console.log(`[features] Instagram=${FEATURES.instagram ? 'on' : 'off'} CRM=${FEATURES.crm ? 'on' : 'off'} Site=${FEATURES.site ? 'on' : 'off'} Tráfego=${FEATURES.trafego ? 'on' : 'off'} Agenda=${FEATURES.agenda ? 'on' : 'off'}`);
+      console.log(`[features] Instagram=${FEATURES.instagram ? 'on' : 'off'} CRM=${FEATURES.crm ? 'on' : 'off'} Campanhas=${FEATURES.campanhas ? 'on' : 'off'} Financeiro=${FEATURES.financeiro ? 'on' : 'off'} Site=${FEATURES.site ? 'on' : 'off'} Tráfego=${FEATURES.trafego ? 'on' : 'off'} Agenda=${FEATURES.agenda ? 'on' : 'off'}`);
       if (FEATURES.site && SITE.valido) {
         console.log(`[site] Preview: ${SITE.relativo} (código: ${SITE.codigoRelativo})`);
       }

@@ -528,7 +528,7 @@ export function iniciar() {
   function definirOcupado(valor) {
     ocupado = valor;
     const status = $('#orbe-status');
-    status.textContent = valor ? 'Vekta pensando…' : 'Vekta ativo';
+    status.textContent = valor ? 'Sorria Bauru pensando…' : 'Sorria Bauru ativo';
     status.classList.toggle('text-alerta', valor);
     status.classList.toggle('text-vekta', !valor);
     chatForm.classList.toggle('chat-caixa--pensando', valor);

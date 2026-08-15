@@ -42,7 +42,7 @@
   },
   "build": {
     "appId": "ai.vekta.desktop",
-    "productName": "Vekta Ai",
+    "productName": "Sorria Bauru AI",
     "//": "Config provisória — a estratégia de projeto gravável (fonte fora do asar, para o Vekta se auto-modificar na máquina do cliente) é o próximo pilar; por isso asar já vem desligado.",
     "asar": false,
     "directories": {

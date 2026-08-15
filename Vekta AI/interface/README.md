@@ -120,6 +120,8 @@ Além das de [Autenticação](#autenticação):
 | --- | --- | --- |
 | `PORT` | `4680` | Porta do servidor |
 | `VEKTA_AI_PERMISSION_MODE` | `bypassPermissions` | Modo de permissão do Claude CLI no chat (`bypassPermissions`, `acceptEdits` ou `default`) |
+| `VEKTA_FEATURE_CAMPANHAS` | `false` | Exibe a aba Campanhas e as APIs `/api/crm/campaigns` |
+| `VEKTA_FEATURE_FINANCEIRO` | `false` | Exibe a aba Financeiro e as APIs `/api/finance` |
 | `VEKTA_FEATURE_SITE` | `true` | Exibe a aba Site e as APIs `/api/site` |
 | `VEKTA_FEATURE_TRAFEGO` | `true` | Exibe a aba Tráfego e as APIs `/api/trafego` |
 | `VEKTA_SITE_DIR` | `marketing/sites/portfolio-1/web/dist` | Pasta com o `index.html` a exibir (Vite: `…/dist`; HTML puro: raiz do site). Relativo à raiz do projeto Vekta |
@@ -134,7 +136,7 @@ Além das de [Autenticação](#autenticação):
 | `GOOGLE_ADS_API_VERSION` | `v21` | Versão da Google Ads API |
 | `GOOGLE_CALENDAR_REFRESH_TOKEN` | — | Refresh token OAuth Calendar (scope `calendar`) |
 | `GOOGLE_CALENDAR_CALENDAR_ID` | `primary` | ID do calendário |
-| `VEKTA_FEATURE_AGENDA` | `true` | Exibe a aba Agenda e as APIs `/api/agenda` |
+| `VEKTA_FEATURE_AGENDA` | `true` | Exibe a aba Agenda e as APIs `/api/agenda`. Sem Google, usa agenda local do site |
 
 Exemplo no PowerShell:
 

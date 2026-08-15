@@ -39,7 +39,8 @@ function envBool(nome, padrao = true) {
 const FEATURES = {
   instagram: envBool('VEKTA_FEATURE_INSTAGRAM', true),
   crm: envBool('VEKTA_FEATURE_CRM', true),
-  financeiro: envBool('VEKTA_FEATURE_FINANCEIRO', true),
+  campanhas: envBool('VEKTA_FEATURE_CAMPANHAS', false),
+  financeiro: envBool('VEKTA_FEATURE_FINANCEIRO', false),
   site: envBool('VEKTA_FEATURE_SITE', true),
   trafego: envBool('VEKTA_FEATURE_TRAFEGO', true),
   agenda: envBool('VEKTA_FEATURE_AGENDA', true),

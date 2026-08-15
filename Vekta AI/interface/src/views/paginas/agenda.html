@@ -10,14 +10,17 @@
   >
     <header class="flex items-end justify-between gap-4 mb-5 max-md:flex-col max-md:items-start">
       <div>
-        <p class="font-mono text-xs uppercase tracking-widest text-vekta mb-1.5">
-          google calendar
+        <p
+          id="ag-origem"
+          class="font-mono text-xs uppercase tracking-widest text-vekta mb-1.5"
+        >
+          agenda
         </p>
         <h1 class="font-display text-3xl font-semibold tracking-tight">
           Agenda
         </h1>
       </div>
-      <div id="ag-acoes" class="hidden flex flex-wrap items-center gap-2">
+      <div id="ag-acoes" class="flex flex-wrap items-center gap-2">
         <button
           type="button"
           id="ag-hoje"
@@ -56,43 +59,7 @@
       </div>
     </header>
 
-    <div id="ag-setup" class="hidden text-center py-16 px-6 text-cinza">
-      <iconify-icon
-        noobserver
-        icon="lucide:calendar-off"
-        class="text-4xl text-vekta mb-4"
-        aria-hidden="true"
-      ></iconify-icon>
-      <h2 class="font-display text-xl text-tinta mb-2">
-        Google Calendar ainda não configurado
-      </h2>
-      <p class="text-base mb-3 max-w-xl mx-auto">
-        Ative a Calendar API no Google Cloud, gere um refresh token com scope
-        <code
-          class="bg-vekta-suave text-vekta px-1.5 py-0.5 rounded-md font-mono text-[0.9em]"
-          >calendar</code
-        >
-        e defina no
-        <code
-          class="bg-vekta-suave text-vekta px-1.5 py-0.5 rounded-md font-mono text-[0.9em]"
-          >interface/.env</code
-        >:
-      </p>
-      <ul
-        class="text-left inline-block text-sm space-y-1.5 mb-2 font-mono text-tinta"
-      >
-        <li>GOOGLE_CLIENT_ID</li>
-        <li>GOOGLE_CLIENT_SECRET</li>
-        <li>GOOGLE_CALENDAR_REFRESH_TOKEN</li>
-      </ul>
-      <p class="text-sm text-cinza-claro mt-3">
-        Opcional:
-        <code class="font-mono text-[0.9em]">GOOGLE_CALENDAR_CALENDAR_ID</code>
-        (default <code class="font-mono text-[0.9em]">primary</code>).
-      </p>
-    </div>
-
-    <div id="ag-painel" class="hidden">
+    <div id="ag-painel">
       <div
         class="flex items-center justify-between gap-3 mb-4 flex-wrap"
       >

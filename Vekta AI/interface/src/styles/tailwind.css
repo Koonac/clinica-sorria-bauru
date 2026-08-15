@@ -9,17 +9,27 @@
 @source "../views";
 
 @theme {
-  --color-fundo: #0a0b0f;
-  --color-superficie: #14161c;
-  --color-tinta: #eef0f4;
-  --color-cinza: #8890a1;
-  --color-cinza-claro: #565d6d;
-  --color-linha: #23262f;
-  --color-vekta: #0e8a76;
-  --color-vekta-escuro: #0a6f5f;
-  --color-vekta-suave: rgba(14, 138, 118, 0.16);
-  --color-alerta: #e8955a;
-  --color-alerta-suave: rgba(232, 149, 90, 0.16);
+  /* Tema claro. Os papéis dos tokens são os mesmos do tema escuro original:
+     "fundo" é o canvas (levemente cinza) e "superficie" são os painéis/sidebar
+     (branco puro, que agora sobressai em vez de recuar. */
+  --color-fundo: #f5f7fa;
+  --color-superficie: #ffffff;
+  --color-tinta: #0f1319;
+  --color-cinza: #5a6373;
+  --color-cinza-claro: #99a1b0;
+  --color-linha: #e3e7ed;
+  /* Destaque = ciano da marca (#00E1FF), a assinatura visual da Sorria Bauru.
+     Ele é claro: funciona como PREENCHIMENTO (botão, bolha, acento), sempre com
+     texto escuro por cima — nunca como texto sobre branco, onde ficaria em
+     ~1.5:1. Para os casos em que o destaque precisa SER o texto (links, ícones,
+     rótulos .text-vekta) existe --color-vekta-texto, o mesmo ciano rebaixado até
+     passar em contraste. O pareamento está em public/css/app.css. */
+  --color-vekta: #00e1ff;
+  --color-vekta-escuro: #00b4cc;
+  --color-vekta-suave: rgba(0, 225, 255, 0.16);
+  --color-vekta-texto: #006e7d;
+  --color-alerta: #b45309;
+  --color-alerta-suave: rgba(180, 83, 9, 0.12);
 
   --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Sora', ui-sans-serif, system-ui, sans-serif;

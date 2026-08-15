@@ -16,6 +16,7 @@ function ehAssetPublicoDoLogin(caminho) {
   return (
     caminho === '/css/tailwind.css'
     || caminho === '/css/app.css'
+    || caminho === '/logo-marca.png'
     || caminho.startsWith('/vendor/')
   );
 }

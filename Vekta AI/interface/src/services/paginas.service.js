@@ -30,7 +30,8 @@ const RE_META = /<!--\s*vekta-pagina\s*(\{[\s\S]*?\})\s*-->/;
 /** Páginas ligadas a features do .env — se a flag estiver false, a aba não existe. */
 const PAGINAS_POR_FEATURE = {
   instagram: ['instagram', 'instagram-fluxos'],
-  crm: ['crm', 'campanhas', 'agent-whatsapp', 'whatsapp'],
+  crm: ['crm', 'agent-whatsapp', 'whatsapp'],
+  campanhas: ['campanhas'],
   financeiro: ['financeiro'],
   site: ['site'],
   trafego: ['trafego'],
