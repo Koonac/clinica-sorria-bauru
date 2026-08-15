@@ -30,6 +30,7 @@ class Connection extends Model
         'qr',
         'is_business',
         'default_lead_stage_id',
+        'whatsapp_agent_auto_resume_hours',
         'created_by',
     ];
 
@@ -77,6 +78,7 @@ class Connection extends Model
             'has_credentials' => $this->hasCredentials(),
             'session_id' => $this->session_id,
             'default_lead_stage_id' => $this->default_lead_stage_id,
+            'whatsapp_agent_auto_resume_hours' => (int) ($this->whatsapp_agent_auto_resume_hours ?? 24),
             'api_username' => $this->api_username,
         ];
     }

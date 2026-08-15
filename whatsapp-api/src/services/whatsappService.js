@@ -1247,6 +1247,55 @@ class WhatsAppService {
     };
   }
 
+  /**
+   * URL temporária da foto de perfil (ou null se oculta/indisponível).
+   */
+  async getProfilePicUrl(sessionId, jid) {
+    const client = this.clients.get(sessionId);
+
+    if (!client) {
+      return {
+        success: false,
+        error: "Cliente não encontrado",
+      };
+    }
+
+    if (!client.info) {
+      return {
+        success: false,
+        error: "Cliente não está conectado",
+      };
+    }
+
+    const chatId = String(jid || "").trim();
+    if (!chatId) {
+      return {
+        success: false,
+        error: "jid é obrigatório",
+      };
+    }
+
+    try {
+      const url = await client.getProfilePicUrl(chatId);
+      return {
+        success: true,
+        sessionId,
+        jid: chatId,
+        url: typeof url === "string" && url.trim() ? url.trim() : null,
+      };
+    } catch (error) {
+      console.warn(
+        `⚠️ getProfilePicUrl falhou para ${chatId}: ${error.message}`,
+      );
+      return {
+        success: true,
+        sessionId,
+        jid: chatId,
+        url: null,
+      };
+    }
+  }
+
   // Enviar mensagem (texto e/ou imagem)
   sendMessage(sessionId, to, message, media = null) {
     return this.enqueueSend(sessionId, to, () =>

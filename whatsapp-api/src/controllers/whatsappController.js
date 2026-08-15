@@ -350,6 +350,42 @@ class WhatsAppController {
       });
     }
   }
+
+  async getProfilePic(req, res) {
+    try {
+      const { sessionId } = req.params;
+      const jid = String(req.query.jid || "").trim();
+
+      if (!sessionId) {
+        return res.status(400).json({
+          success: false,
+          error: "sessionId é obrigatório",
+        });
+      }
+
+      if (!jid) {
+        return res.status(400).json({
+          success: false,
+          error: "jid é obrigatório",
+        });
+      }
+
+      const result = await whatsappService.getProfilePicUrl(sessionId, jid);
+
+      if (!result.success) {
+        const status = result.error === "Cliente não encontrado" ? 404 : 400;
+        return res.status(status).json(result);
+      }
+
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error("Erro no controller getProfilePic:", error);
+      return res.status(500).json({
+        success: false,
+        error: "Erro interno do servidor",
+      });
+    }
+  }
 }
 
 module.exports = new WhatsAppController();

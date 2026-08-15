@@ -31,10 +31,6 @@ const totalLabel = computed(() => {
   return n === 1 ? '1 agent' : `${n} agents`
 })
 
-function modelLabel(agent: Agent) {
-  return agent.model?.trim() || 'Padrão'
-}
-
 function openCreate() {
   editingAgent.value = null
   formOpen.value = true
@@ -191,7 +187,6 @@ onUnmounted(() => {
         <thead class="sticky top-0 bg-[#f4f6f8] text-brand-ink/55">
           <tr class="border-b border-brand-ink/10">
             <th class="px-4 py-3 font-medium">Nome</th>
-            <th class="px-4 py-3 font-medium">Modelo</th>
             <th class="px-4 py-3 font-medium">Debounce</th>
             <th class="px-4 py-3 font-medium">Status</th>
             <th class="px-4 py-3 font-medium text-right">Ações</th>
@@ -204,7 +199,6 @@ onUnmounted(() => {
             class="border-b border-brand-ink/5 transition hover:bg-white/70"
           >
             <td class="px-4 py-3 font-medium text-brand-ink">{{ agent.name }}</td>
-            <td class="px-4 py-3 text-brand-ink/80">{{ modelLabel(agent) }}</td>
             <td class="px-4 py-3 text-brand-ink/80">{{ agent.debounce_seconds }}s</td>
             <td class="px-4 py-3">
               <span

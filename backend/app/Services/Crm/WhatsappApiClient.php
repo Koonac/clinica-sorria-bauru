@@ -112,6 +112,19 @@ class WhatsappApiClient
     }
 
     /**
+     * URL temporária da foto de perfil no WhatsApp (ou null).
+     *
+     * @return array{success?: bool, url?: string|null, error?: string}
+     */
+    public function getProfilePicUrl(string $sessionId, string $jid): array
+    {
+        $path = '/api/whatsapp/profile-pic/'.rawurlencode($sessionId)
+            .'?jid='.rawurlencode($jid);
+
+        return $this->request('get', $path);
+    }
+
+    /**
      * @param  array<string, mixed>  $body
      * @return array<string, mixed>
      */

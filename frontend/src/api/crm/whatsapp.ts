@@ -6,15 +6,32 @@ import type {
   WhatsappMessage,
 } from '@/api/crm/types'
 
+export type WhatsappChatsPage = {
+  data: WhatsappChat[]
+  has_more: boolean
+  offset: number
+  limit: number
+}
+
 export async function listWhatsappChats(params?: {
   search?: string
   filter?: WhatsappChatFilter
-}): Promise<WhatsappChat[]> {
+  limit?: number
+  offset?: number
+}): Promise<WhatsappChatsPage> {
   try {
-    const { data } = await api.get<DataResponse<WhatsappChat[]>>('/v1/crm/whatsapp/chats', {
+    const { data } = await api.get<{
+      data: WhatsappChat[]
+      meta?: { has_more?: boolean; offset?: number; limit?: number }
+    }>('/v1/crm/whatsapp/chats', {
       params,
     })
-    return data.data
+    return {
+      data: data.data,
+      has_more: Boolean(data.meta?.has_more),
+      offset: data.meta?.offset ?? params?.offset ?? 0,
+      limit: data.meta?.limit ?? params?.limit ?? data.data.length,
+    }
   } catch (error) {
     throw toApiError(error)
   }

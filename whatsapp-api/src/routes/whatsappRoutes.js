@@ -15,6 +15,9 @@ router.get("/qrcode/:sessionId", whatsappController.getQRCode);
 // Verificar status da conexão
 router.get("/status/:sessionId", whatsappController.getConnectionStatus);
 
+// Foto de perfil (URL temporária do WhatsApp)
+router.get("/profile-pic/:sessionId", whatsappController.getProfilePic);
+
 // Enviar mensagem
 router.post("/send/:sessionId", whatsappController.sendMessage);
 

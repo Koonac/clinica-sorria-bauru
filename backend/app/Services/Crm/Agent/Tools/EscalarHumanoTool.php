@@ -5,10 +5,13 @@ namespace App\Services\Crm\Agent\Tools;
 use App\Models\Crm\Activity;
 use App\Services\Crm\Agent\AgentContext;
 use App\Services\Crm\Agent\AgentTool;
+use App\Services\Crm\PauseWhatsappAgentWithAutoResumeForLead;
 use RuntimeException;
 
 class EscalarHumanoTool implements AgentTool
 {
+    public function __construct(private PauseWhatsappAgentWithAutoResumeForLead $pauseWithResume) {}
+
     public function name(): string
     {
         return 'escalar_humano';
@@ -18,7 +21,7 @@ class EscalarHumanoTool implements AgentTool
     {
         return [
             'name' => $this->name(),
-            'description' => 'Pausa o atendimento automático deste lead e registra handoff para um humano. Use quando o lead pedir atendente, o caso estiver fora do escopo ou houver risco/reclamação.',
+            'description' => 'Pausa o atendimento automático deste lead e registra handoff para um humano. Use quando o lead pedir atendente, o caso estiver fora do escopo ou houver risco/reclamação. A IA retoma automaticamente após o prazo configurado na conexão.',
             'parameters' => [
                 'type' => 'object',
                 'properties' => [
@@ -43,9 +46,7 @@ class EscalarHumanoTool implements AgentTool
             throw new RuntimeException('Não há lead associado a esta conversa para pausar o agent.');
         }
 
-        $context->lead->forceFill([
-            'whatsapp_agent_paused_at' => now(),
-        ])->save();
+        $result = $this->pauseWithResume->handle($context->lead, $context->connection);
 
         Activity::create([
             'type' => 'note',
@@ -58,6 +59,8 @@ class EscalarHumanoTool implements AgentTool
                 'agent_id' => $context->agent->id,
                 'agent_name' => $context->agent->name,
                 'handoff' => true,
+                'resume_at' => $result['resume_at']->toIso8601String(),
+                'auto_resume_hours' => $result['hours'],
             ],
         ]);
 
@@ -66,6 +69,8 @@ class EscalarHumanoTool implements AgentTool
             'paused' => true,
             'lead_id' => $context->lead->id,
             'motivo' => $motivo,
+            'resume_at' => $result['resume_at']->toIso8601String(),
+            'auto_resume_hours' => $result['hours'],
         ];
     }
 }

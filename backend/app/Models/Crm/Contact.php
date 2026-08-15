@@ -22,7 +22,17 @@ class Contact extends Model
         'instagram',
         'job_title',
         'notes',
+        'avatar_path',
+        'avatar_status',
+        'avatar_fetched_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'avatar_fetched_at' => 'datetime',
+        ];
+    }
 
     public function organization(): BelongsTo
     {

@@ -17,7 +17,6 @@ class Agent extends Model
         'user_id',
         'name',
         'system_prompt',
-        'model',
         'debounce_seconds',
         'is_active',
     ];
@@ -63,12 +62,7 @@ class Agent extends Model
 
     public function resolvedModel(): string
     {
-        $model = trim((string) ($this->model ?? ''));
-        if ($model !== '') {
-            return $model;
-        }
-
-        return (string) config('services.openrouter.agent_model', 'openai/gpt-4o-mini');
+        return (string) config('services.openrouter.agent_model', 'deepseek/deepseek-v4-flash-0731');
     }
 
     public function canActivate(): bool

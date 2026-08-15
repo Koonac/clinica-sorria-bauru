@@ -11,6 +11,10 @@ use App\Models\Crm\Lead;
 use App\Models\Crm\PipelineStage;
 use App\Services\Crm\ConvertLead;
 use App\Services\Crm\MoveLead;
+use App\Services\Crm\PauseWhatsappAgentIndefinitelyForLead;
+use App\Services\Crm\PauseWhatsappAgentWithAutoResumeForLead;
+use App\Services\Crm\ResumeWhatsappAgentForLead;
+use App\Services\Crm\UpsertClinicConnection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -77,9 +81,25 @@ class LeadController extends Controller
         return response()->json(['data' => $lead]);
     }
 
-    public function update(UpdateLeadRequest $request, Lead $lead): JsonResponse
-    {
-        $lead->update($request->validated());
+    public function update(
+        UpdateLeadRequest $request,
+        Lead $lead,
+        PauseWhatsappAgentWithAutoResumeForLead $pauseWithResume,
+        UpsertClinicConnection $upsertConnection,
+    ): JsonResponse {
+        $data = $request->validated();
+        $previousOwnerId = $lead->owner_id;
+
+        $lead->update($data);
+
+        $ownerChanged = array_key_exists('owner_id', $data)
+            && $data['owner_id'] !== null
+            && (int) $data['owner_id'] !== (int) ($previousOwnerId ?? 0);
+
+        if ($ownerChanged) {
+            $connection = $upsertConnection->handle([], $request->user()?->id);
+            $pauseWithResume->handle($lead->fresh() ?? $lead, $connection);
+        }
 
         return response()->json(['data' => $lead->fresh(['contact', 'organization', 'owner', 'source', 'stage'])]);
     }
@@ -111,17 +131,13 @@ class LeadController extends Controller
         return response()->json(['data' => $atualizado]);
     }
 
-    public function resumeAgent(Lead $lead): JsonResponse
+    public function resumeAgent(Lead $lead, ResumeWhatsappAgentForLead $resumer): JsonResponse
     {
-        $lead->forceFill(['whatsapp_agent_paused_at' => null])->save();
-
-        return response()->json(['data' => $lead->fresh(['contact', 'source', 'owner', 'stage'])]);
+        return response()->json(['data' => $resumer->handle($lead)]);
     }
 
-    public function pauseAgent(Lead $lead): JsonResponse
+    public function pauseAgent(Lead $lead, PauseWhatsappAgentIndefinitelyForLead $pauser): JsonResponse
     {
-        $lead->forceFill(['whatsapp_agent_paused_at' => now()])->save();
-
-        return response()->json(['data' => $lead->fresh(['contact', 'source', 'owner', 'stage'])]);
+        return response()->json(['data' => $pauser->handle($lead)]);
     }
 }

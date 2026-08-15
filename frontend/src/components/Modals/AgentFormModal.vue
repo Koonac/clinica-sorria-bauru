@@ -26,7 +26,6 @@ const isEdit = computed(() => Boolean(props.agent))
 const form = reactive({
   name: '',
   system_prompt: '',
-  model: '',
   debounce_seconds: 10,
   is_active: false,
 })
@@ -34,7 +33,6 @@ const form = reactive({
 const fieldErrors = reactive({
   name: '',
   system_prompt: '',
-  model: '',
   debounce_seconds: '',
   is_active: '',
 })
@@ -55,7 +53,6 @@ const canSubmit = computed(() => {
 function clearFieldErrors() {
   fieldErrors.name = ''
   fieldErrors.system_prompt = ''
-  fieldErrors.model = ''
   fieldErrors.debounce_seconds = ''
   fieldErrors.is_active = ''
 }
@@ -63,7 +60,6 @@ function clearFieldErrors() {
 function resetForm() {
   form.name = props.agent?.name ?? ''
   form.system_prompt = props.agent?.system_prompt ?? ''
-  form.model = props.agent?.model ?? ''
   form.debounce_seconds = props.agent?.debounce_seconds ?? 10
   form.is_active = props.agent?.is_active ?? false
   loading.value = false
@@ -102,7 +98,6 @@ function applyApiFieldErrors(details?: Record<string, string[]>) {
   if (!details) return
   fieldErrors.name = details.name?.[0] || ''
   fieldErrors.system_prompt = details.system_prompt?.[0] || ''
-  fieldErrors.model = details.model?.[0] || ''
   fieldErrors.debounce_seconds = details.debounce_seconds?.[0] || ''
   fieldErrors.is_active = details.is_active?.[0] || ''
 }
@@ -124,7 +119,6 @@ async function onSubmit() {
     const payload = {
       name: form.name.trim(),
       system_prompt: form.system_prompt.trim() || null,
-      model: form.model.trim() || null,
       debounce_seconds: Number(form.debounce_seconds),
       is_active: form.is_active,
     }
@@ -225,21 +219,6 @@ async function onSubmit() {
             />
             <span v-if="fieldErrors.system_prompt" class="text-sm text-brand-ink/70" role="alert">
               {{ fieldErrors.system_prompt }}
-            </span>
-          </label>
-
-          <label class="flex flex-col gap-1.5">
-            <span class="text-sm font-medium text-brand-ink/80">Modelo (opcional)</span>
-            <input
-              v-model="form.model"
-              type="text"
-              name="model"
-              maxlength="255"
-              placeholder="ex.: openai/gpt-4o-mini"
-              :class="inputClass"
-            />
-            <span v-if="fieldErrors.model" class="text-sm text-brand-ink/70" role="alert">
-              {{ fieldErrors.model }}
             </span>
           </label>
 

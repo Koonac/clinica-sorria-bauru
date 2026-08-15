@@ -94,6 +94,7 @@ export type Lead = {
   currency?: string | null
   lost_reason?: string | null
   whatsapp_agent_paused_at?: string | null
+  whatsapp_agent_resume_at?: string | null
   converted_deal_id?: number | null
   converted_at?: string | null
   created_at?: string
@@ -156,7 +157,8 @@ export type WhatsappMessage = {
   user_id?: number | null
 }
 
-export type WhatsappChatFilter = 'all' | 'mine' | 'unassigned' | 'unread' | 'human'
+export type WhatsappChatFilter = 'all' | 'mine' | 'unassigned' | 'unread' | 'human' | 'agent'
+
 
 export type WhatsappChat = {
   whatsapp_jid: string
@@ -167,9 +169,11 @@ export type WhatsappChat = {
   lead_id?: number | null
   deal_id?: number | null
   contact_id?: number | null
+  avatar_url?: string | null
   owner_id?: number | null
   owner_name?: string | null
   whatsapp_agent_paused_at?: string | null
+  whatsapp_agent_resume_at?: string | null
   unread_count: number
   last_message: {
     id: number

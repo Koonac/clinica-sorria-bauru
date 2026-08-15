@@ -38,6 +38,7 @@ class PersistInboundWhatsappMessage
                     $lead,
                     $user,
                     'phone',
+                    $event->connection,
                     is_string($message->body) ? mb_substr($message->body, 0, 500) : null,
                 );
             }

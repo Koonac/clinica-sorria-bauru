@@ -3,26 +3,28 @@
 namespace App\Services\Crm;
 
 use App\Models\Crm\Activity;
+use App\Models\Crm\Connection;
 use App\Models\Crm\Lead;
 use App\Models\User;
 
 class PauseWhatsappAgentForLead
 {
+    public function __construct(private PauseWhatsappAgentWithAutoResumeForLead $pauseWithResume) {}
+
     /**
      * Pausa o agent no lead por resposta humana (plataforma ou celular).
-     * Idempotente: se já estiver pausado, não grava Activity de novo.
+     * Agenda retomada automática com base em whatsapp_agent_auto_resume_hours da conexão.
+     * Renova resume_at em mensagens humanas subsequentes; Activity só na primeira pausa.
      *
      * @param  'platform'|'phone'  $source
      */
-    public function handle(Lead $lead, User $user, string $source, ?string $body = null): bool
+    public function handle(Lead $lead, User $user, string $source, Connection $connection, ?string $body = null): bool
     {
-        if ($lead->whatsapp_agent_paused_at !== null) {
+        $result = $this->pauseWithResume->handle($lead, $connection);
+
+        if ($result['was_paused']) {
             return false;
         }
-
-        $lead->forceFill([
-            'whatsapp_agent_paused_at' => now(),
-        ])->save();
 
         $labels = [
             'platform' => 'Agent pausado: resposta humana (plataforma)',
@@ -38,6 +40,8 @@ class PauseWhatsappAgentForLead
             'meta' => [
                 'handoff' => true,
                 'source' => $source,
+                'resume_at' => $result['resume_at']->toIso8601String(),
+                'auto_resume_hours' => $result['hours'],
             ],
         ]);
 

@@ -35,6 +35,7 @@ class Lead extends Model
         'external_id',
         'lost_reason',
         'whatsapp_agent_paused_at',
+        'whatsapp_agent_resume_at',
         'converted_deal_id',
         'converted_at',
     ];
@@ -45,6 +46,7 @@ class Lead extends Model
             'value' => 'decimal:2',
             'converted_at' => 'datetime',
             'whatsapp_agent_paused_at' => 'datetime',
+            'whatsapp_agent_resume_at' => 'datetime',
         ];
     }
 

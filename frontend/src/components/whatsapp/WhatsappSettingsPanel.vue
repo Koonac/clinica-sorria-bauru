@@ -34,6 +34,7 @@ const credentials = ref({
 const settings = ref({
   name: '',
   default_lead_stage_id: '' as string | number,
+  whatsapp_agent_auto_resume_hours: 24,
 })
 
 const inputClass =
@@ -79,6 +80,8 @@ function applyConnection(next: ClinicConnection) {
   settings.value.default_lead_stage_id = next.default_lead_stage_id
     ? String(next.default_lead_stage_id)
     : ''
+  settings.value.whatsapp_agent_auto_resume_hours =
+    next.whatsapp_agent_auto_resume_hours ?? 24
 }
 
 async function load() {
@@ -165,6 +168,7 @@ async function saveSettings() {
     const next = await updateConnectionSettings({
       name: settings.value.name.trim() || null,
       default_lead_stage_id: stageId === '' ? null : Number(stageId),
+      whatsapp_agent_auto_resume_hours: Number(settings.value.whatsapp_agent_auto_resume_hours),
     })
     applyConnection(next)
     flash.value = 'Configurações salvas.'
@@ -309,6 +313,24 @@ onMounted(() => {
           <label class="flex flex-col gap-1.5">
             <span class="text-sm font-medium text-brand-ink/80">Estágio padrão do lead</span>
             <Select v-model="settings.default_lead_stage_id" :options="stageOptions" />
+          </label>
+          <label class="flex flex-col gap-1.5 sm:col-span-2">
+            <span class="text-sm font-medium text-brand-ink/80">
+              Horas para a IA retomar após resposta humana
+            </span>
+            <input
+              v-model.number="settings.whatsapp_agent_auto_resume_hours"
+              type="number"
+              min="1"
+              max="168"
+              required
+              :class="inputClass"
+            />
+            <span class="text-xs text-brand-ink/45">
+              Quando um atendente responde pelo WhatsApp (plataforma ou celular), a IA fica pausada
+              por este período e retoma automaticamente. Pausar pelo botão permanece até retomada
+              manual. (1–168 horas)
+            </span>
           </label>
         </div>
         <div>

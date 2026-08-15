@@ -6,12 +6,15 @@ use App\Events\Crm\WhatsappInboundMessageReceived;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Crm\MarkWhatsappChatReadRequest;
 use App\Http\Requests\Crm\SendWhatsappMessageRequest;
+use App\Jobs\Crm\FetchWhatsappAvatarJob;
 use App\Models\Clinic;
 use App\Models\Crm\Connection;
+use App\Models\Crm\Contact;
 use App\Models\Crm\Lead;
 use App\Models\Crm\WhatsappConversationRead;
 use App\Models\Crm\WhatsappMessage;
 use App\Models\User;
+use App\Services\Crm\EnsureWhatsappAvatar;
 use App\Services\Crm\MarkWhatsappChatRead;
 use App\Services\Crm\PauseWhatsappAgentForLead;
 use App\Services\Crm\SyncWhatsappLabels;
@@ -24,7 +27,9 @@ use App\Support\ClinicContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class WhatsappController extends Controller
 {
@@ -36,6 +41,7 @@ class WhatsappController extends Controller
         private UpsertClinicConnection $upsertConnection,
         private WhatsappConversationKey $conversationKey,
         private MarkWhatsappChatRead $markChatRead,
+        private EnsureWhatsappAvatar $ensureAvatar,
     ) {}
 
     public function send(SendWhatsappMessageRequest $request): JsonResponse
@@ -132,6 +138,7 @@ class WhatsappController extends Controller
                 $resolved['lead'],
                 $user,
                 'platform',
+                $connection,
                 mb_substr($message !== '' ? $message : '[imagem]', 0, 500),
             );
         }
@@ -153,7 +160,7 @@ class WhatsappController extends Controller
         $connection = $this->upsertConnection->handle([], $user->id);
         $search = trim((string) $request->query('search', ''));
         $filter = strtolower(trim((string) $request->query('filter', 'all')));
-        if (! in_array($filter, ['all', 'mine', 'unassigned', 'unread', 'human'], true)) {
+        if (! in_array($filter, ['all', 'mine', 'unassigned', 'unread', 'human', 'agent'], true)) {
             $filter = 'all';
         }
 
@@ -202,10 +209,18 @@ class WhatsappController extends Controller
         $lidKeys = [];
         $conversationKeys = [];
         $leadIds = [];
+        $contactIds = [];
+        $chatJids = [];
         foreach ($rows as $row) {
             $conversationKeys[] = (string) $row->conversation_key;
             if ($row->lead_id) {
                 $leadIds[] = (int) $row->lead_id;
+            }
+            if ($row->contact_id) {
+                $contactIds[] = (int) $row->contact_id;
+            }
+            if (is_string($row->whatsapp_jid) && $row->whatsapp_jid !== '') {
+                $chatJids[] = $row->whatsapp_jid;
             }
             if (is_string($row->whatsapp_jid) && str_ends_with($row->whatsapp_jid, '@lid')) {
                 $lidKeys[] = $row->whatsapp_jid;
@@ -216,6 +231,8 @@ class WhatsappController extends Controller
         $lidKeys = array_values(array_unique($lidKeys));
         $conversationKeys = array_values(array_unique(array_filter($conversationKeys)));
         $leadIds = array_values(array_unique($leadIds));
+        $contactIds = array_values(array_unique($contactIds));
+        $chatJids = array_values(array_unique($chatJids));
 
         $phoneJidByLid = [];
         if ($lidKeys !== []) {
@@ -245,8 +262,39 @@ class WhatsappController extends Controller
             $leadsById = Lead::query()
                 ->with('owner:id,name')
                 ->whereIn('id', $leadIds)
-                ->get(['id', 'owner_id', 'whatsapp_agent_paused_at', 'name'])
+                ->get(['id', 'owner_id', 'whatsapp_agent_paused_at', 'whatsapp_agent_resume_at', 'name', 'contact_id', 'whatsapp_jid'])
                 ->keyBy('id');
+            foreach ($leadsById as $lead) {
+                if ($lead->contact_id) {
+                    $contactIds[] = (int) $lead->contact_id;
+                }
+            }
+            $contactIds = array_values(array_unique($contactIds));
+        }
+
+        $contactsById = collect();
+        $contactsByJid = collect();
+        if ($contactIds !== [] || $chatJids !== []) {
+            $contacts = Contact::query()
+                ->where(function ($q) use ($contactIds, $chatJids) {
+                    if ($contactIds !== []) {
+                        $q->orWhereIn('id', $contactIds);
+                    }
+                    if ($chatJids !== []) {
+                        $q->orWhereIn('whatsapp_jid', $chatJids);
+                    }
+                })
+                ->get([
+                    'id',
+                    'whatsapp_jid',
+                    'avatar_path',
+                    'avatar_status',
+                    'avatar_fetched_at',
+                    'name',
+                ]);
+            $contactsById = $contacts->keyBy('id');
+            $contactsByJid = $contacts->filter(fn (Contact $c) => filled($c->whatsapp_jid))
+                ->keyBy('whatsapp_jid');
         }
 
         $readsByKey = [];
@@ -302,18 +350,34 @@ class WhatsappController extends Controller
                 $unread = max($unread, 1);
             }
 
+            $contactId = $row->contact_id ? (int) $row->contact_id : ($lead?->contact_id ? (int) $lead->contact_id : null);
+            /** @var Contact|null $contact */
+            $contact = $contactId
+                ? ($contactsById[$contactId] ?? null)
+                : ($contactsByJid[$jid] ?? null);
+            if ($contact && ! $contactId) {
+                $contactId = (int) $contact->id;
+            }
+
+            $avatarUrl = null;
+            if ($contact && $this->ensureAvatar->hasServableAvatar($contact)) {
+                $avatarUrl = '/v1/crm/whatsapp/avatars/'.$contact->id;
+            }
+
             $item = [
                 'whatsapp_jid' => $jid,
                 'whatsapp_lid' => $lid,
                 'phone_number' => $phone,
-                'contact_name' => $row->contact_name ?: ($lead?->name),
+                'contact_name' => $row->contact_name ?: ($lead?->name) ?: ($contact?->name),
                 'conversation_key' => $key,
                 'lead_id' => $leadId,
                 'deal_id' => $row->deal_id ? (int) $row->deal_id : null,
-                'contact_id' => $row->contact_id ? (int) $row->contact_id : null,
+                'contact_id' => $contactId,
+                'avatar_url' => $avatarUrl,
                 'owner_id' => $lead?->owner_id,
                 'owner_name' => $lead?->owner?->name,
                 'whatsapp_agent_paused_at' => $lead?->whatsapp_agent_paused_at?->toIso8601String(),
+                'whatsapp_agent_resume_at' => $lead?->whatsapp_agent_resume_at?->toIso8601String(),
                 'unread_count' => $unread,
                 'last_message' => [
                     'id' => (int) $row->id,
@@ -332,7 +396,24 @@ class WhatsappController extends Controller
             $data[] = $item;
         }
 
-        return response()->json(['data' => $data]);
+        $limit = (int) $request->query('limit', 20);
+        $offset = (int) $request->query('offset', 0);
+        $limit = max(1, min($limit, 50));
+        $offset = max(0, $offset);
+
+        $page = array_values(array_slice($data, $offset, $limit));
+        $hasMore = ($offset + count($page)) < count($data);
+
+        $this->dispatchAvatarFetches($connection, $page, $contactsById, $contactsByJid);
+
+        return response()->json([
+            'data' => $page,
+            'meta' => [
+                'offset' => $offset,
+                'limit' => $limit,
+                'has_more' => $hasMore,
+            ],
+        ]);
     }
 
     public function markChatRead(MarkWhatsappChatReadRequest $request): JsonResponse
@@ -350,7 +431,42 @@ class WhatsappController extends Controller
             $leadId !== null ? (int) $leadId : null,
         );
 
+        $contact = $this->resolveContactForChat($jid, $leadId !== null ? (int) $leadId : null);
+        if ($contact && $this->ensureAvatar->needsFetch($contact)) {
+            FetchWhatsappAvatarJob::dispatch($connection->id, $contact->id);
+        }
+
         return response()->json(['data' => $result]);
+    }
+
+    public function avatar(Request $request, Contact $contact): BinaryFileResponse|JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $connection = $this->upsertConnection->handle([], $user->id);
+
+        if ($this->ensureAvatar->needsFetch($contact)) {
+            $this->ensureAvatar->handle($connection, $contact);
+            $contact->refresh();
+        }
+
+        if (! $this->ensureAvatar->hasServableAvatar($contact)) {
+            return response()->json(['message' => 'Avatar indisponível.'], 404);
+        }
+
+        $path = (string) $contact->avatar_path;
+        $absolute = Storage::disk('local')->path($path);
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $mime = match ($ext) {
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            default => 'image/jpeg',
+        };
+
+        return response()->file($absolute, [
+            'Content-Type' => $mime,
+            'Cache-Control' => 'private, max-age=86400',
+        ]);
     }
 
     public function messages(Request $request, WhatsappChatHistory $history): JsonResponse
@@ -630,6 +746,7 @@ class WhatsappController extends Controller
             'unassigned' => ($item['lead_id'] ?? null) === null || ($item['owner_id'] ?? null) === null,
             'unread' => ((int) ($item['unread_count'] ?? 0)) > 0,
             'human' => filled($item['whatsapp_agent_paused_at'] ?? null),
+            'agent' => ($item['lead_id'] ?? null) !== null && ! filled($item['whatsapp_agent_paused_at'] ?? null),
             default => true,
         };
     }
@@ -661,5 +778,66 @@ class WhatsappController extends Controller
         }
 
         return [$jid, $lid];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $chats
+     * @param  \Illuminate\Support\Collection<int|string, Contact>  $contactsById
+     * @param  \Illuminate\Support\Collection<string, Contact>  $contactsByJid
+     */
+    private function dispatchAvatarFetches(
+        Connection $connection,
+        array $chats,
+        $contactsById,
+        $contactsByJid,
+    ): void {
+        $dispatched = 0;
+        $seen = [];
+
+        foreach ($chats as $chat) {
+            if ($dispatched >= 5) {
+                break;
+            }
+
+            $contactId = isset($chat['contact_id']) ? (int) $chat['contact_id'] : 0;
+            $jid = is_string($chat['whatsapp_jid'] ?? null) ? (string) $chat['whatsapp_jid'] : '';
+
+            /** @var Contact|null $contact */
+            $contact = $contactId > 0
+                ? ($contactsById[$contactId] ?? null)
+                : ($jid !== '' ? ($contactsByJid[$jid] ?? null) : null);
+
+            if (! $contact || isset($seen[$contact->id])) {
+                continue;
+            }
+            $seen[$contact->id] = true;
+
+            if (! $this->ensureAvatar->needsFetch($contact)) {
+                continue;
+            }
+
+            FetchWhatsappAvatarJob::dispatch($connection->id, $contact->id);
+            $dispatched++;
+        }
+    }
+
+    private function resolveContactForChat(string $jid, ?int $leadId): ?Contact
+    {
+        if ($leadId) {
+            $lead = Lead::query()->find($leadId);
+            if ($lead?->contact_id) {
+                $contact = Contact::query()->find($lead->contact_id);
+                if ($contact) {
+                    return $contact;
+                }
+            }
+        }
+
+        $jid = trim($jid);
+        if ($jid === '') {
+            return null;
+        }
+
+        return Contact::query()->where('whatsapp_jid', $jid)->first();
     }
 }

@@ -13,6 +13,7 @@ export type ClinicConnection = {
   has_credentials: boolean
   session_id: string | null
   default_lead_stage_id: number | null
+  whatsapp_agent_auto_resume_hours: number
   api_username: string | null
   has_qr?: boolean
 }
@@ -50,6 +51,7 @@ export async function updateConnectionCredentials(payload: {
 export async function updateConnectionSettings(payload: {
   name?: string | null
   default_lead_stage_id?: number | null
+  whatsapp_agent_auto_resume_hours?: number
 }): Promise<ClinicConnection> {
   try {
     const { data } = await api.put<DataResponse<ClinicConnection>>(

@@ -243,6 +243,7 @@ class WhatsappAgentJobTest extends TestCase
         $lead->refresh();
         $this->assertSame((int) $stage->id, (int) $lead->stage_id);
         $this->assertNotNull($lead->whatsapp_agent_paused_at);
+        $this->assertNotNull($lead->whatsapp_agent_resume_at);
     }
 
     public function test_criar_agendamento_cria_task_e_evento_google(): void

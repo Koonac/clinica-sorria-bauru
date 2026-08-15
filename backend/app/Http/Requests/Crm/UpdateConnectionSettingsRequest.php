@@ -18,6 +18,7 @@ class UpdateConnectionSettingsRequest extends FormRequest
                     fn ($q) => $q->where('kind', 'lead')->where('active', true)
                 ),
             ],
+            'whatsapp_agent_auto_resume_hours' => ['sometimes', 'integer', 'min:1', 'max:168'],
         ];
     }
 }

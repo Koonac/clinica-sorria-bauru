@@ -7,7 +7,6 @@ export type Agent = {
   user_id: number
   name: string
   system_prompt: string | null
-  model: string | null
   debounce_seconds: number
   is_active: boolean
   created_at: string
@@ -17,7 +16,6 @@ export type Agent = {
 export type CreateAgentPayload = {
   name: string
   system_prompt?: string | null
-  model?: string | null
   debounce_seconds?: number
   is_active?: boolean
 }
@@ -25,7 +23,6 @@ export type CreateAgentPayload = {
 export type UpdateAgentPayload = {
   name?: string
   system_prompt?: string | null
-  model?: string | null
   debounce_seconds?: number
   is_active?: boolean
 }

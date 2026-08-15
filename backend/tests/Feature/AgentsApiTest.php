@@ -104,13 +104,16 @@ class AgentsApiTest extends TestCase
             'title' => 'Lead',
             'name' => 'Maria',
             'whatsapp_agent_paused_at' => now(),
+            'whatsapp_agent_resume_at' => now()->addHours(12),
         ]);
 
         $this->postJson("/api/v1/crm/leads/{$lead->id}/agent/resume")
             ->assertOk()
-            ->assertJsonPath('data.whatsapp_agent_paused_at', null);
+            ->assertJsonPath('data.whatsapp_agent_paused_at', null)
+            ->assertJsonPath('data.whatsapp_agent_resume_at', null);
 
         $this->assertNull($lead->fresh()->whatsapp_agent_paused_at);
+        $this->assertNull($lead->fresh()->whatsapp_agent_resume_at);
     }
 
     public function test_pausa_agent_no_lead(): void
@@ -120,13 +123,16 @@ class AgentsApiTest extends TestCase
             'title' => 'Lead',
             'name' => 'Maria',
             'whatsapp_agent_paused_at' => null,
+            'whatsapp_agent_resume_at' => now()->addHours(6),
         ]);
 
         $response = $this->postJson("/api/v1/crm/leads/{$lead->id}/agent/pause")
             ->assertOk();
 
         $this->assertNotNull($response->json('data.whatsapp_agent_paused_at'));
+        $this->assertNull($response->json('data.whatsapp_agent_resume_at'));
         $this->assertNotNull($lead->fresh()->whatsapp_agent_paused_at);
+        $this->assertNull($lead->fresh()->whatsapp_agent_resume_at);
     }
 
     public function test_nao_acessa_agent_de_outro_user(): void

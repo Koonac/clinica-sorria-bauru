@@ -94,6 +94,13 @@ class WhatsappOutboundSyncTest extends TestCase
         ]);
 
         $this->assertNotNull($lead->fresh()->whatsapp_agent_paused_at);
+        $this->assertNotNull($lead->fresh()->whatsapp_agent_resume_at);
+        $this->assertTrue(
+            $lead->fresh()->whatsapp_agent_resume_at->between(
+                now()->addHours(23),
+                now()->addHours(25),
+            ),
+        );
         $this->assertDatabaseHas('activities', [
             'lead_id' => $lead->id,
             'type' => 'note',
@@ -180,6 +187,7 @@ class WhatsappOutboundSyncTest extends TestCase
             'lead_id' => $lead->id,
         ]);
         $this->assertNotNull($lead->fresh()->whatsapp_agent_paused_at);
+        $this->assertNotNull($lead->fresh()->whatsapp_agent_resume_at);
         $this->assertDatabaseHas('activities', [
             'lead_id' => $lead->id,
             'subject' => 'Agent pausado: resposta humana (plataforma)',
