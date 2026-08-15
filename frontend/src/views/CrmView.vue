@@ -11,6 +11,8 @@ import { getLeadsPorDia } from '@/api/crm/stats'
 import { listLeads } from '@/api/crm/leads'
 import type {
   Contact,
+  Deal,
+  Lead,
   LeadsPorDiaPoint,
   PipelineKind,
   PipelineStage,
@@ -60,10 +62,10 @@ const contactTotal = ref(0)
 const convertedTotal = ref(0)
 const leadsPorDia = ref<LeadsPorDiaPoint[]>([])
 
-const loadingDash = ref(false)
-const loadingLeads = ref(false)
-const loadingDeals = ref(false)
-const loadingContacts = ref(false)
+const loadingDash = ref(true)
+const loadingLeads = ref(true)
+const loadingDeals = ref(true)
+const loadingContacts = ref(true)
 const errorDash = ref('')
 const errorLeads = ref('')
 const errorDeals = ref('')
@@ -128,8 +130,8 @@ async function loadDashboard() {
   }
 }
 
-async function loadLeadsPipeline() {
-  loadingLeads.value = true
+async function loadLeadsPipeline(options?: { silent?: boolean }) {
+  if (!options?.silent) loadingLeads.value = true
   errorLeads.value = ''
   try {
     leadStages.value = await getPipeline({
@@ -140,12 +142,12 @@ async function loadLeadsPipeline() {
     errorLeads.value =
       error instanceof ApiError ? error.message : 'Não foi possível carregar os leads.'
   } finally {
-    loadingLeads.value = false
+    if (!options?.silent) loadingLeads.value = false
   }
 }
 
-async function loadDealsPipeline() {
-  loadingDeals.value = true
+async function loadDealsPipeline(options?: { silent?: boolean }) {
+  if (!options?.silent) loadingDeals.value = true
   errorDeals.value = ''
   try {
     dealStages.value = await getPipeline({
@@ -156,7 +158,7 @@ async function loadDealsPipeline() {
     errorDeals.value =
       error instanceof ApiError ? error.message : 'Não foi possível carregar os negócios.'
   } finally {
-    loadingDeals.value = false
+    if (!options?.silent) loadingDeals.value = false
   }
 }
 
@@ -209,6 +211,38 @@ function findStage(kind: PipelineKind, id: number): PipelineStage | undefined {
   return list.find((s) => s.id === id)
 }
 
+/** Mantém o estado do pai alinhado ao drag (sem trocar a ref da lista). */
+function applyLocalMove(move: PendingMove) {
+  const stages = move.kind === 'lead' ? leadStages : dealStages
+  let card: Lead | Deal | undefined
+
+  for (const stage of stages.value) {
+    const list = move.kind === 'lead' ? stage.leads : stage.deals
+    if (!list?.length) continue
+    const idx = list.findIndex((c) => c.id === move.id)
+    if (idx >= 0) {
+      card = list.splice(idx, 1)[0]
+      break
+    }
+  }
+
+  if (!card) return
+
+  card.stage_id = move.stageId
+  const target = stages.value.find((s) => s.id === move.stageId)
+  if (!target) return
+
+  if (move.kind === 'lead') {
+    const list = target.leads ?? []
+    if (!list.some((c) => c.id === card.id)) list.push(card as Lead)
+    target.leads = list
+  } else {
+    const list = target.deals ?? []
+    if (!list.some((c) => c.id === card.id)) list.push(card as Deal)
+    target.deals = list
+  }
+}
+
 async function applyMove(move: PendingMove, lostReason?: string) {
   try {
     if (move.kind === 'lead') {
@@ -216,27 +250,26 @@ async function applyMove(move: PendingMove, lostReason?: string) {
         stage_id: move.stageId,
         lost_reason: lostReason,
       })
-      await loadLeadsPipeline()
     } else {
       await updateDeal(move.id, {
         stage_id: move.stageId,
         lost_reason: lostReason,
       })
-      await loadDealsPipeline()
     }
   } catch (error) {
     const msg = error instanceof ApiError ? error.message : 'Não foi possível mover o card.'
     if (move.kind === 'lead') {
       errorLeads.value = msg
-      await loadLeadsPipeline()
+      await loadLeadsPipeline({ silent: true })
     } else {
       errorDeals.value = msg
-      await loadDealsPipeline()
+      await loadDealsPipeline({ silent: true })
     }
   }
 }
 
 function onMoveCard(payload: PendingMove) {
+  applyLocalMove(payload)
   const target = findStage(payload.kind, payload.stageId)
   if (target?.is_lost) {
     pendingMove.value = payload
@@ -255,8 +288,8 @@ function onLostConfirm(reason: string) {
 
 function onLostCancel() {
   pendingMove.value = null
-  if (tab.value === 'leads') void loadLeadsPipeline()
-  else if (tab.value === 'negocios') void loadDealsPipeline()
+  if (tab.value === 'leads') void loadLeadsPipeline({ silent: true })
+  else if (tab.value === 'negocios') void loadDealsPipeline({ silent: true })
 }
 
 async function onReorderStages(kind: PipelineKind, orderedIds: number[]) {
@@ -267,10 +300,10 @@ async function onReorderStages(kind: PipelineKind, orderedIds: number[]) {
       error instanceof ApiError ? error.message : 'Não foi possível reordenar as colunas.'
     if (kind === 'lead') {
       errorLeads.value = msg
-      await loadLeadsPipeline()
+      await loadLeadsPipeline({ silent: true })
     } else {
       errorDeals.value = msg
-      await loadDealsPipeline()
+      await loadDealsPipeline({ silent: true })
     }
   }
 }

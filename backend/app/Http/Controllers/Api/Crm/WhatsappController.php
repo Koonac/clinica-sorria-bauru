@@ -4,16 +4,21 @@ namespace App\Http\Controllers\Api\Crm;
 
 use App\Events\Crm\WhatsappInboundMessageReceived;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Crm\MarkWhatsappChatReadRequest;
 use App\Http\Requests\Crm\SendWhatsappMessageRequest;
 use App\Models\Clinic;
 use App\Models\Crm\Connection;
+use App\Models\Crm\Lead;
+use App\Models\Crm\WhatsappConversationRead;
 use App\Models\Crm\WhatsappMessage;
 use App\Models\User;
+use App\Services\Crm\MarkWhatsappChatRead;
 use App\Services\Crm\PauseWhatsappAgentForLead;
 use App\Services\Crm\SyncWhatsappLabels;
 use App\Services\Crm\UpsertClinicConnection;
 use App\Services\Crm\WhatsappApiClient;
 use App\Services\Crm\WhatsappChatHistory;
+use App\Services\Crm\WhatsappConversationKey;
 use App\Services\Crm\WhatsappLeadResolver;
 use App\Support\ClinicContext;
 use Illuminate\Http\JsonResponse;
@@ -29,6 +34,8 @@ class WhatsappController extends Controller
         private PauseWhatsappAgentForLead $pauseAgent,
         private ClinicContext $clinicContext,
         private UpsertClinicConnection $upsertConnection,
+        private WhatsappConversationKey $conversationKey,
+        private MarkWhatsappChatRead $markChatRead,
     ) {}
 
     public function send(SendWhatsappMessageRequest $request): JsonResponse
@@ -141,9 +148,16 @@ class WhatsappController extends Controller
 
     public function chats(Request $request): JsonResponse
     {
-        $connection = $this->upsertConnection->handle([], $request->user()?->id);
+        /** @var User $user */
+        $user = $request->user();
+        $connection = $this->upsertConnection->handle([], $user->id);
         $search = trim((string) $request->query('search', ''));
+        $filter = strtolower(trim((string) $request->query('filter', 'all')));
+        if (! in_array($filter, ['all', 'mine', 'unassigned', 'unread', 'human'], true)) {
+            $filter = 'all';
+        }
 
+        $keyExpr = $this->conversationKey->sqlExpression();
         $bindings = [$connection->id];
         $searchSql = '';
         if ($search !== '') {
@@ -171,22 +185,7 @@ class WhatsappController extends Controller
                         id, whatsapp_jid, whatsapp_lid, phone_number, contact_name,
                         direction, body, has_media, lead_id, deal_id, contact_id,
                         wa_timestamp, created_at,
-                        CASE
-                            WHEN phone_number IS NOT NULL
-                              AND phone_number <> ''
-                              AND length(regexp_replace(phone_number, '\\D', '', 'g')) >= 10
-                              AND NOT (
-                                  whatsapp_jid LIKE '%@lid'
-                                  AND regexp_replace(phone_number, '\\D', '', 'g')
-                                      = split_part(whatsapp_jid, '@', 1)
-                              )
-                            THEN regexp_replace(phone_number, '\\D', '', 'g')
-                            ELSE COALESCE(
-                                NULLIF(whatsapp_lid, ''),
-                                CASE WHEN whatsapp_jid LIKE '%@lid' THEN whatsapp_jid END,
-                                whatsapp_jid
-                            )
-                        END AS conversation_key
+                        {$keyExpr} AS conversation_key
                     FROM whatsapp_messages
                     WHERE connection_id = ?
                       AND whatsapp_jid IS NOT NULL
@@ -201,7 +200,13 @@ class WhatsappController extends Controller
         );
 
         $lidKeys = [];
+        $conversationKeys = [];
+        $leadIds = [];
         foreach ($rows as $row) {
+            $conversationKeys[] = (string) $row->conversation_key;
+            if ($row->lead_id) {
+                $leadIds[] = (int) $row->lead_id;
+            }
             if (is_string($row->whatsapp_jid) && str_ends_with($row->whatsapp_jid, '@lid')) {
                 $lidKeys[] = $row->whatsapp_jid;
             } elseif (is_string($row->whatsapp_lid) && $row->whatsapp_lid !== '') {
@@ -209,6 +214,8 @@ class WhatsappController extends Controller
             }
         }
         $lidKeys = array_values(array_unique($lidKeys));
+        $conversationKeys = array_values(array_unique(array_filter($conversationKeys)));
+        $leadIds = array_values(array_unique($leadIds));
 
         $phoneJidByLid = [];
         if ($lidKeys !== []) {
@@ -233,7 +240,34 @@ class WhatsappController extends Controller
             }
         }
 
-        $data = array_map(function (object $row) use ($phoneJidByLid): array {
+        $leadsById = [];
+        if ($leadIds !== []) {
+            $leadsById = Lead::query()
+                ->with('owner:id,name')
+                ->whereIn('id', $leadIds)
+                ->get(['id', 'owner_id', 'whatsapp_agent_paused_at', 'name'])
+                ->keyBy('id');
+        }
+
+        $readsByKey = [];
+        if ($conversationKeys !== []) {
+            $readsByKey = WhatsappConversationRead::query()
+                ->where('connection_id', $connection->id)
+                ->where('user_id', $user->id)
+                ->whereIn('conversation_key', $conversationKeys)
+                ->get()
+                ->keyBy('conversation_key');
+        }
+
+        $unreadByKey = $this->unreadCountsByConversationKey(
+            $connection->id,
+            $user->id,
+            $conversationKeys,
+            $keyExpr,
+        );
+
+        $data = [];
+        foreach ($rows as $row) {
             $hasMedia = $row->has_media;
             if (is_string($hasMedia)) {
                 $hasMedia = in_array(strtolower($hasMedia), ['1', 't', 'true', 'yes'], true);
@@ -244,6 +278,7 @@ class WhatsappController extends Controller
             $jid = (string) $row->whatsapp_jid;
             $lid = filled($row->whatsapp_lid ?? null) ? (string) $row->whatsapp_lid : null;
             $phone = $row->phone_number;
+            $key = (string) $row->conversation_key;
 
             if (str_ends_with($jid, '@lid')) {
                 $lid = $lid ?: $jid;
@@ -258,14 +293,28 @@ class WhatsappController extends Controller
                 $phone = $mapped['phone'] ?: $phone;
             }
 
-            return [
+            $leadId = $row->lead_id ? (int) $row->lead_id : null;
+            /** @var Lead|null $lead */
+            $lead = $leadId ? ($leadsById[$leadId] ?? null) : null;
+            $unread = (int) ($unreadByKey[$key] ?? 0);
+            // Sem registro de leitura: conta como não lida se última msg for inbound
+            if (! isset($readsByKey[$key]) && in_array($row->direction, ['in', 'inbound'], true)) {
+                $unread = max($unread, 1);
+            }
+
+            $item = [
                 'whatsapp_jid' => $jid,
                 'whatsapp_lid' => $lid,
                 'phone_number' => $phone,
-                'contact_name' => $row->contact_name,
-                'lead_id' => $row->lead_id ? (int) $row->lead_id : null,
+                'contact_name' => $row->contact_name ?: ($lead?->name),
+                'conversation_key' => $key,
+                'lead_id' => $leadId,
                 'deal_id' => $row->deal_id ? (int) $row->deal_id : null,
                 'contact_id' => $row->contact_id ? (int) $row->contact_id : null,
+                'owner_id' => $lead?->owner_id,
+                'owner_name' => $lead?->owner?->name,
+                'whatsapp_agent_paused_at' => $lead?->whatsapp_agent_paused_at?->toIso8601String(),
+                'unread_count' => $unread,
                 'last_message' => [
                     'id' => (int) $row->id,
                     'body' => $row->body,
@@ -275,9 +324,33 @@ class WhatsappController extends Controller
                     'created_at' => $row->created_at,
                 ],
             ];
-        }, $rows);
+
+            if (! $this->chatMatchesFilter($item, $filter, $user->id)) {
+                continue;
+            }
+
+            $data[] = $item;
+        }
 
         return response()->json(['data' => $data]);
+    }
+
+    public function markChatRead(MarkWhatsappChatReadRequest $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $connection = $this->upsertConnection->handle([], $user->id);
+        $jid = trim((string) $request->validated('jid'));
+        $leadId = $request->validated('lead_id');
+
+        $result = $this->markChatRead->handle(
+            $connection,
+            $user,
+            $jid,
+            $leadId !== null ? (int) $leadId : null,
+        );
+
+        return response()->json(['data' => $result]);
     }
 
     public function messages(Request $request, WhatsappChatHistory $history): JsonResponse
@@ -501,6 +574,64 @@ class WhatsappController extends Controller
         }
 
         return $jid;
+    }
+
+    /**
+     * @param  list<string>  $conversationKeys
+     * @return array<string, int>
+     */
+    private function unreadCountsByConversationKey(
+        int $connectionId,
+        int $userId,
+        array $conversationKeys,
+        string $keyExpr,
+    ): array {
+        if ($conversationKeys === []) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($conversationKeys), '?'));
+
+        $rows = DB::select(
+            "SELECT keyed.conversation_key, COUNT(*)::int AS unread_count
+             FROM (
+                SELECT id, direction, {$keyExpr} AS conversation_key
+                FROM whatsapp_messages
+                WHERE connection_id = ?
+                  AND direction IN ('inbound', 'in')
+                  AND whatsapp_jid IS NOT NULL
+                  AND whatsapp_jid <> ''
+             ) keyed
+             LEFT JOIN whatsapp_conversation_reads r
+               ON r.connection_id = ?
+              AND r.user_id = ?
+              AND r.conversation_key = keyed.conversation_key
+             WHERE keyed.conversation_key IN ({$placeholders})
+               AND keyed.id > COALESCE(r.last_read_message_id, 0)
+             GROUP BY keyed.conversation_key",
+            array_merge([$connectionId, $connectionId, $userId], $conversationKeys),
+        );
+
+        $out = [];
+        foreach ($rows as $row) {
+            $out[(string) $row->conversation_key] = (int) $row->unread_count;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function chatMatchesFilter(array $item, string $filter, int $userId): bool
+    {
+        return match ($filter) {
+            'mine' => ($item['owner_id'] ?? null) === $userId,
+            'unassigned' => ($item['lead_id'] ?? null) === null || ($item['owner_id'] ?? null) === null,
+            'unread' => ((int) ($item['unread_count'] ?? 0)) > 0,
+            'human' => filled($item['whatsapp_agent_paused_at'] ?? null),
+            default => true,
+        };
     }
 
     /**

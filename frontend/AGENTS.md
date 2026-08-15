@@ -33,7 +33,7 @@ frontend/src/
 ├── router/index.ts     # Rotas + guards (auth e roles)
 ├── stores/             # Pinia (auth, etc.)
 ├── views/              # Páginas (lazy import nas rotas)
-├── components/         # UI por categoria (Buttons/, Layout/, Modals/)
+├── components/         # UI por categoria (Buttons/, Feedback/, Layout/, Modals/)
 ├── App.vue
 └── main.ts
 ```
@@ -93,6 +93,37 @@ import { Icon } from '@iconify/vue'
 
 - Preferir set **`lucide:`** (já usado no login), salvo necessidade clara de outro set.
 - **Não** usar SVGs inline de ícones genéricos, font-icons nem bibliotecas alternativas.
+
+## Loading — Skeleton
+
+**Toda página (e painel/modal que busca dados na API)** deve mostrar **skeleton** enquanto o conteúdo principal ainda não chegou — nunca só texto “Carregando…” no lugar do layout.
+
+| Peça | Uso |
+|------|-----|
+| [`Skeleton.vue`](src/components/Feedback/Skeleton.vue) | Bloco primitivo (`animate-pulse`) |
+| [`ContentSkeleton.vue`](src/components/Feedback/ContentSkeleton.vue) | Layouts prontos por tipo de tela |
+
+Variantes de `ContentSkeleton`: `table` | `kanban` | `dashboard` | `calendar` | `cards` | `detail`.
+
+```vue
+<script setup lang="ts">
+import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
+</script>
+
+<template>
+  <ContentSkeleton v-if="loading" variant="table" :rows="8" />
+  <div v-else><!-- conteúdo --></div>
+</template>
+```
+
+### Ao criar ou alterar página/painel
+
+1. Estado `loading` inicia em **`true`** se há fetch no mount (evita flash de empty state).
+2. Enquanto `loading` e sem dados: renderizar `ContentSkeleton` (ou composição com `Skeleton`) no formato da tela.
+3. Depois do load: conteúdo real, empty state ou erro — **não** misturar skeleton com lista já preenchida (exceto refresh opcional discreto).
+4. Loading de **submit** (salvar/entrar) continua no `Button` (`:loading`) — skeleton é para **conteúdo** da página/painel.
+
+Páginas estáticas sem fetch (ex.: Início sem API) não precisam de skeleton.
 
 ## Rotas e roles (`admin` | `funcionario`)
 
@@ -159,6 +190,7 @@ Hoje o guard cobre auth/guest; **roles em `meta` + enforcement no guard são obr
 
 - Estilizar com **Tailwind**; CSS custom só se Tailwind não resolver ou animação complexa exigir.
 - Ícones com **Iconify** (`@iconify/vue`).
+- Conteúdo assíncrono com **skeleton** (`ContentSkeleton` / `Skeleton`) — não texto “Carregando…” no lugar do layout.
 - Declarar e validar **role** de cada rota (`admin`, `funcionario` ou ambos).
 - Tipar props/estado relevante; rodar `npm run type-check` em mudanças estruturais.
 - Tratar erros de API via `toApiError`.
@@ -182,5 +214,6 @@ Hoje o guard cobre auth/guest; **roles em `meta` + enforcement no guard são obr
 - [`src/stores/auth.ts`](src/stores/auth.ts) — sessão e roles
 - [`src/api/client.ts`](src/api/client.ts) — HTTP
 - [`src/assets/main.css`](src/assets/main.css) — Tailwind + tokens
+- [`src/components/Feedback/ContentSkeleton.vue`](src/components/Feedback/ContentSkeleton.vue) — skeletons de página
 - [AGENTS.md da raiz](../AGENTS.md) — monorepo
 - [`backend/AGENTS.md`](../backend/AGENTS.md) — API Laravel

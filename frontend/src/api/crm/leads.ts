@@ -79,3 +79,21 @@ export async function convertLead(
     throw toApiError(error)
   }
 }
+
+export async function pauseLeadAgent(id: number): Promise<Lead> {
+  try {
+    const { data } = await api.post<DataResponse<Lead>>(`/v1/crm/leads/${id}/agent/pause`)
+    return data.data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+export async function resumeLeadAgent(id: number): Promise<Lead> {
+  try {
+    const { data } = await api.post<DataResponse<Lead>>(`/v1/crm/leads/${id}/agent/resume`)
+    return data.data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}

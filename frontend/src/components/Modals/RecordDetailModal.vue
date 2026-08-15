@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { ApiError } from '@/api/client'
 import { createActivity } from '@/api/crm/activities'
 import { convertLead, deleteLead, getLead, updateLead } from '@/api/crm/leads'
 import { deleteDeal, getDeal, updateDeal } from '@/api/crm/deals'
 import { createTask, deleteTask, updateTask } from '@/api/crm/tasks'
-import { listWhatsappMessages, sendWhatsappMessage } from '@/api/crm/whatsapp'
 import type {
   Activity,
   CrmTask,
@@ -14,10 +13,11 @@ import type {
   Lead,
   PipelineStage,
   Source,
-  WhatsappMessage,
 } from '@/api/crm/types'
 import Button from '@/components/Buttons/Button.vue'
 import Select from '@/components/Forms/Select.vue'
+import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
+import WhatsappThread from '@/components/whatsapp/WhatsappThread.vue'
 import {
   formatDateTime,
   fromLocalInputValue,
@@ -57,10 +57,6 @@ const error = ref('')
 const tab = ref<Tab>('dados')
 const lead = ref<Lead | null>(null)
 const deal = ref<Deal | null>(null)
-const chatMessages = ref<WhatsappMessage[]>([])
-const chatText = ref('')
-const chatLoading = ref(false)
-const chatSending = ref(false)
 const noteBody = ref('')
 const taskForm = reactive({ title: '', due_at: '', description: '' })
 
@@ -153,28 +149,10 @@ async function load() {
       dealForm.lost_notes = deal.value.lost_notes || ''
     }
     tab.value = 'dados'
-    if (showChat.value) await loadChat()
   } catch (e) {
     error.value = e instanceof ApiError ? e.message : 'Não foi possível carregar o registro.'
   } finally {
     loading.value = false
-  }
-}
-
-async function loadChat() {
-  if (!props.recordId || !jid.value) return
-  chatLoading.value = true
-  try {
-    chatMessages.value = await listWhatsappMessages({
-      lead_id: props.kind === 'lead' ? props.recordId : undefined,
-      deal_id: props.kind === 'deal' ? props.recordId : undefined,
-      jid: jid.value,
-    })
-    await nextTick()
-  } catch {
-    chatMessages.value = []
-  } finally {
-    chatLoading.value = false
   }
 }
 
@@ -328,30 +306,8 @@ async function removeTask(task: CrmTask) {
   }
 }
 
-async function sendChat() {
-  if (!jid.value || !chatText.value.trim() || chatSending.value) return
-  chatSending.value = true
-  try {
-    await sendWhatsappMessage({
-      to: jid.value,
-      message: chatText.value.trim(),
-      contact_name: props.kind === 'lead' ? lead.value?.name : deal.value?.contact?.name,
-    })
-    chatText.value = ''
-    await loadChat()
-  } catch (e) {
-    error.value = e instanceof ApiError ? e.message : 'Não foi possível enviar a mensagem.'
-  } finally {
-    chatSending.value = false
-  }
-}
-
 function activityLabel(a: Activity): string {
   return a.subject || a.body || a.type
-}
-
-function isOutbound(direction: string): boolean {
-  return direction === 'out' || direction === 'outbound'
 }
 </script>
 
@@ -367,7 +323,9 @@ function isOutbound(direction: string): boolean {
         aria-modal="true"
         class="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl"
       >
-        <header class="flex items-start justify-between gap-3 border-b border-brand-ink/10 px-5 py-4">
+        <header
+          class="flex shrink-0 items-start justify-between gap-3 border-b border-brand-ink/10 px-5 py-4"
+        >
           <div class="min-w-0">
             <p class="text-[0.7rem] font-medium tracking-[0.2em] text-brand-cyan-ink uppercase">
               {{ kind === 'lead' ? 'Lead' : 'Negócio' }}
@@ -386,7 +344,10 @@ function isOutbound(direction: string): boolean {
           </button>
         </header>
 
-        <nav class="flex gap-1 overflow-x-auto border-b border-brand-ink/10 px-3 pt-2">
+        <nav
+          class="flex shrink-0 gap-1 overflow-x-auto border-b border-brand-ink/10 px-3 pt-2"
+          aria-label="Seções do registro"
+        >
           <button
             v-for="t in tabs"
             :key="t.id"
@@ -404,7 +365,7 @@ function isOutbound(direction: string): boolean {
         </nav>
 
         <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <p v-if="loading" class="py-8 text-center text-sm text-brand-ink/50">Carregando…</p>
+          <ContentSkeleton v-if="loading" variant="detail" :rows="6" />
           <p v-else-if="error" class="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {{ error }}
           </p>
@@ -485,6 +446,9 @@ function isOutbound(direction: string): boolean {
                   <span>{{ formatDateTime(a.created_at) }}</span>
                 </div>
                 <p class="mt-1 text-sm text-brand-ink">{{ activityLabel(a) }}</p>
+                <p v-if="a.user?.name" class="mt-1 text-xs text-brand-ink/45">
+                  por {{ a.user.name }}
+                </p>
               </article>
             </div>
 
@@ -505,7 +469,10 @@ function isOutbound(direction: string): boolean {
                 :key="a.id"
                 class="rounded-xl border border-brand-ink/10 px-3 py-2.5"
               >
-                <p class="text-xs text-brand-ink/45">{{ formatDateTime(a.created_at) }}</p>
+                <p class="text-xs text-brand-ink/45">
+                  {{ formatDateTime(a.created_at)
+                  }}<template v-if="a.user?.name"> · {{ a.user.name }}</template>
+                </p>
                 <p class="mt-1 text-sm text-brand-ink">{{ a.body || a.subject }}</p>
               </article>
             </div>
@@ -548,45 +515,16 @@ function isOutbound(direction: string): boolean {
               </article>
             </div>
 
-            <div v-show="tab === 'chat'" class="flex h-[22rem] flex-col gap-3">
-              <div class="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-xl bg-[#f4f6f8] p-3">
-                <p v-if="chatLoading" class="text-center text-sm text-brand-ink/45">Carregando…</p>
-                <p
-                  v-else-if="!chatMessages.length"
-                  class="text-center text-sm text-brand-ink/45"
-                >
-                  Nenhuma mensagem.
-                </p>
-                <div
-                  v-for="m in chatMessages"
-                  :key="m.id"
-                  class="flex"
-                  :class="isOutbound(m.direction) ? 'justify-end' : 'justify-start'"
-                >
-                  <div
-                    class="max-w-[80%] rounded-2xl px-3 py-2 text-sm"
-                    :class="
-                      isOutbound(m.direction)
-                        ? 'bg-brand-cyan text-brand-ink'
-                        : 'bg-white text-brand-ink shadow-sm'
-                    "
-                  >
-                    <p class="whitespace-pre-wrap">{{ m.body || (m.has_media ? '[mídia]' : '') }}</p>
-                    <p class="mt-1 text-[10px] opacity-60">
-                      {{ formatDateTime(m.wa_timestamp || m.created_at) }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <form class="flex gap-2" @submit.prevent="sendChat">
-                <input
-                  v-model="chatText"
-                  placeholder="Mensagem…"
-                  :class="inputClass"
-                  class="flex-1"
-                />
-                <Button type="submit" :loading="chatSending" icon="lucide:send">Enviar</Button>
-              </form>
+            <div v-show="tab === 'chat'" class="flex h-[22rem] flex-col">
+              <WhatsappThread
+                v-if="jid"
+                :jid="jid"
+                :lead-id="kind === 'lead' ? recordId : null"
+                :deal-id="kind === 'deal' ? recordId : null"
+                :contact-name="kind === 'lead' ? lead?.name : deal?.contact?.name"
+                :poll-ms="0"
+                @error="error = $event"
+              />
             </div>
 
             <div v-show="tab === 'perda'" class="space-y-3">
@@ -609,7 +547,7 @@ function isOutbound(direction: string): boolean {
         </div>
 
         <footer
-          class="flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 px-5 py-4"
+          class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 px-5 py-4"
         >
           <Button variant="danger" size="sm" :loading="saving" @click="removeRecord">
             Excluir

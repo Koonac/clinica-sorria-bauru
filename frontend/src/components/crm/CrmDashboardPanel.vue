@@ -13,6 +13,7 @@ import {
   Filler,
 } from 'chart.js'
 import { formatMoney, isTerminalStage, type LeadsPorDiaPoint, type PipelineStage } from '@/api/crm/types'
+import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
 
 Chart.register(
   CategoryScale,
@@ -178,9 +179,7 @@ onBeforeUnmount(() => {
       {{ error }}
     </p>
 
-    <div v-if="loading" class="py-16 text-center text-sm text-brand-ink/50">
-      Carregando dashboard…
-    </div>
+    <ContentSkeleton v-if="loading" variant="dashboard" />
 
     <template v-else>
       <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

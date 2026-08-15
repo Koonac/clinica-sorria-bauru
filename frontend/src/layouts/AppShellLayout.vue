@@ -4,7 +4,7 @@ import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import ClinicFormModal from '@/components/Modals/ClinicFormModal.vue'
 import SettingsModal from '@/components/Modals/SettingsModal.vue'
-import { NAV_ITEMS } from '@/navigation/nav'
+import { NAV_ITEMS, type AppRole, type NavItem } from '@/navigation/nav'
 import { useAuthStore } from '@/stores/auth'
 import { useClinicsStore } from '@/stores/clinics'
 
@@ -23,12 +23,35 @@ const clinicFormOpen = ref(false)
 const loggingOut = ref(false)
 const clinicMenuRef = ref<HTMLElement | null>(null)
 
-const visibleNavItems = computed(() => {
+function canSeeNavItem(item: NavItem, role: AppRole | undefined) {
+  if (!item.roles?.length) return true
+  return role ? item.roles.includes(role) : false
+}
+
+function isAdminOnlyNavItem(item: NavItem) {
+  const roles = item.roles
+  if (!roles?.length) return false
+  return roles.every((role) => role === 'admin')
+}
+
+const navGroups = computed(() => {
   const role = auth.user?.role
-  return NAV_ITEMS.filter((item) => {
-    if (!item.roles?.length) return true
-    return role ? item.roles.includes(role) : false
-  })
+  const clinicItems = NAV_ITEMS.filter(
+    (item) => canSeeNavItem(item, role) && !isAdminOnlyNavItem(item),
+  )
+  const adminItems = auth.isAdmin
+    ? NAV_ITEMS.filter((item) => isAdminOnlyNavItem(item) && canSeeNavItem(item, 'admin'))
+    : []
+
+  const groups: { key: string; label?: string; items: NavItem[] }[] = [
+    { key: 'clinica', items: clinicItems },
+  ]
+
+  if (adminItems.length) {
+    groups.push({ key: 'admin', label: 'Admin', items: adminItems })
+  }
+
+  return groups
 })
 
 const showClinicSwitcher = computed(() => auth.isAdmin)
@@ -268,22 +291,35 @@ function isActive(name: string) {
         class="rail-nav flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-3"
         aria-label="Seções"
       >
-        <RouterLink
-          v-for="item in visibleNavItems"
-          :key="item.name"
-          :to="item.to"
-          class="inline-flex cursor-pointer items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-medium text-brand-ink/65 transition hover:bg-[#f4f6f8] hover:text-brand-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue"
-          :class="
-            isActive(item.name)
-              ? 'bg-brand-cyan/15 text-brand-cyan-ink hover:bg-brand-cyan/15 hover:text-brand-cyan-ink'
-              : ''
-          "
-          :title="item.label"
-          @click="menuOpen = false"
-        >
-          <Icon :icon="item.icon" class="size-[18px] shrink-0" aria-hidden="true" />
-          <span class="rail-rotulo truncate">{{ item.label }}</span>
-        </RouterLink>
+        <template v-for="group in navGroups" :key="group.key">
+          <div
+            v-if="group.label"
+            class="mt-2 mb-1 flex items-center gap-2 px-3.5"
+            role="separator"
+            :aria-label="group.label"
+          >
+            <span class="rail-rotulo text-[11px] font-semibold uppercase tracking-wider text-brand-ink/40">
+              {{ group.label }}
+            </span>
+            <span class="h-px min-w-0 flex-1 bg-brand-ink/10" aria-hidden="true" />
+          </div>
+          <RouterLink
+            v-for="item in group.items"
+            :key="item.name"
+            :to="item.to"
+            class="inline-flex cursor-pointer items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm font-medium text-brand-ink/65 transition hover:bg-[#f4f6f8] hover:text-brand-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue"
+            :class="
+              isActive(item.name)
+                ? 'bg-brand-cyan/15 text-brand-cyan-ink hover:bg-brand-cyan/15 hover:text-brand-cyan-ink'
+                : ''
+            "
+            :title="item.label"
+            @click="menuOpen = false"
+          >
+            <Icon :icon="item.icon" class="size-[18px] shrink-0" aria-hidden="true" />
+            <span class="rail-rotulo truncate">{{ item.label }}</span>
+          </RouterLink>
+        </template>
       </nav>
 
       <div class="rail-rodape shrink-0 border-t border-brand-ink/10 p-3">

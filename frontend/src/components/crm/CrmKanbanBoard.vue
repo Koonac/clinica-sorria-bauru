@@ -4,6 +4,7 @@ import { Icon } from '@iconify/vue'
 import draggable from 'vuedraggable'
 import type { Deal, Lead, PipelineKind, PipelineStage } from '@/api/crm/types'
 import { formatMoney } from '@/api/crm/types'
+import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
 import { daysSince, formatDateTime } from '@/utils/crmFormat'
 
 const props = defineProps<{
@@ -28,18 +29,24 @@ const emit = defineEmits<{
 }>()
 
 const localStages = ref<PipelineStage[]>([])
-const moving = ref(false)
+const pendingMoveIds = ref(new Set<number>())
 
+function cloneStages(value: PipelineStage[]): PipelineStage[] {
+  return value.map((s) => ({
+    ...s,
+    leads: (s.leads || []).map((l) => ({ ...l })),
+    deals: (s.deals || []).map((d) => ({ ...d })),
+  }))
+}
+
+// Só re-sincroniza quando o pai troca a lista (load), não em mutações profundas —
+// senão o drag otimista “volta” o card e stage_id fica dessincronizado.
 watch(
   () => props.stages,
   (value) => {
-    localStages.value = value.map((s) => ({
-      ...s,
-      leads: [...(s.leads || [])],
-      deals: [...(s.deals || [])],
-    }))
+    localStages.value = cloneStages(value)
   },
-  { immediate: true, deep: true },
+  { immediate: true },
 )
 
 const stageList = computed({
@@ -70,24 +77,28 @@ function isLead(card: Lead | Deal): card is Lead {
   return props.kind === 'lead'
 }
 
-async function onCardChange(stage: PipelineStage, evt: { added?: { element: Lead | Deal } }) {
-  if (!evt.added || moving.value) return
+function onCardChange(stage: PipelineStage, evt: { added?: { element: Lead | Deal } }) {
+  if (!evt.added) return
   const card = evt.added.element
-  const fromStageId = Number(card.stage_id)
-  if (fromStageId === stage.id) return
+  if (pendingMoveIds.value.has(card.id)) return
 
-  moving.value = true
+  const fromStageId = Number(card.stage_id)
+  if (!fromStageId || fromStageId === stage.id) return
+
+  pendingMoveIds.value.add(card.id)
   card.stage_id = stage.id
-  try {
-    emit('move-card', {
-      kind: props.kind,
-      id: card.id,
-      stageId: stage.id,
-      fromStageId,
-    })
-  } finally {
-    moving.value = false
-  }
+
+  emit('move-card', {
+    kind: props.kind,
+    id: card.id,
+    stageId: stage.id,
+    fromStageId,
+  })
+
+  // Libera após o tick para não engolir o change espelho do Sortable
+  queueMicrotask(() => {
+    pendingMoveIds.value.delete(card.id)
+  })
 }
 
 function stageSum(stage: PipelineStage): number {
@@ -132,7 +143,7 @@ function stageSum(stage: PipelineStage): number {
       {{ error }}
     </p>
 
-    <div v-if="loading" class="py-12 text-center text-sm text-brand-ink/50">Carregando pipeline…</div>
+    <ContentSkeleton v-if="loading" variant="kanban" />
 
     <div v-else class="min-h-0 flex-1 overflow-x-auto pb-2">
       <draggable

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import type { Contact } from '@/api/crm/types'
+import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
 
 defineProps<{
   contacts: Contact[]
@@ -48,7 +49,10 @@ const emit = defineEmits<{
       {{ error }}
     </p>
 
+    <ContentSkeleton v-if="loading" variant="table" :rows="8" />
+
     <div
+      v-else
       class="min-h-0 flex-1 overflow-auto rounded-2xl border border-brand-ink/10 bg-white"
     >
       <table class="w-full min-w-[40rem] border-collapse text-left text-sm">
@@ -61,10 +65,7 @@ const emit = defineEmits<{
           </tr>
         </thead>
         <tbody>
-          <tr v-if="loading">
-            <td colspan="4" class="px-4 py-10 text-center text-brand-ink/50">Carregando…</td>
-          </tr>
-          <tr v-else-if="!contacts.length">
+          <tr v-if="!contacts.length">
             <td colspan="4" class="px-4 py-10 text-center text-brand-ink/50">
               Nenhum contato encontrado.
             </td>

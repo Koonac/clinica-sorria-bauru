@@ -69,6 +69,17 @@ const router = createRouter({
           },
         },
         {
+          path: 'agents',
+          name: 'agents',
+          component: () => import('@/views/AgentsView.vue'),
+          meta: {
+            requiresAuth: true,
+            roles: ['admin'],
+            title: 'Agents',
+            icon: 'lucide:bot',
+          },
+        },
+        {
           path: 'usuarios',
           name: 'users',
           component: () => import('@/views/UsersView.vue'),

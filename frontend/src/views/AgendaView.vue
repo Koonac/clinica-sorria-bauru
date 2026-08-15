@@ -7,12 +7,13 @@ import { listTasks } from '@/api/crm/tasks'
 import type { CrmTask } from '@/api/crm/types'
 import TaskEventModal from '@/components/Modals/TaskEventModal.vue'
 import Button from '@/components/Buttons/Button.vue'
+import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
 import PageView from '@/components/Layout/PageView.vue'
 import { endOfMonth, monthGrid, startOfMonth, ymd } from '@/utils/crmFormat'
 
 const visibleMonth = ref(startOfMonth(new Date()))
 const tasks = ref<CrmTask[]>([])
-const loading = ref(false)
+const loading = ref(true)
 const error = ref('')
 const pendingOnly = ref(false)
 const modalOpen = ref(false)
@@ -186,7 +187,10 @@ onMounted(() => {
         {{ error }}
       </p>
 
+      <ContentSkeleton v-if="loading" variant="calendar" />
+
       <div
+        v-else
         class="min-h-0 flex-1 overflow-auto rounded-2xl border border-brand-ink/10 bg-white"
       >
         <div class="grid grid-cols-7 border-b border-brand-ink/10 bg-[#f8fafb]">
@@ -199,9 +203,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <div v-if="loading" class="py-16 text-center text-sm text-brand-ink/50">Carregando…</div>
-
-        <div v-else class="grid grid-cols-7 auto-rows-[minmax(6.5rem,1fr)]">
+        <div class="grid grid-cols-7 auto-rows-[minmax(6.5rem,1fr)]">
           <button
             v-for="(day, idx) in cells"
             :key="idx"

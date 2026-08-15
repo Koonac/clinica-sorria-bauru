@@ -153,6 +153,37 @@ export type WhatsappMessage = {
   created_at?: string
   lead_id?: number | null
   deal_id?: number | null
+  user_id?: number | null
+}
+
+export type WhatsappChatFilter = 'all' | 'mine' | 'unassigned' | 'unread' | 'human'
+
+export type WhatsappChat = {
+  whatsapp_jid: string
+  whatsapp_lid?: string | null
+  phone_number?: string | null
+  contact_name?: string | null
+  conversation_key?: string
+  lead_id?: number | null
+  deal_id?: number | null
+  contact_id?: number | null
+  owner_id?: number | null
+  owner_name?: string | null
+  whatsapp_agent_paused_at?: string | null
+  unread_count: number
+  last_message: {
+    id: number
+    body?: string | null
+    direction: string
+    has_media: boolean
+    wa_timestamp?: string | null
+    created_at?: string | null
+  }
+}
+
+export type CrmAttendant = {
+  id: number
+  name: string
 }
 
 export type CreateLeadPayload = {
@@ -174,6 +205,7 @@ export type UpdateLeadPayload = Partial<
   Omit<CreateLeadPayload, 'status'> & {
     status?: Exclude<LeadStatus, 'converted'>
     lost_reason?: string | null
+    owner_id?: number | null
   }
 >
 

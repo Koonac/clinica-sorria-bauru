@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\UserController;
 use App\Http\Controllers\Api\Crm\ActivityController;
 use App\Http\Controllers\Api\Crm\AgentController;
+use App\Http\Controllers\Api\Crm\AttendantController;
 use App\Http\Controllers\Api\Crm\ClinicController;
 use App\Http\Controllers\Api\Crm\ClinicaController;
 use App\Http\Controllers\Api\Crm\ConnectionController;
@@ -106,14 +107,17 @@ Route::prefix('v1/crm')->middleware(['auth:sanctum', 'clinic'])->group(function 
     Route::post('organizations', [OrganizationController::class, 'store']);
 
     Route::get('connection', [ConnectionController::class, 'show']);
-    Route::put('connection/credentials', [ConnectionController::class, 'updateCredentials']);
-    Route::put('connection/settings', [ConnectionController::class, 'updateSettings']);
-    Route::post('connection/connect', [ConnectionController::class, 'connect']);
-    Route::get('connection/qrcode', [ConnectionController::class, 'qrcode']);
     Route::get('connection/status', [ConnectionController::class, 'status']);
-    Route::delete('connection/disconnect', [ConnectionController::class, 'disconnect']);
+    Route::put('connection/credentials', [ConnectionController::class, 'updateCredentials'])->middleware('role:admin');
+    Route::put('connection/settings', [ConnectionController::class, 'updateSettings'])->middleware('role:admin');
+    Route::post('connection/connect', [ConnectionController::class, 'connect'])->middleware('role:admin');
+    Route::get('connection/qrcode', [ConnectionController::class, 'qrcode'])->middleware('role:admin');
+    Route::delete('connection/disconnect', [ConnectionController::class, 'disconnect'])->middleware('role:admin');
+
+    Route::get('attendants', [AttendantController::class, 'index']);
 
     Route::get('whatsapp/chats', [WhatsappController::class, 'chats']);
+    Route::post('whatsapp/chats/read', [WhatsappController::class, 'markChatRead']);
     Route::get('whatsapp/messages', [WhatsappController::class, 'messages']);
     Route::post('whatsapp/send', [WhatsappController::class, 'send']);
 

@@ -36,6 +36,13 @@ export const NAV_ITEMS: NavItem[] = [
     to: { name: 'whatsapp' },
   },
   {
+    name: 'agents',
+    label: 'Agents',
+    icon: 'lucide:bot',
+    to: { name: 'agents' },
+    roles: ['admin'],
+  },
+  {
     name: 'users',
     label: 'Usuários',
     icon: 'lucide:users',

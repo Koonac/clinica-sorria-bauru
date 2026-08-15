@@ -3,13 +3,9 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { ApiError } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
+import WhatsappSettingsPanel from '@/components/whatsapp/WhatsappSettingsPanel.vue'
 
-type SettingsSection = 'geral' | 'senha'
-
-const SECTIONS: { id: SettingsSection; label: string; icon: string }[] = [
-  { id: 'geral', label: 'Geral', icon: 'lucide:sliders-horizontal' },
-  { id: 'senha', label: 'Alteração de senha', icon: 'lucide:key-round' },
-]
+type SettingsSection = 'geral' | 'whatsapp' | 'senha'
 
 const open = defineModel<boolean>('open', { default: false })
 
@@ -26,6 +22,17 @@ const loading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 const panelRef = ref<HTMLElement | null>(null)
+
+const sections = computed(() => {
+  const items: { id: SettingsSection; label: string; icon: string }[] = [
+    { id: 'geral', label: 'Geral', icon: 'lucide:sliders-horizontal' },
+  ]
+  if (auth.isAdmin) {
+    items.push({ id: 'whatsapp', label: 'WhatsApp', icon: 'lucide:message-circle' })
+  }
+  items.push({ id: 'senha', label: 'Alteração de senha', icon: 'lucide:key-round' })
+  return items
+})
 
 const canSubmit = computed(
   () =>
@@ -163,7 +170,7 @@ async function onSubmit() {
             aria-label="Seções de configuração"
           >
             <button
-              v-for="item in SECTIONS"
+              v-for="item in sections"
               :key="item.id"
               type="button"
               class="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue"
@@ -187,8 +194,10 @@ async function onSubmit() {
               </p>
             </div>
 
+            <WhatsappSettingsPanel v-else-if="section === 'whatsapp' && auth.isAdmin" />
+
             <form
-              v-else
+              v-else-if="section === 'senha'"
               class="mx-auto flex max-w-lg flex-col gap-4"
               @submit.prevent="onSubmit"
             >
