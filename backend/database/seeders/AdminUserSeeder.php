@@ -10,17 +10,36 @@ class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
-        $user = User::firstOrCreate(
-            ['email' => 'admin@vekta.local'],
-            [
-                'name' => 'Vekta Admin',
-                'password' => Str::password(24),
-            ],
-        );
+        $admin = User::query()->where('username', 'Admin')->first()
+            ?? User::query()->where('email', 'admin@vekta.local')->first();
 
-        // Um token de serviço por instalação; roda de novo só se ainda não existir.
-        if (! $user->tokens()->where('name', 'interface')->exists()) {
-            $token = $user->createToken('interface')->plainTextToken;
+        if (! $admin) {
+            $senha = Str::password(24);
+
+            $admin = User::query()->create([
+                'username' => 'Admin',
+                'name' => 'Admin',
+                'email' => 'admin@vekta.local',
+                'role' => User::ROLE_ADMIN,
+                'password' => $senha,
+            ]);
+
+            $this->command?->warn('Admin criado. Guarde as credenciais (a senha não será exibida de novo):');
+            $this->command?->line('User: Admin');
+            $this->command?->line('Senha: '.$senha);
+        } else {
+            $admin->forceFill([
+                'username' => 'Admin',
+                'name' => 'Admin',
+                'role' => User::ROLE_ADMIN,
+            ])->save();
+
+            $this->command?->info('Admin já existe (User: Admin). Use a rota de alteração de senha se precisar trocar.');
+        }
+
+        // Token de serviço da interface Vekta (uma vez por instalação).
+        if (! $admin->tokens()->where('name', 'interface')->exists()) {
+            $token = $admin->createToken('interface')->plainTextToken;
 
             $this->command?->warn('Token de serviço da interface (guarde — não será exibido de novo):');
             $this->command?->line($token);

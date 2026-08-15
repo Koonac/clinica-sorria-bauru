@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\Auth\AuthController;
+use App\Http\Controllers\Api\Auth\UserController;
 use App\Http\Controllers\Api\Crm\ActivityController;
 use App\Http\Controllers\Api\Crm\AgentController;
 use App\Http\Controllers\Api\Crm\ClinicaController;
@@ -20,6 +22,26 @@ use App\Http\Controllers\Api\Finance\FinanceStatsController;
 use App\Http\Controllers\Api\Finance\FinancialAccountController;
 use App\Http\Controllers\Api\Finance\FinancialEntryController;
 use Illuminate\Support\Facades\Route;
+
+Route::prefix('v1/auth')->group(function () {
+    Route::post('login', [AuthController::class, 'login'])
+        ->middleware('throttle:10,1');
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('me', [AuthController::class, 'me']);
+        Route::post('password', [AuthController::class, 'changePassword']);
+        Route::post('logout', [AuthController::class, 'logout']);
+        Route::post('logout-all', [AuthController::class, 'logoutAll']);
+    });
+});
+
+Route::prefix('v1/users')->middleware(['auth:sanctum', 'role:admin'])->group(function () {
+    Route::get('/', [UserController::class, 'index']);
+    Route::post('/', [UserController::class, 'store']);
+    Route::get('{user}', [UserController::class, 'show']);
+    Route::patch('{user}', [UserController::class, 'update']);
+    Route::delete('{user}', [UserController::class, 'destroy']);
+});
 
 Route::prefix('v1/crm')->group(function () {
     Route::post('whatsapp/webhooks/notifications', [WhatsappController::class, 'notificationsWebhook']);

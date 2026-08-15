@@ -19,10 +19,19 @@ php artisan migrate --seed
 
 O Postgres sobe pelo compose da raiz do monorepo (`docker compose up -d postgres`) ou local na porta 5432 (`vekta_ai` / `postgres`).
 
-No primeiro `migrate --seed`, o `AdminUserSeeder` imprime o **token de serviço da interface** — copie o valor para `BACKEND_API_TOKEN` em `vekta-ai/interface/.env`. Ele não é exibido de novo; para gerar outro:
+No primeiro `migrate --seed`, o `AdminUserSeeder` cria o usuário **Admin** com senha aleatória e imprime no terminal:
+
+```text
+User: Admin
+Senha: <aleatória>
+```
+
+Guarde a senha — ela não é exibida de novo. Para trocar depois: `POST /api/v1/auth/password` (autenticado).
+
+Também imprime o **token de serviço da interface** — copie para `BACKEND_API_TOKEN` em `vekta-ai/interface/.env`. Ele não é exibido de novo; para gerar outro:
 
 ```bash
-php artisan tinker --execute="echo App\Models\User::where('email','admin@vekta.local')->first()->createToken('interface')->plainTextToken;"
+php artisan tinker --execute="echo App\Models\User::where('username','Admin')->first()->createToken('interface')->plainTextToken;"
 ```
 
 ## Rodar

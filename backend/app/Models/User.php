@@ -16,6 +16,15 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
+    public const ROLE_ADMIN = 'admin';
+
+    public const ROLE_FUNCIONARIO = 'funcionario';
+
+    public const ROLES = [
+        self::ROLE_ADMIN,
+        self::ROLE_FUNCIONARIO,
+    ];
+
     public const WHATSAPP_STATUSES = [
         'disconnected',
         'connecting',
@@ -30,8 +39,10 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'username',
         'email',
         'password',
+        'role',
         'whatsapp_api_username',
         'whatsapp_api_password',
         'whatsapp_session_id',
@@ -74,6 +85,35 @@ class User extends Authenticatable
     public function hasWhatsappCredentials(): bool
     {
         return filled($this->whatsapp_api_username) && filled($this->whatsapp_api_password);
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === self::ROLE_ADMIN;
+    }
+
+    public function isFuncionario(): bool
+    {
+        return $this->role === self::ROLE_FUNCIONARIO;
+    }
+
+    public function hasRole(string $role): bool
+    {
+        return $this->role === $role;
+    }
+
+    /**
+     * @return array{id: int, name: string, username: string, email: string, role: string}
+     */
+    public function toAuthArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'username' => $this->username,
+            'email' => $this->email,
+            'role' => $this->role,
+        ];
     }
 
     public function whatsappDefaultLeadStage(): BelongsTo
