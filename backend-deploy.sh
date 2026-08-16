@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Deploy do backend Laravel (API + queue + postgres)
-# git pull + rebuild dos containers backend / backend-queue
+# Deploy do backend Laravel (API + queue + scheduler + postgres)
+# git pull + rebuild dos containers backend / backend-queue / backend-scheduler
 #
 # Uso:
 #   bash backend-deploy.sh
@@ -27,13 +27,14 @@ fi
 echo "==> [backend] git pull"
 git pull
 
-echo "==> [backend] build + up postgres backend backend-queue"
-docker compose -f "$COMPOSE_FILE" up -d --build postgres backend backend-queue
+echo "==> [backend] build + up postgres redis backend backend-queue backend-scheduler"
+docker compose -f "$COMPOSE_FILE" up -d --build postgres redis backend backend-queue backend-scheduler
 
 if [ "$SEED" = "1" ]; then
   echo "==> [backend] AdminUserSeeder (token da interface)"
   docker compose -f "$COMPOSE_FILE" exec -T backend php artisan db:seed --class=AdminUserSeeder --force
 fi
 
-echo "==> [backend] OK — API em http://127.0.0.1:8080 (health: /up)"
-echo "    Interface: BACKEND_URL=http://127.0.0.1:8080 + BACKEND_API_TOKEN no .env da raiz / interface"
+echo "==> [backend] OK — API em http://127.0.0.1:${BACKEND_PORT:-8180} (health: /up)"
+echo "    Interface: BACKEND_URL=http://127.0.0.1:${BACKEND_PORT:-8180} + BACKEND_API_TOKEN"
+echo "    Filas: Redis (serviço redis no compose)"

@@ -74,8 +74,17 @@ VEKTA_GROUP="$(id -gn "$VEKTA_USER")"
 VEKTA_HOME="$(getent passwd "$VEKTA_USER" | cut -d: -f6)"
 INTERFACE_DIR="$ROOT/vekta-ai/interface"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
-UNIT_SRC="$ROOT/deploy/systemd/vekta-ai.service"
-UNIT_DST="/etc/systemd/system/vekta-ai.service"
+SERVICE_NAME="${VEKTA_SERVICE:-clinica-ai}"
+UNIT_SRC="$ROOT/deploy/systemd/clinica-ai.service"
+UNIT_DST="/etc/systemd/system/${SERVICE_NAME}.service"
+DEFAULTS_FILE="/etc/default/${SERVICE_NAME}"
+AI_PORT="${AI_PORT:-4780}"
+if [ -f "$ROOT/.env" ]; then
+  env_port="$(grep -E '^AI_PORT=' "$ROOT/.env" | tail -n1 | cut -d= -f2- | tr -d '[:space:]' | tr -d '"' | tr -d "'" || true)"
+  if [ -n "$env_port" ]; then
+    AI_PORT="$env_port"
+  fi
+fi
 
 run_root() {
   if [ "$(id -u)" -eq 0 ]; then
@@ -270,7 +279,7 @@ chmod +x "$RUN_SCRIPT"
 
 INTERFACE_DIR_UNIT="${INTERFACE_DIR}"
 
-echo "==> [setup-vekta] /etc/default/vekta-ai (env sem espaço no path do arquivo)"
+echo "==> [setup-vekta] ${DEFAULTS_FILE} (env sem espaço no path do arquivo)"
 TMP_ENV="$(mktemp)"
 cat > "$TMP_ENV" <<EOF
 VEKTA_INTERFACE_DIR=${INTERFACE_DIR_UNIT}
@@ -279,9 +288,9 @@ EOF
 if [ -f "$INTERFACE_DIR/.env" ]; then
   grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$INTERFACE_DIR/.env" >> "$TMP_ENV" || true
 fi
-run_root cp "$TMP_ENV" /etc/default/vekta-ai
-run_root chmod 640 /etc/default/vekta-ai
-run_root chown "root:$VEKTA_GROUP" /etc/default/vekta-ai
+run_root cp "$TMP_ENV" "$DEFAULTS_FILE"
+run_root chmod 640 "$DEFAULTS_FILE"
+run_root chown "root:$VEKTA_GROUP" "$DEFAULTS_FILE"
 rm -f "$TMP_ENV"
 
 echo "==> [setup-vekta] unit systemd → $UNIT_DST"
@@ -294,6 +303,7 @@ sed \
   -e "s|__VEKTA_INTERFACE_DIR__|${INTERFACE_DIR_UNIT}|g" \
   -e "s|__VEKTA_RUN_SCRIPT__|${RUN_SCRIPT}|g" \
   -e "s|__VEKTA_PATH__|${VEKTA_PATH}|g" \
+  -e "s|__VEKTA_PORT__|${AI_PORT}|g" \
   "$UNIT_SRC" > "$TMP_UNIT"
 run_root cp "$TMP_UNIT" "$UNIT_DST"
 rm -f "$TMP_UNIT"
@@ -306,37 +316,29 @@ if ! systemd-analyze verify "$UNIT_DST" 2>/tmp/vekta-unit-verify.err; then
   exit 1
 fi
 
-run_root systemctl enable vekta-ai.service
+run_root systemctl enable "${SERVICE_NAME}.service"
 
 if [ "$MIGRATE" -eq 1 ]; then
-  echo "==> [setup-vekta] migrate: parando container vekta-interface (libera :4680)"
-  docker compose -f "$COMPOSE_FILE" stop vekta-interface 2>/dev/null || true
-  docker compose -f "$COMPOSE_FILE" rm -f vekta-interface 2>/dev/null || true
-  # Nomes comuns: vekta-prod-vekta-interface-1, vekta-vekta-interface-1
-  while read -r cid; do
-    [ -n "$cid" ] || continue
-    docker stop "$cid" 2>/dev/null || true
-    docker rm -f "$cid" 2>/dev/null || true
-  done < <(docker ps -aq --filter name=vekta-interface 2>/dev/null || true)
-
-  if ss -ltn 2>/dev/null | grep -qE ':4680\s'; then
-    echo "erro: porta 4680 ainda em uso. Liberte-a e rode: systemctl start vekta-ai" >&2
-    ss -ltnp | grep 4680 || true
-    exit 1
+  echo "==> [setup-vekta] subindo systemd ${SERVICE_NAME} (porta ${AI_PORT})"
+  if ! systemctl is-active --quiet "${SERVICE_NAME}.service" 2>/dev/null; then
+    if ss -ltn 2>/dev/null | grep -qE ":${AI_PORT}\\s"; then
+      echo "erro: porta ${AI_PORT} ainda em uso. Liberte-a e rode: systemctl start ${SERVICE_NAME}" >&2
+      ss -ltnp | grep "${AI_PORT}" || true
+      exit 1
+    fi
   fi
 
-  echo "==> [setup-vekta] subindo systemd vekta-ai"
-  run_root systemctl restart vekta-ai.service
+  run_root systemctl restart "${SERVICE_NAME}.service"
   sleep 2
-  run_root systemctl --no-pager --full status vekta-ai.service || true
+  run_root systemctl --no-pager --full status "${SERVICE_NAME}.service" || true
 
-  if curl -fsS -o /dev/null -w "%{http_code}" "http://127.0.0.1:4680/" | grep -Eq '200|302|401'; then
-    echo "==> [setup-vekta] OK — http://127.0.0.1:4680 responde"
+  if curl -fsS -o /dev/null -w "%{http_code}" "http://127.0.0.1:${AI_PORT}/" | grep -Eq '200|302|401'; then
+    echo "==> [setup-vekta] OK — http://127.0.0.1:${AI_PORT} responde (https://aiclinica.vektaai.com.br)"
   else
-    echo "aviso: healthcheck local falhou — veja: journalctl -u vekta-ai -n 80 --no-pager" >&2
+    echo "aviso: healthcheck local falhou — veja: journalctl -u ${SERVICE_NAME} -n 80 --no-pager" >&2
   fi
 
-  echo "==> [setup-vekta] limpando órfãos do compose (CRM/WhatsApp seguem no ar)"
+  echo "==> [setup-vekta] stack Docker (painel + backend + WhatsApp)"
   docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
 else
   echo

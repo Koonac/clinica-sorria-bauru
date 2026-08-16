@@ -1,7 +1,8 @@
 # Redeploy — implementar este projeto em outra VPS / outro domínio
 
 > **Atualização:** o Frappe CRM (e MariaDB/Redis) foram removidos da stack Docker.
-> O CRM atual é o **backend Laravel** (`backend/`, porta `127.0.0.1:8080` em prod).
+> O CRM atual é o **backend Laravel** (`backend/`, porta `127.0.0.1:8180` em prod).
+> Painel: `https://clinica.vektaai.com.br` · AI: `https://aiclinica.vektaai.com.br`
 > Este guia ainda menciona Frappe/`crm.*` em trechos antigos — ignore-os e use
 > [`README.md`](README.md) + [`docker-compose.prod.yml`](docker-compose.prod.yml) como fonte de verdade.
 

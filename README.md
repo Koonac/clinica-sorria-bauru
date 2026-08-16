@@ -9,10 +9,11 @@ Este monorepo reúne a interface principal do agente e as ferramentas que ele us
 | Peça | Papel | Onde roda |
 |------|--------|-----------|
 | **Vekta AI (interface)** | Hub — DNA, arquivos, skills, chat (Claude CLI) e scripts Python | **Host** (Node / systemd) |
-| **CRM (backend Laravel)** | Gestão de relacionamentos, pipeline e campanhas WhatsApp | Docker (`vekta-network`) |
-| **WhatsApp API** | Sessões WhatsApp Web e webhooks | Docker (`vekta-network`) |
+| **Painel (frontend Vue)** | Interface da clínica (CRM no browser) | Docker (`clinica-network`) |
+| **CRM (backend Laravel)** | Gestão de relacionamentos, pipeline e campanhas WhatsApp | Docker (`clinica-network`) |
+| **WhatsApp API** | Sessões WhatsApp Web e webhooks | Docker (`clinica-network`) |
 
-Backend e WhatsApp sobem na rede `vekta-network`. A interface não usa essa rede — o nginx (ou o browser) fala com ela em `127.0.0.1:4680`.
+Painel, backend e WhatsApp sobem na rede `clinica-network`. A interface Vekta não usa essa rede — o nginx (ou o browser) fala com ela em `127.0.0.1:4780`.
 
 ## Como iniciar (dev)
 
@@ -46,18 +47,24 @@ npm run start
 
 | Serviço | URL |
 |---------|-----|
-| Interface Vekta | http://localhost:4680 |
-| Backend API | http://localhost:8000 (Laravel no host) / http://127.0.0.1:8080 (prod Docker) |
+| Interface Vekta | http://localhost:4680 (dev) / http://127.0.0.1:4780 (prod Docker/systemd) |
+| Painel Vue | http://localhost:5173 (dev) / http://127.0.0.1:8181 (prod Docker) |
+| Backend API | http://localhost:8000 (Laravel no host) / http://127.0.0.1:8180 (prod Docker) |
 | WhatsApp API | http://localhost:3000 (só dev; em prod não é publicado) |
 | Postgres | localhost:5432 |
 
 ## Produção (nginx no host)
 
-Domínio: `ai.vektaai.com.br` (Vekta no host). O backend fica em loopback (`127.0.0.1:8080`). O wwebjs **não** tem URL pública.
+- Vekta: `https://aiclinica.vektaai.com.br` → `127.0.0.1:4780` (systemd `clinica-ai`)
+- Painel Vue: `https://clinica.vektaai.com.br` → `127.0.0.1:8181`
+- Backend: loopback `127.0.0.1:8180` (Vekta usa `BACKEND_URL`; o painel chama `/api` no mesmo origin)
+- Filas Laravel: Redis (container interno)
+- wwebjs **não** tem URL pública
 
 ```bash
 cp .env.example .env   # preencha secrets
 cp backend/.env.example backend/.env
+cp whatsapp-api/.env.example whatsapp-api/.env
 docker compose -f docker-compose.prod.yml up -d --build
 # Ative deploy/nginx/*.conf no nginx do host + Certbot; DNS A/AAAA → IP do servidor
 
@@ -68,29 +75,32 @@ bash deploy/host/setup-vekta-host.sh --migrate
 Deploys incrementais (no servidor, após o primeiro up):
 
 ```bash
-bash vekta-deploy.sh      # só interface (git pull + npm + systemctl restart)
-bash whatsapp-deploy.sh   # só wwebjs
-bash deploy.sh            # stack Docker + migrate backend + restart Vekta no host
+bash vekta-deploy.sh         # só interface (git pull + npm + systemctl restart)
+bash frontend-deploy.sh      # só painel Vue
+bash backend-deploy.sh       # API + queue + scheduler
+bash whatsapp-deploy.sh      # só wwebjs
+bash deploy.sh               # stack Docker + migrate backend + restart Vekta no host
 ```
 
-Detalhes: [`docker-compose.prod.yml`](docker-compose.prod.yml), [`deploy/host/setup-vekta-host.sh`](deploy/host/setup-vekta-host.sh), [`deploy/systemd/vekta-ai.service`](deploy/systemd/vekta-ai.service), [`deploy/nginx/`](deploy/nginx/).
+Detalhes: [`docker-compose.prod.yml`](docker-compose.prod.yml), [`deploy/host/setup-vekta-host.sh`](deploy/host/setup-vekta-host.sh), [`deploy/systemd/clinica-ai.service`](deploy/systemd/clinica-ai.service), [`deploy/nginx/`](deploy/nginx/).
 
 ## Estrutura
 
 ```
 ├── vekta-ai/                 # Interface + contexto do agente (host)
+├── frontend/                 # Painel Vue (Docker em prod)
 ├── backend/                  # CRM próprio — Laravel API (Docker em prod)
 ├── whatsapp-api/             # API WhatsApp (Docker; rede interna em prod)
 ├── deploy/nginx/             # Server blocks
 ├── deploy/host/              # Setup da interface no host
-├── deploy/systemd/           # Unit vekta-ai.service
+├── deploy/systemd/           # Unit clinica-ai.service
 ├── docker-compose.yml        # Dev (Postgres + WhatsApp)
-└── docker-compose.prod.yml   # Prod (Backend + WhatsApp; portas só em 127.0.0.1)
+└── docker-compose.prod.yml   # Prod (painel + backend + redis + WhatsApp; portas só em 127.0.0.1)
 ```
 
 ## Parar
 
 ```powershell
 docker compose down
-# Interface no host: Ctrl+C no npm, ou em prod: sudo systemctl stop vekta-ai
+# Interface no host: Ctrl+C no npm, ou em prod: sudo systemctl stop clinica-ai
 ```

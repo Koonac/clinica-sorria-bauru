@@ -15,7 +15,7 @@ if ! command -v xdpyinfo >/dev/null 2>&1 || ! xdpyinfo -display "$DISPLAY" >/dev
   else
     echo "[vekta-ai-run] iniciando Xvfb em $DISPLAY"
     Xvfb "$DISPLAY" -screen 0 1280x900x24 -ac +extension GLX +render -noreset \
-      >/tmp/vekta-xvfb.log 2>&1 &
+      >/tmp/clinica-xvfb.log 2>&1 &
     for _ in $(seq 1 50); do
       if xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; then
         break

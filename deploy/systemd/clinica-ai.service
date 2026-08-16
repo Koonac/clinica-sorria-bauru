@@ -1,10 +1,11 @@
 # Unit template — preenchido por deploy/host/setup-vekta-host.sh
 # WorkingDirectory: vekta-ai/interface
 #
-# Upstream nginx: 127.0.0.1:4680
+# Upstream nginx: 127.0.0.1:4780 (aiclinica.vektaai.com.br)
+# DISPLAY=:98 — a stack Vekta vizinha usa :99
 
 [Unit]
-Description=Vekta AI Interface (Node + Claude CLI)
+Description=Clínica Sorria — Vekta AI Interface (Node + Claude CLI)
 After=network-online.target
 Wants=network-online.target
 
@@ -14,15 +15,15 @@ User=__VEKTA_USER__
 Group=__VEKTA_GROUP__
 WorkingDirectory=__VEKTA_INTERFACE_DIR__
 
-EnvironmentFile=-/etc/default/vekta-ai
+EnvironmentFile=-/etc/default/clinica-ai
 EnvironmentFile=-__VEKTA_ROOT__/.env
 
 Environment=NODE_ENV=production
 Environment=HOST=127.0.0.1
-Environment=PORT=4680
+Environment=PORT=__VEKTA_PORT__
 Environment=HOME=__VEKTA_HOME__
 Environment=PATH=__VEKTA_PATH__
-Environment=DISPLAY=:99
+Environment=DISPLAY=:98
 
 ExecStart=__VEKTA_RUN_SCRIPT__
 Restart=on-failure

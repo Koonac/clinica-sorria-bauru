@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Deploy da interface Vekta AI no HOST (systemd) — https://ai.vektaai.com.br
-# git pull + npm install/build + systemctl restart vekta-ai
+# Deploy da interface Vekta AI no HOST (systemd) — https://aiclinica.vektaai.com.br
+# git pull + npm install/build + systemctl restart clinica-ai
 #
 # Pré-requisito (uma vez na VPS):
 #   bash deploy/host/setup-vekta-host.sh --migrate
@@ -18,6 +18,7 @@ cd "$ROOT"
 
 INTERFACE_DIR="$ROOT/vekta-ai/interface"
 SKIP_PULL="${SKIP_PULL:-0}"
+SERVICE_NAME="${VEKTA_SERVICE:-clinica-ai}"
 
 if [ ! -d "$INTERFACE_DIR" ]; then
   echo "erro: pasta não encontrada: $INTERFACE_DIR" >&2
@@ -29,14 +30,14 @@ if [ "$SKIP_PULL" != "1" ]; then
   git pull
 fi
 
-if ! systemctl cat vekta-ai.service >/dev/null 2>&1; then
-  echo "erro: serviço systemd vekta-ai não encontrado." >&2
+if ! systemctl cat "${SERVICE_NAME}.service" >/dev/null 2>&1; then
+  echo "erro: serviço systemd ${SERVICE_NAME} não encontrado." >&2
   echo "  Instale/migre com: bash deploy/host/setup-vekta-host.sh --migrate" >&2
   exit 1
 fi
 
 # Preferir Node do serviço / system-wide (nunca /root/.nvm)
-NODE_BIN="$(systemctl show -p Environment --value vekta-ai.service 2>/dev/null \
+NODE_BIN="$(systemctl show -p Environment --value "${SERVICE_NAME}.service" 2>/dev/null \
   | tr ' ' '\n' | sed -n 's/^VEKTA_NODE_BIN=//p' | head -n1 || true)"
 if [ -z "$NODE_BIN" ] || [ ! -x "$NODE_BIN" ]; then
   if [ -x /usr/bin/node ]; then
@@ -67,7 +68,7 @@ case "$NPM_BIN" in
     ;;
 esac
 
-SERVICE_USER="$(systemctl show -p User --value vekta-ai.service 2>/dev/null || true)"
+SERVICE_USER="$(systemctl show -p User --value "${SERVICE_NAME}.service" 2>/dev/null || true)"
 if [ -z "$SERVICE_USER" ]; then
   SERVICE_USER=vekta
 fi
@@ -105,21 +106,21 @@ run_as_service run css:build
 run_as_service run lucide:build
 cd "$ROOT"
 
-WD="$(systemctl show -p WorkingDirectory --value vekta-ai.service 2>/dev/null || true)"
+WD="$(systemctl show -p WorkingDirectory --value "${SERVICE_NAME}.service" 2>/dev/null || true)"
 if [ -n "$WD" ] && [ ! -d "$WD" ]; then
   echo "erro: WorkingDirectory da unit não existe: $WD" >&2
   echo "  reinstale a unit: bash deploy/host/setup-vekta-host.sh" >&2
   exit 1
 fi
 
-echo "==> [vekta] systemctl restart vekta-ai"
-run_root systemctl restart vekta-ai.service
+echo "==> [vekta] systemctl restart ${SERVICE_NAME}"
+run_root systemctl restart "${SERVICE_NAME}.service"
 
 sleep 1
-if systemctl is-active --quiet vekta-ai.service; then
-  echo "==> [vekta] OK — https://ai.vektaai.com.br (systemd active)"
+if systemctl is-active --quiet "${SERVICE_NAME}.service"; then
+  echo "==> [vekta] OK — https://aiclinica.vektaai.com.br (systemd active)"
 else
-  echo "erro: vekta-ai não ficou active — journalctl -u vekta-ai -n 80 --no-pager" >&2
-  run_root systemctl --no-pager --full status vekta-ai.service || true
+  echo "erro: ${SERVICE_NAME} não ficou active — journalctl -u ${SERVICE_NAME} -n 80 --no-pager" >&2
+  run_root systemctl --no-pager --full status "${SERVICE_NAME}.service" || true
   exit 1
 fi

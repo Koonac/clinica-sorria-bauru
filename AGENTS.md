@@ -36,8 +36,8 @@ clinica-sorria-bauru/
 | `vekta-ai/` | **Vekta AI** — gerente de operações de IA. Skills/agentes (marketing, Instagram, copy, etc.), pasta `.dna/` com contexto da clínica, interface web/desktop e saídas em `marketing/`, `saidas/`. |
 | `whatsapp-api/` | API **Node.js** (whatsapp-web.js + MongoDB) para sessões WhatsApp, webhooks e conexão com o CRM/agents. Tem `AGENTS.md` próprio. |
 | `deploy/` | Arquivos de **deploy no servidor**: `nginx/` (server blocks), `systemd/` (unit da interface), `host/` (scripts de setup/run no host). |
-| `docker-compose.yml` / `docker-compose.prod.yml` | Orquestração local e produção (Postgres, WhatsApp, backend em prod). |
-| `deploy.sh`, `backend-deploy.sh`, `whatsapp-deploy.sh`, `vekta-deploy.sh` | Scripts de redeploy incremental por peça. |
+| `docker-compose.yml` / `docker-compose.prod.yml` | Orquestração local e produção (Postgres, Redis, painel Vue, backend e WhatsApp em prod). |
+| `deploy.sh`, `backend-deploy.sh`, `frontend-deploy.sh`, `whatsapp-deploy.sh`, `vekta-deploy.sh` | Scripts de redeploy incremental por peça. |
 | `redeploy.md` | Runbook de deploy / produção. |
 
 ## Como as peças se conectam

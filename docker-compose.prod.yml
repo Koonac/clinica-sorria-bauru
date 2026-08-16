@@ -1,29 +1,64 @@
-# Stack de PRODUÇÃO: Backend Laravel (CRM próprio) + WhatsApp (interno)
-# A interface Vekta AI roda no HOST via systemd (não neste compose).
+# Stack de PRODUÇÃO (Clínica Sorria) — namespace isolado da stack Vekta vizinha.
+# A interface Vekta AI desta clínica roda no HOST via systemd (clinica-ai).
 # TLS e domínios ficam no nginx do HOST.
 #
-# Domínios / portas:
-#   https://ai.vektaai.com.br   → 127.0.0.1:4680  (systemd: vekta-ai)
-#   Backend API (loopback)     → 127.0.0.1:8080  (interface: BACKEND_URL)
-#   wwebjs                     → NÃO publicado (só vekta-network)
+# Domínios / portas (não reutilizar 4680/8080 da outra stack):
+#   https://aiclinica.vektaai.com.br  → 127.0.0.1:4780  (systemd: clinica-ai)
+#   https://clinica.vektaai.com.br    → 127.0.0.1:8181  (painel Vue)
+#   Backend API (loopback)            → 127.0.0.1:8180  (BACKEND_URL da interface)
+#   wwebjs / redis / postgres / mongo → NÃO publicados (só clinica-network)
+#
+# O painel fala com a API no mesmo origin: nginx do frontend faz proxy de /api
+# para o serviço backend. Webhooks do wwebjs usam APP_URL=http://backend:8000
+# (rede interna — não troque pelo domínio público).
+# Filas Laravel: Redis (QUEUE_CONNECTION=redis).
 #
 # Pré-requisitos:
 #   1. cp .env.example .env  (e preencha)
 #   2. cp backend/.env.example backend/.env  (APP_KEY, DB_PASSWORD, etc.)
 #   3. whatsapp-api/.env
-#   4. DNS A/AAAA de ai.vektaai.com.br → IP do servidor
+#   4. DNS A/AAAA de clinica.vektaai.com.br e aiclinica.vektaai.com.br → IP da VPS
 #   5. Server blocks em deploy/nginx/ ativados no nginx do host
 #   6. Interface no host: bash deploy/host/setup-vekta-host.sh
-#      (BACKEND_URL=http://127.0.0.1:8080 + BACKEND_API_TOKEN)
+#      (BACKEND_URL=http://127.0.0.1:8180 + BACKEND_API_TOKEN)
 #
 # Uso:
 #   docker compose -f docker-compose.prod.yml up -d --build
 #   bash vekta-deploy.sh
 
-name: vekta-prod
+name: clinica-prod
+
+x-backend-env: &backend-env
+  APP_ENV: production
+  APP_DEBUG: "false"
+  # URL interna: wwebjs chama webhooks neste host
+  APP_URL: http://backend:8000
+  DB_CONNECTION: pgsql
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_DATABASE: "${POSTGRES_DB:-vekta_ai}"
+  DB_USERNAME: "${POSTGRES_USER:-postgres}"
+  DB_PASSWORD: "${POSTGRES_PASSWORD}"
+  WHATSAPP_API_URL: http://wwebjs:3000
+  OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+  OPENROUTER_AGENT_MODEL: "${OPENROUTER_AGENT_MODEL:-openai/gpt-4o-mini}"
+  GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+  GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+  GOOGLE_CALENDAR_REFRESH_TOKEN: "${GOOGLE_CALENDAR_REFRESH_TOKEN:-}"
+  GOOGLE_CALENDAR_CALENDAR_ID: "${GOOGLE_CALENDAR_CALENDAR_ID:-primary}"
+  GOOGLE_CALENDAR_TIMEZONE: "${GOOGLE_CALENDAR_TIMEZONE:-America/Sao_Paulo}"
+  QUEUE_CONNECTION: redis
+  REDIS_CLIENT: phpredis
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: "${REDIS_PASSWORD:-null}"
+  REDIS_PREFIX: "clinica-"
+  # Maior que o --timeout=21600 do worker (jobs de agent/campanha)
+  REDIS_QUEUE_RETRY_AFTER: "21700"
+  CACHE_STORE: database
+  SESSION_DRIVER: database
 
 services:
-  # --- Backend (Laravel API — CRM próprio) ---
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -34,12 +69,26 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d vekta_ai"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
       retries: 10
     networks:
-      - vekta-network
+      - clinica-network
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - clinica-network
 
   backend:
     build: ./backend
@@ -48,32 +97,14 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      APP_ENV: production
-      APP_DEBUG: "false"
-      # URL interna: wwebjs chama webhooks neste host
-      APP_URL: http://backend:8000
-      DB_CONNECTION: pgsql
-      DB_HOST: postgres
-      DB_PORT: "5432"
-      DB_DATABASE: "${POSTGRES_DB:-vekta_ai}"
-      DB_USERNAME: "${POSTGRES_USER:-postgres}"
-      DB_PASSWORD: "${POSTGRES_PASSWORD}"
-      WHATSAPP_API_URL: http://wwebjs:3000
-      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
-      OPENROUTER_AGENT_MODEL: "${OPENROUTER_AGENT_MODEL:-openai/gpt-4o-mini}"
-      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
-      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
-      GOOGLE_CALENDAR_REFRESH_TOKEN: "${GOOGLE_CALENDAR_REFRESH_TOKEN:-}"
-      GOOGLE_CALENDAR_CALENDAR_ID: "${GOOGLE_CALENDAR_CALENDAR_ID:-primary}"
-      GOOGLE_CALENDAR_TIMEZONE: "${GOOGLE_CALENDAR_TIMEZONE:-America/Sao_Paulo}"
-      QUEUE_CONNECTION: database
-      CACHE_STORE: database
-      SESSION_DRIVER: database
+      <<: *backend-env
     ports:
-      # Só loopback — interface no host usa BACKEND_URL=http://127.0.0.1:8080
-      - "127.0.0.1:8080:8000"
+      # Só loopback — interface no host usa BACKEND_URL=http://127.0.0.1:8180
+      - "127.0.0.1:${BACKEND_PORT:-8180}:8000"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       wwebjs:
         condition: service_started
@@ -86,7 +117,7 @@ services:
       retries: 10
       start_period: 40s
     networks:
-      - vekta-network
+      - clinica-network
 
   backend-queue:
     build: ./backend
@@ -95,35 +126,59 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      APP_ENV: production
-      APP_DEBUG: "false"
-      APP_URL: http://backend:8000
-      DB_CONNECTION: pgsql
-      DB_HOST: postgres
-      DB_PORT: "5432"
-      DB_DATABASE: "${POSTGRES_DB:-vekta_ai}"
-      DB_USERNAME: "${POSTGRES_USER:-postgres}"
-      DB_PASSWORD: "${POSTGRES_PASSWORD}"
-      WHATSAPP_API_URL: http://wwebjs:3000
-      OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
-      OPENROUTER_AGENT_MODEL: "${OPENROUTER_AGENT_MODEL:-openai/gpt-4o-mini}"
-      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
-      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
-      GOOGLE_CALENDAR_REFRESH_TOKEN: "${GOOGLE_CALENDAR_REFRESH_TOKEN:-}"
-      GOOGLE_CALENDAR_CALENDAR_ID: "${GOOGLE_CALENDAR_CALENDAR_ID:-primary}"
-      GOOGLE_CALENDAR_TIMEZONE: "${GOOGLE_CALENDAR_TIMEZONE:-America/Sao_Paulo}"
-      QUEUE_CONNECTION: database
-      CACHE_STORE: database
-      SESSION_DRIVER: database
+      <<: *backend-env
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       backend:
         condition: service_healthy
     volumes:
       - backend-storage:/var/www/html/storage
     networks:
-      - vekta-network
+      - clinica-network
+
+  backend-scheduler:
+    build: ./backend
+    restart: unless-stopped
+    command: ["scheduler"]
+    env_file:
+      - ./backend/.env
+    environment:
+      <<: *backend-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    volumes:
+      - backend-storage:/var/www/html/storage
+    networks:
+      - clinica-network
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: /api
+    restart: unless-stopped
+    ports:
+      # Só loopback — nginx do host faz TLS (clinica.vektaai.com.br)
+      - "127.0.0.1:${FRONTEND_PORT:-8181}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - clinica-network
 
   mongo:
     image: mongo:7
@@ -140,11 +195,13 @@ services:
       retries: 10
       start_period: 15s
     networks:
-      - vekta-network
+      - clinica-network
 
   wwebjs:
     build: ./whatsapp-api
     restart: unless-stopped
+    init: true
+    shm_size: "1gb"
     # SEM ports: — não expor no host / nginx
     env_file:
       - ./whatsapp-api/.env
@@ -159,14 +216,15 @@ services:
       - sessions_data:/app/sessions
       - ./whatsapp-api/.env:/app/.env:ro
     networks:
-      - vekta-network
+      - clinica-network
 
 networks:
-  vekta-network:
-    name: vekta-network
+  clinica-network:
+    name: clinica-network
 
 volumes:
   postgres-data:
   backend-storage:
+  redis-data:
   mongo_data:
   sessions_data:

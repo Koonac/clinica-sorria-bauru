@@ -155,7 +155,8 @@ Fluxo WhatsApp → AI (não quebrar):
 | Grupo | Variáveis |
 |-------|-----------|
 | App / DB | `APP_KEY`, `APP_URL`, `DB_*` |
-| Queue | `QUEUE_CONNECTION=database` |
+| Queue | `QUEUE_CONNECTION=database` (Docker prod: `redis`) |
+| Redis | `REDIS_HOST`, `REDIS_PORT` (prod: serviço `redis`) |
 | WhatsApp | `WHATSAPP_API_URL` |
 | LLM | `OPENROUTER_API_KEY`, `OPENROUTER_AGENT_MODEL`, `OPENROUTER_TRANSCRIPTION_MODEL`, `OPENROUTER_TRANSCRIPTION_LANGUAGE`, `OPENROUTER_VISION_MODEL` |
 | Calendar | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALENDAR_*` |
