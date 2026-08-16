@@ -84,6 +84,8 @@ export type WhatsappAttendanceSegment = {
   ended_at?: string | null
   duration_seconds?: number | null
   source?: string | null
+  ai_summary?: string | null
+  ai_summary_at?: string | null
   user?: CrmUserRef | null
 }
 

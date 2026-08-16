@@ -4,6 +4,7 @@ namespace App\Services\Crm;
 
 use App\Models\Crm\Connection;
 use App\Models\Crm\Contact;
+use App\Models\Crm\WhatsappMessage;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -92,9 +93,20 @@ class EnsureWhatsappAvatar
             }
 
             try {
+                $lid = WhatsappMessage::query()
+                    ->where('connection_id', $connection->id)
+                    ->where(function ($q) use ($jid) {
+                        $q->where('whatsapp_jid', $jid)
+                            ->orWhere('whatsapp_lid', $jid);
+                    })
+                    ->whereNotNull('whatsapp_lid')
+                    ->latest('id')
+                    ->value('whatsapp_lid');
+
                 $result = (new WhatsappApiClient($connection))->getProfilePicUrl(
                     (string) $connection->session_id,
                     $jid,
+                    is_string($lid) && $lid !== '' ? $lid : null,
                 );
             } catch (RuntimeException $e) {
                 Log::warning('EnsureWhatsappAvatar: API falhou', [

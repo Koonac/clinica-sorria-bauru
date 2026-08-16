@@ -6,7 +6,11 @@ use App\Events\Crm\WhatsappInboundMessageReceived;
 use App\Events\Crm\WhatsappMessageStored;
 use App\Listeners\Crm\DispatchWhatsappAiReplyJob;
 use App\Listeners\Crm\PersistInboundWhatsappMessage;
+use App\Listeners\LogOutboundHttpConnectionFailed;
+use App\Listeners\LogOutboundHttpResponseReceived;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use Illuminate\Http\Client\Events\ConnectionFailed;
+use Illuminate\Http\Client\Events\ResponseReceived;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -19,6 +23,12 @@ class EventServiceProvider extends ServiceProvider
         ],
         WhatsappMessageStored::class => [
             DispatchWhatsappAiReplyJob::class,
+        ],
+        ResponseReceived::class => [
+            LogOutboundHttpResponseReceived::class,
+        ],
+        ConnectionFailed::class => [
+            LogOutboundHttpConnectionFailed::class,
         ],
     ];
 

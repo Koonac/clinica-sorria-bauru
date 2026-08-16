@@ -4,7 +4,10 @@ namespace App\Services\Crm\Agent;
 
 use App\Models\Crm\Connection;
 use App\Models\Crm\PipelineStage;
+use App\Models\Crm\WhatsappAttendanceSegment;
 use App\Models\Crm\WhatsappMessage;
+use App\Services\Crm\Agent\Tools\EscalarHumanoTool;
+use App\Services\Crm\FinalizeWhatsappConversationForLead;
 use App\Services\Crm\OpenRouterAgentClient;
 use App\Services\Crm\WhatsappChatHistory;
 use Illuminate\Support\Facades\Log;
@@ -14,7 +17,9 @@ class WhatsappAgentRunner
 {
     private const MAX_ROUNDS = 5;
 
-    private const HISTORY_LIMIT = 40;
+    private const DEFAULT_HISTORY_LIMIT = 40;
+
+    private const PRIOR_SUMMARY_LIMIT = 5;
 
     public function __construct(
         private OpenRouterAgentClient $openRouter,
@@ -102,14 +107,31 @@ class WhatsappAgentRunner
      */
     private function buildMessages(AgentContext $context): array
     {
+        $since = null;
+        if ($context->lead) {
+            $openSegment = WhatsappAttendanceSegment::query()
+                ->where('lead_id', $context->lead->id)
+                ->whereNull('ended_at')
+                ->latest('id')
+                ->first();
+            $since = $openSegment?->started_at;
+        }
+
+        $historyLimit = $context->connection->resolvedAgentHistoryLimit();
+        if ($historyLimit < 1) {
+            $historyLimit = self::DEFAULT_HISTORY_LIMIT;
+        }
+
         $history = $this->history->messages(
             $context->connection->id,
             $context->lead?->id,
             $context->jid,
-            self::HISTORY_LIMIT,
+            $historyLimit,
+            $since,
         );
 
         $aiName = trim((string) ($context->connection->ai_display_name ?? ''));
+        $systemNotices = $this->systemNoticeBodies($context->connection);
         $chatMessages = [];
         foreach ($history as $msg) {
             /** @var WhatsappMessage $msg */
@@ -128,6 +150,9 @@ class WhatsappAgentRunner
                 if ($body === '') {
                     continue;
                 }
+            }
+            if ($this->isSystemNoticeBody($body, $systemNotices)) {
+                continue;
             }
             $chatMessages[] = [
                 'role' => $msg->direction === 'outbound' ? 'assistant' : 'user',
@@ -173,6 +198,7 @@ class WhatsappAgentRunner
             $leadBlock = 'Sem lead vinculado.';
         }
 
+        $priorSummaries = $this->priorAttendanceSummariesBlock($context);
         $rules = trim((string) $context->agent->system_prompt);
 
         return <<<PROMPT
@@ -193,16 +219,85 @@ Regras de operação (obrigatórias):
 - Quando o pedido estiver resolvido (confirmação do cliente, informação entregue, agendamento feito sem pendência), chame finalizar_atendimento após a última enviar_resposta.
 - Responda em português brasileiro, de forma objetiva.
 - Não invente preços, prazos ou políticas que não estejam nas regras do agent.
+- Aja com base nas mensagens do atendimento ATUAL. Resumos de atendimentos anteriores são só contexto — não escale nem finalize só porque o histórico antigo menciona handoff ou encerramento.
 
 Contexto CRM:
 - {$leadBlock}
 - Estágios de lead disponíveis: {$stagesJson}
 - Fuso horário: America/Sao_Paulo
 - Agora: {$this->nowIso()}
-
+{$priorSummaries}
 Regras do agent (system prompt do cliente):
 {$rules}
 PROMPT;
+    }
+
+    private function priorAttendanceSummariesBlock(AgentContext $context): string
+    {
+        if (! $context->lead) {
+            return '';
+        }
+
+        $segments = WhatsappAttendanceSegment::query()
+            ->where('lead_id', $context->lead->id)
+            ->whereNotNull('ended_at')
+            ->whereNotNull('ai_summary')
+            ->where('ai_summary', '!=', '')
+            ->orderByDesc('ended_at')
+            ->limit(self::PRIOR_SUMMARY_LIMIT)
+            ->get(['ended_at', 'ai_summary']);
+
+        if ($segments->isEmpty()) {
+            return '';
+        }
+
+        $lines = [
+            '',
+            'Histórico de atendimentos anteriores (resumo; NÃO são mensagens atuais — não escale/finalize só por causa deles):',
+        ];
+
+        foreach ($segments->reverse() as $segment) {
+            $date = $segment->ended_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') ?? '?';
+            $summary = trim((string) $segment->ai_summary);
+            $lines[] = "- [{$date}]: {$summary}";
+        }
+
+        $lines[] = '';
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function systemNoticeBodies(Connection $connection): array
+    {
+        $notices = [
+            EscalarHumanoTool::TRANSFER_NOTICE,
+            FinalizeWhatsappConversationForLead::DEFAULT_FINALIZE_NOTICE,
+        ];
+
+        $configured = trim((string) ($connection->whatsapp_finalize_notice ?? ''));
+        if ($configured !== '') {
+            $notices[] = $configured;
+        }
+
+        return array_values(array_unique($notices));
+    }
+
+    /**
+     * @param  list<string>  $notices
+     */
+    private function isSystemNoticeBody(string $body, array $notices): bool
+    {
+        $normalized = trim($body);
+        foreach ($notices as $notice) {
+            if ($notice !== '' && $normalized === $notice) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function nowIso(): string

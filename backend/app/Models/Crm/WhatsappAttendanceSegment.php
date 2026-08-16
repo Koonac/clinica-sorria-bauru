@@ -26,6 +26,8 @@ class WhatsappAttendanceSegment extends Model
         'ended_at',
         'duration_seconds',
         'source',
+        'ai_summary',
+        'ai_summary_at',
     ];
 
     protected function casts(): array
@@ -33,6 +35,7 @@ class WhatsappAttendanceSegment extends Model
         return [
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
+            'ai_summary_at' => 'datetime',
         ];
     }
 

@@ -355,6 +355,7 @@ class WhatsAppController {
     try {
       const { sessionId } = req.params;
       const jid = String(req.query.jid || "").trim();
+      const lid = String(req.query.lid || "").trim() || null;
 
       if (!sessionId) {
         return res.status(400).json({
@@ -363,14 +364,14 @@ class WhatsAppController {
         });
       }
 
-      if (!jid) {
+      if (!jid && !lid) {
         return res.status(400).json({
           success: false,
           error: "jid é obrigatório",
         });
       }
 
-      const result = await whatsappService.getProfilePicUrl(sessionId, jid);
+      const result = await whatsappService.getProfilePicUrl(sessionId, jid, lid);
 
       if (!result.success) {
         const status = result.error === "Cliente não encontrado" ? 404 : 400;

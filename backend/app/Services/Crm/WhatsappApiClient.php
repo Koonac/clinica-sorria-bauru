@@ -116,10 +116,14 @@ class WhatsappApiClient
      *
      * @return array{success?: bool, url?: string|null, error?: string}
      */
-    public function getProfilePicUrl(string $sessionId, string $jid): array
+    public function getProfilePicUrl(string $sessionId, string $jid, ?string $lid = null): array
     {
         $path = '/api/whatsapp/profile-pic/'.rawurlencode($sessionId)
             .'?jid='.rawurlencode($jid);
+
+        if (filled($lid)) {
+            $path .= '&lid='.rawurlencode($lid);
+        }
 
         return $this->request('get', $path);
     }

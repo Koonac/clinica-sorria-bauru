@@ -3,6 +3,7 @@
 namespace App\Services\Crm;
 
 use App\Models\Crm\WhatsappMessage;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 class WhatsappChatHistory
@@ -99,6 +100,8 @@ class WhatsappChatHistory
         ?int $leadId,
         ?string $jid,
         int $limit = 40,
+        ?Carbon $since = null,
+        ?Carbon $until = null,
     ): Collection {
         $relatedJids = ($jid !== null && $jid !== '') ? $this->relatedJids($connectionId, $jid) : [];
 
@@ -114,9 +117,29 @@ class WhatsappChatHistory
                             ->orWhereIn('whatsapp_lid', $relatedJids);
                     });
                 }
-            })
-            ->latest('wa_timestamp')
-            ->latest('id');
+            });
+
+        if ($since !== null) {
+            $query->where(function ($q) use ($since) {
+                $q->where('wa_timestamp', '>=', $since)
+                    ->orWhere(function ($inner) use ($since) {
+                        $inner->whereNull('wa_timestamp')
+                            ->where('created_at', '>=', $since);
+                    });
+            });
+        }
+
+        if ($until !== null) {
+            $query->where(function ($q) use ($until) {
+                $q->where('wa_timestamp', '<=', $until)
+                    ->orWhere(function ($inner) use ($until) {
+                        $inner->whereNull('wa_timestamp')
+                            ->where('created_at', '<=', $until);
+                    });
+            });
+        }
+
+        $query->latest('wa_timestamp')->latest('id');
 
         return $query->limit($limit)->get()->sortBy(function (WhatsappMessage $m) {
             return [$m->wa_timestamp?->timestamp ?? 0, $m->id];

@@ -1249,8 +1249,9 @@ class WhatsAppService {
 
   /**
    * URL temporária da foto de perfil (ou null se oculta/indisponível).
+   * Tenta @c.us e, se informado, @lid; com fallback via ProfilePicThumb.
    */
-  async getProfilePicUrl(sessionId, jid) {
+  async getProfilePicUrl(sessionId, jid, lid = null) {
     const client = this.clients.get(sessionId);
 
     if (!client) {
@@ -1267,33 +1268,93 @@ class WhatsAppService {
       };
     }
 
-    const chatId = String(jid || "").trim();
-    if (!chatId) {
+    const primary = String(jid || "").trim();
+    const altLid = String(lid || "").trim();
+    if (!primary && !altLid) {
       return {
         success: false,
         error: "jid é obrigatório",
       };
     }
 
-    try {
-      const url = await client.getProfilePicUrl(chatId);
-      return {
-        success: true,
-        sessionId,
-        jid: chatId,
-        url: typeof url === "string" && url.trim() ? url.trim() : null,
-      };
-    } catch (error) {
-      console.warn(
-        `⚠️ getProfilePicUrl falhou para ${chatId}: ${error.message}`,
-      );
-      return {
-        success: true,
-        sessionId,
-        jid: chatId,
-        url: null,
-      };
+    const candidates = [];
+    if (primary) candidates.push(primary);
+    if (altLid && altLid !== primary) candidates.push(altLid);
+
+    let lastError = null;
+    for (const chatId of candidates) {
+      try {
+        let url = await client.getProfilePicUrl(chatId);
+        if (typeof url === "string" && url.trim()) {
+          return {
+            success: true,
+            sessionId,
+            jid: chatId,
+            url: url.trim(),
+          };
+        }
+
+        url = await this._profilePicFromThumb(client, chatId);
+        if (typeof url === "string" && url.trim()) {
+          return {
+            success: true,
+            sessionId,
+            jid: chatId,
+            url: url.trim(),
+          };
+        }
+      } catch (error) {
+        lastError = error;
+        const detail = error?.message || error?.name || String(error);
+        console.warn(`⚠️ getProfilePicUrl falhou para ${chatId}: ${detail}`);
+      }
     }
+
+    // Sem URL: privacidade/indisponível (não é falha de sessão).
+    return {
+      success: true,
+      sessionId,
+      jid: primary || altLid,
+      url: null,
+      error: lastError ? String(lastError.message || lastError) : undefined,
+    };
+  }
+
+  /**
+   * Fallback: ProfilePicThumb + chat interno (sem WWebJS.getChat).
+   */
+  async _profilePicFromThumb(client, chatId) {
+    if (!client?.pupPage) return null;
+
+    return client.pupPage.evaluate(async (contactId) => {
+      try {
+        const wid = window.require("WAWebWidFactory").createWid(contactId);
+        const pictures = window.require("WAWebCollections").ProfilePicThumb;
+        let thumb = pictures.get(wid) || null;
+        if (!thumb) {
+          try {
+            thumb = await pictures.find(wid);
+          } catch (_) {
+            thumb = null;
+          }
+        }
+        const cached = thumb?.eurl || thumb?.imgFull || thumb?.img || null;
+        if (cached) return cached;
+
+        const found = await window
+          .require("WAWebFindChatAction")
+          .findOrCreateLatestChat(wid);
+        const chat = found?.chat || found;
+        if (!chat) return null;
+
+        const fresh = await window
+          .require("WAWebContactProfilePicThumbBridge")
+          .requestProfilePicFromServer(chat);
+        return fresh?.eurl || fresh?.imgFull || fresh?.img || null;
+      } catch (_) {
+        return null;
+      }
+    }, chatId);
   }
 
   // Enviar mensagem (texto e/ou imagem)

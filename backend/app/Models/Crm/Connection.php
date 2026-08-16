@@ -33,6 +33,8 @@ class Connection extends Model
         'default_lead_stage_id',
         'whatsapp_agent_auto_resume_hours',
         'whatsapp_attendance_auto_close_minutes',
+        'whatsapp_finalize_notice',
+        'whatsapp_agent_history_limit',
         'created_by',
     ];
 
@@ -121,7 +123,16 @@ class Connection extends Model
             'default_lead_stage_id' => $this->default_lead_stage_id,
             'whatsapp_agent_auto_resume_hours' => (int) ($this->whatsapp_agent_auto_resume_hours ?? 24),
             'whatsapp_attendance_auto_close_minutes' => (int) ($this->whatsapp_attendance_auto_close_minutes ?? 10),
+            'whatsapp_finalize_notice' => (string) ($this->whatsapp_finalize_notice ?? '_finalizando chamado_'),
+            'whatsapp_agent_history_limit' => $this->resolvedAgentHistoryLimit(),
             'api_username' => $this->api_username,
         ];
+    }
+
+    public function resolvedAgentHistoryLimit(): int
+    {
+        $limit = (int) ($this->whatsapp_agent_history_limit ?? 40);
+
+        return max(5, min(100, $limit > 0 ? $limit : 40));
     }
 }

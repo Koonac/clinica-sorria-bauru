@@ -2,6 +2,8 @@
 
 namespace App\Services\Crm;
 
+use App\Jobs\Crm\SendWhatsappFinalizeNoticeJob;
+use App\Jobs\Crm\SummarizeWhatsappAttendanceSegmentJob;
 use App\Models\Crm\Activity;
 use App\Models\Crm\Lead;
 use App\Models\User;
@@ -15,16 +17,23 @@ class FinalizeWhatsappConversationForLead
 
     public const SOURCE_AUTO_CLOSE = 'auto_close';
 
+    public const DEFAULT_FINALIZE_NOTICE = '_finalizando chamado_';
+
     public function __construct(private CloseWhatsappAttendanceSegment $closeSegment) {}
 
     /**
      * Finaliza o atendimento: remove dono, limpa pausa, fecha segmento e marca conversa fechada.
+     * Aviso WhatsApp e resumo IA rodam em jobs (não bloqueiam a resposta HTTP).
      *
      * @param  self::SOURCE_*  $source
      */
     public function handle(Lead $lead, ?User $user = null, string $source = self::SOURCE_MANUAL): Lead
     {
-        return DB::transaction(function () use ($lead, $user, $source) {
+        $closedSegmentId = null;
+        $didFinalize = false;
+        $shouldNotify = $source !== self::SOURCE_AUTO_CLOSE;
+
+        $updated = DB::transaction(function () use ($lead, $user, $source, &$closedSegmentId, &$didFinalize) {
             if ($lead->isWhatsappConversationClosed()) {
                 return $lead->fresh(['contact', 'source', 'owner', 'stage']) ?? $lead;
             }
@@ -38,9 +47,11 @@ class FinalizeWhatsappConversationForLead
                 'whatsapp_auto_close_at' => null,
             ])->save();
 
-            $this->closeSegment->handle($lead);
+            $closedSegment = $this->closeSegment->handle($lead);
+            $closedSegmentId = $closedSegment?->id;
+            $didFinalize = true;
 
-            $updated = $lead->fresh(['contact', 'source', 'owner', 'stage']) ?? $lead;
+            $fresh = $lead->fresh(['contact', 'source', 'owner', 'stage']) ?? $lead;
 
             [$subject, $body] = $this->activityCopy($user, $source);
 
@@ -48,8 +59,8 @@ class FinalizeWhatsappConversationForLead
                 'type' => 'note',
                 'subject' => $subject,
                 'body' => $body,
-                'lead_id' => $updated->id,
-                'contact_id' => $updated->contact_id,
+                'lead_id' => $fresh->id,
+                'contact_id' => $fresh->contact_id,
                 'user_id' => $user?->id,
                 'meta' => [
                     'whatsapp_finalized' => true,
@@ -59,8 +70,18 @@ class FinalizeWhatsappConversationForLead
                 ],
             ]);
 
-            return $updated;
+            return $fresh;
         });
+
+        if ($didFinalize && $shouldNotify) {
+            SendWhatsappFinalizeNoticeJob::dispatch($updated->id, $user?->id)->afterCommit();
+        }
+
+        if ($didFinalize && $closedSegmentId) {
+            SummarizeWhatsappAttendanceSegmentJob::dispatch($closedSegmentId)->afterCommit();
+        }
+
+        return $updated;
     }
 
     /**

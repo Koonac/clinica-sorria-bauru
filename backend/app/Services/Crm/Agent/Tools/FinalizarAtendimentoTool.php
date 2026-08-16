@@ -21,7 +21,7 @@ class FinalizarAtendimentoTool implements AgentTool
     {
         return [
             'name' => $this->name(),
-            'description' => 'Encerra o atendimento deste lead quando o pedido foi resolvido, o cliente confirmou ou não há mais ação. Feche o chamado após enviar a mensagem final com enviar_resposta. Não use se ainda precisar de humano — nesse caso use escalar_humano.',
+            'description' => 'Encerra o atendimento deste lead quando o pedido foi resolvido, o cliente confirmou ou não há mais ação. Avisa o cliente com "finalizando chamado" e fecha o chamado. Prefira chamar após a última enviar_resposta. Não use se ainda precisar de humano — nesse caso use escalar_humano.',
             'parameters' => [
                 'type' => 'object',
                 'properties' => [

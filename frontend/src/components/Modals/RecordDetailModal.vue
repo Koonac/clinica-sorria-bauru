@@ -13,6 +13,7 @@ import type {
   Lead,
   PipelineStage,
   Source,
+  WhatsappAttendanceSegment,
 } from '@/api/crm/types'
 import Button from '@/components/Buttons/Button.vue'
 import Select from '@/components/Forms/Select.vue'
@@ -26,7 +27,7 @@ import {
   labelClass,
 } from '@/utils/crmFormat'
 
-type Tab = 'dados' | 'historico' | 'notas' | 'tarefas' | 'chat' | 'perda'
+type Tab = 'dados' | 'historico' | 'notas' | 'anotacoes_ia' | 'tarefas' | 'chat' | 'perda'
 
 const open = defineModel<boolean>('open', { default: false })
 
@@ -88,6 +89,17 @@ const activities = computed(() => record.value?.activities || [])
 const notes = computed(() => activities.value.filter((a) => a.type === 'note'))
 const history = computed(() => activities.value.filter((a) => a.type !== 'note'))
 const tasks = computed(() => record.value?.tasks || [])
+const aiNotes = computed(() => {
+  if (props.kind !== 'lead' || !lead.value?.attendance_segments) return []
+  return lead.value.attendance_segments
+    .filter((s) => Boolean(s.ai_summary && String(s.ai_summary).trim()))
+    .slice()
+    .sort((a, b) => {
+      const ta = new Date(a.ai_summary_at || a.ended_at || a.started_at).getTime()
+      const tb = new Date(b.ai_summary_at || b.ended_at || b.started_at).getTime()
+      return tb - ta
+    })
+})
 const jid = computed(() => {
   if (props.kind === 'lead') return lead.value?.whatsapp_jid || ''
   return deal.value?.whatsapp_jid || deal.value?.contact?.whatsapp_jid || ''
@@ -103,12 +115,21 @@ const tabs = computed(() => {
     { id: 'dados', label: 'Dados' },
     { id: 'historico', label: 'Histórico' },
     { id: 'notas', label: 'Notas' },
-    { id: 'tarefas', label: 'Tarefas' },
   ]
+  if (props.kind === 'lead') {
+    base.push({ id: 'anotacoes_ia', label: 'Anotações IA' })
+  }
+  base.push({ id: 'tarefas', label: 'Tarefas' })
   if (showChat.value) base.push({ id: 'chat', label: 'Chat' })
   if (showPerda.value || props.kind === 'deal') base.push({ id: 'perda', label: 'Perda' })
   return base
 })
+
+function aiNoteMeta(seg: WhatsappAttendanceSegment): string {
+  const when = formatDateTime(seg.ai_summary_at || seg.ended_at || seg.started_at)
+  const mode = seg.mode === 'ai' ? 'Agent IA' : seg.user?.name || 'Humano'
+  return `${when} · ${mode}`
+}
 
 function close() {
   open.value = false
@@ -489,6 +510,20 @@ function activityLabel(a: Activity): string {
                   }}<template v-if="a.user?.name"> · {{ a.user.name }}</template>
                 </p>
                 <p class="mt-1 text-sm text-brand-ink">{{ a.body || a.subject }}</p>
+              </article>
+            </div>
+
+            <div v-show="tab === 'anotacoes_ia'" class="space-y-2">
+              <p v-if="!aiNotes.length" class="text-sm text-brand-ink/45">
+                Nenhuma anotação da IA ainda. Elas aparecem após finalizar um atendimento.
+              </p>
+              <article
+                v-for="seg in aiNotes"
+                :key="seg.id"
+                class="rounded-xl border border-brand-ink/10 bg-[#f8fafb] px-3 py-2.5"
+              >
+                <p class="text-xs text-brand-ink/45">{{ aiNoteMeta(seg) }}</p>
+                <p class="mt-1 whitespace-pre-wrap text-sm text-brand-ink">{{ seg.ai_summary }}</p>
               </article>
             </div>
 

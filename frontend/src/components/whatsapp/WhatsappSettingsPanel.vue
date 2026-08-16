@@ -14,6 +14,7 @@ import type { PipelineStage } from '@/api/crm/types'
 import Button from '@/components/Buttons/Button.vue'
 import Skeleton from '@/components/Feedback/Skeleton.vue'
 import Select from '@/components/Forms/Select.vue'
+import Slider from '@/components/Forms/Slider.vue'
 import { useClinicsStore } from '@/stores/clinics'
 
 const clinics = useClinicsStore()
@@ -37,6 +38,8 @@ const settings = ref({
   default_lead_stage_id: '' as string | number,
   whatsapp_agent_auto_resume_hours: 24,
   whatsapp_attendance_auto_close_minutes: 10,
+  whatsapp_finalize_notice: '_finalizando chamado_',
+  whatsapp_agent_history_limit: 40,
 })
 
 const inputClass =
@@ -87,6 +90,9 @@ function applyConnection(next: ClinicConnection) {
     next.whatsapp_agent_auto_resume_hours ?? 24
   settings.value.whatsapp_attendance_auto_close_minutes =
     next.whatsapp_attendance_auto_close_minutes ?? 10
+  settings.value.whatsapp_finalize_notice =
+    next.whatsapp_finalize_notice ?? '_finalizando chamado_'
+  settings.value.whatsapp_agent_history_limit = next.whatsapp_agent_history_limit ?? 40
 }
 
 async function load() {
@@ -178,6 +184,8 @@ async function saveSettings() {
       whatsapp_attendance_auto_close_minutes: Number(
         settings.value.whatsapp_attendance_auto_close_minutes,
       ),
+      whatsapp_finalize_notice: settings.value.whatsapp_finalize_notice.trim(),
+      whatsapp_agent_history_limit: Number(settings.value.whatsapp_agent_history_limit),
     })
     applyConnection(next)
     flash.value = 'Configurações salvas.'
@@ -369,6 +377,42 @@ onMounted(() => {
             <span class="text-xs text-brand-ink/45">
               Após uma mensagem nossa (IA ou humano), se o cliente não responder neste prazo, o
               atendimento é finalizado automaticamente. (1–1440 minutos; padrão 10)
+            </span>
+          </label>
+          <label class="flex flex-col gap-2 sm:col-span-2">
+            <span class="flex items-center justify-between gap-2 text-sm font-medium text-brand-ink/80">
+              Mensagens de contexto da IA
+              <span class="tabular-nums text-brand-ink">{{ settings.whatsapp_agent_history_limit }}</span>
+            </span>
+            <Slider
+              v-model="settings.whatsapp_agent_history_limit"
+              :min="5"
+              :max="100"
+              :step="1"
+              aria-label="Mensagens de contexto da IA"
+            />
+            <span class="flex justify-between text-[11px] text-brand-ink/40 tabular-nums">
+              <span>5</span>
+              <span>100</span>
+            </span>
+            <span class="text-xs text-brand-ink/45">
+              Quantas mensagens do atendimento atual a IA lê ao responder (5–100; padrão 40).
+            </span>
+          </label>
+          <label class="flex flex-col gap-1.5 sm:col-span-2">
+            <span class="text-sm font-medium text-brand-ink/80">
+              Mensagem ao finalizar chamado
+            </span>
+            <textarea
+              v-model="settings.whatsapp_finalize_notice"
+              rows="2"
+              maxlength="500"
+              placeholder="_finalizando chamado_"
+              :class="inputClass"
+            />
+            <span class="text-xs text-brand-ink/45">
+              Enviada automaticamente ao cliente quando o atendimento é finalizado (IA ou
+              atendente). Deixe vazio para não enviar aviso.
             </span>
           </label>
         </div>

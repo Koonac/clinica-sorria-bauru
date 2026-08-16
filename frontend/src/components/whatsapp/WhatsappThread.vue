@@ -19,6 +19,9 @@ type SendStatus = 'pending' | 'failed'
 
 type ChatBubble = WhatsappMessage & {
   client_id?: string
+  client_seq?: number
+  /** Momento em que o usuário disparou o envio — estabiliza a ordem na UI */
+  sort_at?: string
   send_status?: SendStatus
 }
 
@@ -118,23 +121,74 @@ async function scrollToBottom() {
 
 function sortMessages(list: ChatBubble[]): ChatBubble[] {
   return [...list].sort((a, b) => {
-    const ta = new Date(a.wa_timestamp || a.created_at || 0).getTime()
-    const tb = new Date(b.wa_timestamp || b.created_at || 0).getTime()
+    const ta = new Date(a.sort_at || a.wa_timestamp || a.created_at || 0).getTime()
+    const tb = new Date(b.sort_at || b.wa_timestamp || b.created_at || 0).getTime()
     if (ta !== tb) return ta - tb
-    return (a.id || 0) - (b.id || 0)
+
+    const sa = a.client_seq
+    const sb = b.client_seq
+    if (sa != null && sb != null && sa !== sb) return sa - sb
+    if (sa != null && sb == null) return -1
+    if (sb != null && sa == null) return 1
+
+    // Evita id negativo (otimista) “ganhar” de id positivo do servidor no mesmo segundo.
+    const ia = a.id != null && a.id > 0 ? a.id : Number.MAX_SAFE_INTEGER
+    const ib = b.id != null && b.id > 0 ? b.id : Number.MAX_SAFE_INTEGER
+    if (ia !== ib) return ia - ib
+
+    return 0
   })
 }
 
 function mergeWithLocals(server: WhatsappMessage[]): ChatBubble[] {
   const locals = messages.value.filter((m) => m.send_status === 'pending' || m.send_status === 'failed')
-  const kept = locals.filter((local) => {
-    const body = (local.body || '').trim()
-    if (!body) return true
-    return !server.some(
-      (s) => isOutbound(s.direction) && (s.body || '').trim() === body,
-    )
+  const used = new Set<string>()
+
+  const enriched: ChatBubble[] = server.map((s) => {
+    if (!isOutbound(s.direction)) return { ...s }
+
+    const body = (s.body || '').trim()
+    const match = locals.find((local) => {
+      if (!local.client_id || used.has(local.client_id)) return false
+      return body !== '' && (local.body || '').trim() === body
+    })
+
+    if (!match?.client_id) return { ...s }
+
+    used.add(match.client_id)
+    return {
+      ...s,
+      client_id: match.client_id,
+      client_seq: match.client_seq,
+      sort_at: match.sort_at,
+    }
   })
-  return sortMessages([...server, ...kept])
+
+  // Já confirmadas nesta sessão (sem send_status) também preservam seq/sort_at.
+  const confirmedLocals = messages.value.filter(
+    (m) => m.client_id && m.client_seq != null && !m.send_status,
+  )
+  for (const local of confirmedLocals) {
+    if (!local.client_id || used.has(local.client_id)) continue
+    const body = (local.body || '').trim()
+    const idx = enriched.findIndex((s) => {
+      if (s.client_seq != null) return false
+      if (!isOutbound(s.direction)) return false
+      if (local.id > 0 && s.id === local.id) return true
+      return body !== '' && (s.body || '').trim() === body
+    })
+    if (idx < 0) continue
+    used.add(local.client_id)
+    enriched[idx] = {
+      ...enriched[idx]!,
+      client_id: local.client_id,
+      client_seq: local.client_seq,
+      sort_at: local.sort_at,
+    }
+  }
+
+  const kept = locals.filter((local) => !local.client_id || !used.has(local.client_id))
+  return sortMessages([...enriched, ...kept])
 }
 
 async function load(silent = false) {
@@ -248,11 +302,14 @@ async function deliverMessage(body: string) {
   if (!props.jid || !body.trim()) return
 
   const outboundBody = formatOutboundBody(body)
-  const clientId = `local-${Date.now()}-${++localSeq}`
+  const clientSeq = ++localSeq
+  const clientId = `local-${Date.now()}-${clientSeq}`
   const now = new Date().toISOString()
   const optimistic: ChatBubble = {
-    id: -localSeq,
+    id: -clientSeq,
     client_id: clientId,
+    client_seq: clientSeq,
+    sort_at: now,
     send_status: 'pending',
     direction: 'outbound',
     body: outboundBody,
@@ -271,12 +328,18 @@ async function deliverMessage(body: string) {
       contact_name: props.contactName || undefined,
     })
     const idx = messages.value.findIndex((m) => m.client_id === clientId)
+    const confirmed: ChatBubble = {
+      ...message,
+      client_id: clientId,
+      client_seq: clientSeq,
+      sort_at: optimistic.sort_at,
+    }
     if (idx >= 0) {
       const next = [...messages.value]
-      next[idx] = message
+      next[idx] = confirmed
       messages.value = next
     } else {
-      messages.value = [...messages.value, message]
+      messages.value = sortMessages([...messages.value, confirmed])
     }
     emit('sent', message)
   } catch (e) {

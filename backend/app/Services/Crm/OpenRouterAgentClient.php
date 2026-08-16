@@ -29,10 +29,10 @@ class OpenRouterAgentClient
         $payload = [
             'model' => $model,
             'messages' => $messages,
-            'tool_choice' => 'auto',
         ];
         if ($tools !== []) {
             $payload['tools'] = $tools;
+            $payload['tool_choice'] = 'auto';
         }
 
         $response = Http::withHeaders([
@@ -95,5 +95,23 @@ class OpenRouterAgentClient
             'tool_calls' => $toolCalls,
             'raw_message' => $message,
         ];
+    }
+
+    /**
+     * Completion simples sem tools (ex.: resumo de atendimento).
+     */
+    public function complete(string $system, string $user, string $model): string
+    {
+        $result = $this->chat([
+            ['role' => 'system', 'content' => $system],
+            ['role' => 'user', 'content' => $user],
+        ], [], $model);
+
+        $content = is_string($result['content'] ?? null) ? trim((string) $result['content']) : '';
+        if ($content === '') {
+            throw new RuntimeException('OpenRouter não retornou conteúdo para o resumo.');
+        }
+
+        return $content;
     }
 }
