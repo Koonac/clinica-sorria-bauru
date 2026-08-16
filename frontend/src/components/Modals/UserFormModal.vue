@@ -26,6 +26,7 @@ const inputClass =
   'w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-base text-brand-ink outline-none transition placeholder:text-brand-ink/35 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25'
 
 const isEdit = computed(() => Boolean(props.user))
+const isDeveloperUser = computed(() => props.user?.role === 'developer')
 
 const clinics = ref<Clinic[]>([])
 
@@ -165,15 +166,17 @@ async function onSubmit() {
         name: string
         username: string
         email: string
-        role: AuthUser['role']
+        role?: AuthUser['role']
         clinic_id: number | null
         password?: string
       } = {
         name: form.name.trim(),
         username: form.username.trim(),
         email: form.email.trim(),
-        role: form.role,
         clinic_id: clinicId,
+      }
+      if (!isDeveloperUser.value) {
+        payload.role = form.role
       }
       if (form.password) payload.password = form.password
       saved = await updateUser(props.user.id, payload)
@@ -183,7 +186,7 @@ async function onSubmit() {
         username: form.username.trim(),
         email: form.email.trim(),
         password: form.password,
-        role: form.role,
+        role: form.role === 'admin' ? 'admin' : 'funcionario',
         clinic_id: clinicId,
       })
     }
@@ -357,7 +360,16 @@ async function onSubmit() {
 
           <label class="flex flex-col gap-1.5">
             <span class="text-sm font-medium text-brand-ink/80">Perfil</span>
+            <input
+              v-if="isDeveloperUser"
+              type="text"
+              name="role"
+              value="Developer"
+              readonly
+              class="w-full cursor-default rounded-xl border border-brand-ink/15 bg-brand-ink/[0.04] px-4 py-3 text-base text-brand-ink outline-none"
+            />
             <Select
+              v-else
               v-model="form.role"
               name="role"
               required

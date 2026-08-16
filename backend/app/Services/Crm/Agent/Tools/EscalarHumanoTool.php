@@ -178,7 +178,7 @@ class EscalarHumanoTool implements AgentTool
         if ($clinicId !== null) {
             $query->where(function ($q) use ($clinicId) {
                 $q->where('clinic_id', $clinicId)
-                    ->orWhere('role', User::ROLE_ADMIN);
+                    ->orWhereIn('role', [User::ROLE_ADMIN, User::ROLE_DEVELOPER]);
             });
         }
 

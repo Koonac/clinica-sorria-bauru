@@ -230,16 +230,63 @@ class AgentsApiTest extends TestCase
         $this->assertGreaterThanOrEqual(10, (int) $aiClosed->duration_seconds);
     }
 
-    public function test_nao_acessa_agent_de_outro_user(): void
+    public function test_admin_lista_e_acessa_agents_da_clinica_mesmo_de_outro_user(): void
     {
+        $clinic = $this->defaultClinic();
         $this->autenticar();
         $outro = User::factory()->create();
+
+        Agent::create([
+            'clinic_id' => $clinic->id,
+            'user_id' => $outro->id,
+            'name' => 'Do Outro',
+            'system_prompt' => 'Prompt compartilhado na clínica',
+        ]);
+
+        $this->getJson('/api/v1/crm/agents')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Do Outro']);
+
+        $agentId = Agent::query()->where('name', 'Do Outro')->value('id');
+
+        $this->getJson("/api/v1/crm/agents/{$agentId}")
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Do Outro');
+    }
+
+    public function test_developer_lista_agents_da_clinica(): void
+    {
+        $clinic = $this->defaultClinic();
+        $owner = User::factory()->admin()->create();
+        Agent::create([
+            'clinic_id' => $clinic->id,
+            'user_id' => $owner->id,
+            'name' => 'Agent Clínica',
+            'system_prompt' => 'x',
+        ]);
+
+        Sanctum::actingAs(User::factory()->developer()->create());
+
+        $this->getJson('/api/v1/crm/agents')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Agent Clínica']);
+    }
+
+    public function test_funcionario_nao_acessa_agent_de_outro_user(): void
+    {
+        $clinic = $this->defaultClinic();
+        Sanctum::actingAs(User::factory()->funcionario()->create([
+            'clinic_id' => $clinic->id,
+        ]));
+        $outro = User::factory()->create();
         $agent = Agent::create([
+            'clinic_id' => $clinic->id,
             'user_id' => $outro->id,
             'name' => 'Alheio',
             'system_prompt' => 'x',
         ]);
 
+        $this->getJson('/api/v1/crm/agents')->assertOk()->assertJsonCount(0, 'data');
         $this->getJson("/api/v1/crm/agents/{$agent->id}")->assertNotFound();
     }
 }

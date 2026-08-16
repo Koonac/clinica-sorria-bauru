@@ -37,7 +37,7 @@ class UpdateUserRequest extends FormRequest
                 Rule::unique('users', 'email')->ignore($user->id),
             ],
             'password' => ['sometimes', 'string', Password::defaults()],
-            'role' => ['sometimes', Rule::in(User::ROLES)],
+            'role' => ['sometimes', Rule::in(User::ASSIGNABLE_ROLES)],
             'clinic_id' => [
                 Rule::requiredIf(fn () => $role === User::ROLE_FUNCIONARIO),
                 'nullable',

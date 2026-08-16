@@ -66,15 +66,20 @@ class AuthApiTest extends TestCase
         ])->assertUnprocessable();
     }
 
-    public function test_seeder_cria_apenas_admin_com_username_fix(): void
+    public function test_seeder_cria_admin_e_developer_com_usernames_fixos(): void
     {
         $this->seed(AdminUserSeeder::class);
 
-        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseCount('users', 2);
         $this->assertDatabaseHas('users', [
             'username' => 'Admin',
             'name' => 'Admin',
             'role' => User::ROLE_ADMIN,
+        ]);
+        $this->assertDatabaseHas('users', [
+            'username' => 'henrique',
+            'name' => 'Henrique',
+            'role' => User::ROLE_DEVELOPER,
         ]);
     }
 
@@ -215,6 +220,27 @@ class AuthApiTest extends TestCase
             'password' => 'SenhaForte123!',
             'role' => User::ROLE_FUNCIONARIO,
         ])->assertForbidden();
+    }
+
+    public function test_developer_acessa_rotas_de_admin(): void
+    {
+        Sanctum::actingAs(User::factory()->developer()->create());
+
+        $this->getJson('/api/v1/users')->assertOk();
+    }
+
+    public function test_nao_permite_atribuir_role_developer_via_api(): void
+    {
+        Sanctum::actingAs(User::factory()->admin()->create());
+
+        $this->postJson('/api/v1/users', [
+            'name' => 'Dev Interno',
+            'username' => 'devinterno',
+            'email' => 'dev@teste.local',
+            'password' => 'SenhaForte123!',
+            'role' => User::ROLE_DEVELOPER,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['role']);
     }
 
     public function test_nao_exclui_ultimo_admin_nem_a_propria_conta(): void

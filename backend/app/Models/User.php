@@ -20,7 +20,16 @@ class User extends Authenticatable
 
     public const ROLE_FUNCIONARIO = 'funcionario';
 
+    public const ROLE_DEVELOPER = 'developer';
+
     public const ROLES = [
+        self::ROLE_ADMIN,
+        self::ROLE_FUNCIONARIO,
+        self::ROLE_DEVELOPER,
+    ];
+
+    /** Papéis que podem ser atribuídos via API de criação/edição de usuários. */
+    public const ASSIGNABLE_ROLES = [
         self::ROLE_ADMIN,
         self::ROLE_FUNCIONARIO,
     ];
@@ -69,12 +78,17 @@ class User extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return $this->role === self::ROLE_ADMIN;
+        return in_array($this->role, [self::ROLE_ADMIN, self::ROLE_DEVELOPER], true);
     }
 
     public function isFuncionario(): bool
     {
         return $this->role === self::ROLE_FUNCIONARIO;
+    }
+
+    public function isDeveloper(): bool
+    {
+        return $this->role === self::ROLE_DEVELOPER;
     }
 
     public function hasRole(string $role): bool

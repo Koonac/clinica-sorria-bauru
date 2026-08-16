@@ -65,25 +65,51 @@ withDefaults(
     </div>
 
     <!-- Dashboard -->
-    <div v-else-if="variant === 'dashboard'" class="flex flex-col gap-5">
-      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <div
-          v-for="i in 6"
-          :key="i"
-          class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-4"
-        >
-          <Skeleton class="h-2.5 w-20 rounded-md" />
-          <Skeleton class="mt-3 h-7 w-24 rounded-md" />
+    <div v-else-if="variant === 'dashboard'" class="flex flex-col gap-8">
+      <div class="space-y-4">
+        <div>
+          <Skeleton class="h-4 w-44 rounded-md" />
+          <Skeleton class="mt-2 h-3 w-64 rounded-md" />
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div
+            v-for="i in 4"
+            :key="`att-${i}`"
+            class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-4"
+          >
+            <Skeleton class="h-2.5 w-28 rounded-md" />
+            <Skeleton class="mt-3 h-7 w-16 rounded-md" />
+          </div>
+        </div>
+        <div class="rounded-2xl border border-brand-ink/10 bg-white p-4">
+          <Skeleton class="h-3 w-48 rounded-md" />
+          <Skeleton class="mt-3 h-3 w-full rounded-full" />
         </div>
       </div>
-      <div class="grid gap-4 lg:grid-cols-2">
-        <div class="rounded-2xl border border-brand-ink/10 bg-white p-4">
-          <Skeleton class="h-4 w-40 rounded-md" />
-          <Skeleton class="mt-4 h-56 w-full rounded-xl" />
+      <div class="space-y-4">
+        <div>
+          <Skeleton class="h-4 w-16 rounded-md" />
+          <Skeleton class="mt-2 h-3 w-52 rounded-md" />
         </div>
-        <div class="rounded-2xl border border-brand-ink/10 bg-white p-4">
-          <Skeleton class="h-4 w-44 rounded-md" />
-          <Skeleton class="mt-4 h-56 w-full rounded-xl" />
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div
+            v-for="i in 8"
+            :key="`crm-${i}`"
+            class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-4"
+          >
+            <Skeleton class="h-2.5 w-20 rounded-md" />
+            <Skeleton class="mt-3 h-7 w-24 rounded-md" />
+          </div>
+        </div>
+        <div class="grid gap-4 lg:grid-cols-2">
+          <div class="rounded-2xl border border-brand-ink/10 bg-white p-4">
+            <Skeleton class="h-4 w-40 rounded-md" />
+            <Skeleton class="mt-4 h-56 w-full rounded-xl" />
+          </div>
+          <div class="rounded-2xl border border-brand-ink/10 bg-white p-4">
+            <Skeleton class="h-4 w-44 rounded-md" />
+            <Skeleton class="mt-4 h-56 w-full rounded-xl" />
+          </div>
         </div>
       </div>
     </div>

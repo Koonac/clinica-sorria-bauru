@@ -25,6 +25,7 @@ use App\Services\Crm\WhatsappApiClient;
 use App\Services\Crm\WhatsappChatHistory;
 use App\Services\Crm\WhatsappConversationKey;
 use App\Services\Crm\WhatsappLeadResolver;
+use App\Services\Crm\WhatsappMediaStore;
 use App\Support\ClinicContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -46,6 +47,7 @@ class WhatsappController extends Controller
         private EnsureWhatsappAvatar $ensureAvatar,
         private EnsureContactForLead $ensureContact,
         private ScheduleWhatsappAttendanceAutoClose $autoClose,
+        private WhatsappMediaStore $mediaStore,
     ) {}
 
     public function send(SendWhatsappMessageRequest $request): JsonResponse
@@ -85,7 +87,6 @@ class WhatsappController extends Controller
             $mediaStored = [
                 'mimetype' => $mimetype,
                 'filename' => $filename,
-                'omitted' => true,
             ];
         }
 
@@ -140,6 +141,12 @@ class WhatsappController extends Controller
             'wa_timestamp' => now(),
         ]);
 
+        if ($hasMedia && is_array($mediaPayload)) {
+            $record->forceFill([
+                'media' => $this->mediaStore->store($record, (string) $mediaPayload['data'], $mediaStored),
+            ])->save();
+        }
+
         if ($resolved['lead']) {
             $this->pauseAgent->handle(
                 $resolved['lead'],
@@ -193,12 +200,12 @@ class WhatsappController extends Controller
             "SELECT * FROM (
                 SELECT DISTINCT ON (conversation_key)
                     id, whatsapp_jid, whatsapp_lid, phone_number, contact_name,
-                    direction, body, has_media, lead_id, deal_id, contact_id,
+                    direction, body, has_media, type, lead_id, deal_id, contact_id,
                     wa_timestamp, created_at, conversation_key
                 FROM (
                     SELECT
                         id, whatsapp_jid, whatsapp_lid, phone_number, contact_name,
-                        direction, body, has_media, lead_id, deal_id, contact_id,
+                        direction, body, has_media, type, lead_id, deal_id, contact_id,
                         wa_timestamp, created_at,
                         {$keyExpr} AS conversation_key
                     FROM whatsapp_messages
@@ -401,6 +408,7 @@ class WhatsappController extends Controller
                     'body' => $row->body,
                     'direction' => $row->direction,
                     'has_media' => $hasMedia,
+                    'type' => $row->type,
                     'wa_timestamp' => $row->wa_timestamp,
                     'created_at' => $row->created_at,
                 ],
@@ -482,6 +490,25 @@ class WhatsappController extends Controller
 
         return response()->file($absolute, [
             'Content-Type' => $mime,
+            'Cache-Control' => 'private, max-age=86400',
+        ]);
+    }
+
+    public function messageMedia(Request $request, WhatsappMessage $message): BinaryFileResponse|JsonResponse
+    {
+        $connection = $this->upsertConnection->handle([], $request->user()?->id);
+
+        if ((int) $message->connection_id !== (int) $connection->id) {
+            return response()->json(['message' => 'Mídia indisponível.'], 404);
+        }
+
+        $absolute = $this->mediaStore->absolutePath($message);
+        if ($absolute === null) {
+            return response()->json(['message' => 'Mídia indisponível.'], 404);
+        }
+
+        return response()->file($absolute, [
+            'Content-Type' => $message->mediaMimetype() ?: 'application/octet-stream',
             'Cache-Control' => 'private, max-age=86400',
         ]);
     }

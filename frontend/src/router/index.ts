@@ -13,7 +13,8 @@ declare module 'vue-router' {
   }
 }
 
-const bothRoles: AppRole[] = ['admin', 'funcionario']
+const bothRoles: AppRole[] = ['admin', 'funcionario', 'developer']
+const elevatedRoles: AppRole[] = ['admin', 'developer']
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -33,7 +34,7 @@ const router = createRouter({
           path: '',
           name: 'home',
           component: () => import('@/views/HomeView.vue'),
-          meta: { requiresAuth: true, roles: ['admin'], title: 'Dashboard', icon: 'lucide:layout-dashboard' },
+          meta: { requiresAuth: true, roles: elevatedRoles, title: 'Dashboard', icon: 'lucide:layout-dashboard' },
         },
         {
           path: 'crm',
@@ -85,7 +86,7 @@ const router = createRouter({
           component: () => import('@/views/ServicesView.vue'),
           meta: {
             requiresAuth: true,
-            roles: ['admin'],
+            roles: elevatedRoles,
             title: 'Serviços',
             icon: 'lucide:stethoscope',
           },
@@ -96,7 +97,7 @@ const router = createRouter({
           component: () => import('@/views/AgentsView.vue'),
           meta: {
             requiresAuth: true,
-            roles: ['admin'],
+            roles: elevatedRoles,
             title: 'Agents',
             icon: 'lucide:bot',
           },
@@ -107,7 +108,7 @@ const router = createRouter({
           component: () => import('@/views/AgentFormView.vue'),
           meta: {
             requiresAuth: true,
-            roles: ['admin'],
+            roles: elevatedRoles,
             title: 'Novo agent',
             icon: 'lucide:bot',
           },
@@ -118,7 +119,7 @@ const router = createRouter({
           component: () => import('@/views/AgentFormView.vue'),
           meta: {
             requiresAuth: true,
-            roles: ['admin'],
+            roles: elevatedRoles,
             title: 'Editar agent',
             icon: 'lucide:bot',
           },
@@ -129,9 +130,20 @@ const router = createRouter({
           component: () => import('@/views/UsersView.vue'),
           meta: {
             requiresAuth: true,
-            roles: ['admin'],
+            roles: elevatedRoles,
             title: 'Usuários',
             icon: 'lucide:users',
+          },
+        },
+        {
+          path: 'dev',
+          name: 'dev',
+          component: () => import('@/views/DevView.vue'),
+          meta: {
+            requiresAuth: true,
+            roles: ['developer'],
+            title: 'Dev',
+            icon: 'lucide:terminal',
           },
         },
         {
@@ -152,7 +164,7 @@ function routeRoles(to: { matched: { meta: { roles?: AppRole[] } }[] }): AppRole
 }
 
 function defaultAuthenticatedRoute(role: AppRole | undefined): string {
-  return role === 'admin' ? 'home' : 'crm'
+  return role === 'admin' || role === 'developer' ? 'home' : 'crm'
 }
 
 router.beforeEach((to) => {

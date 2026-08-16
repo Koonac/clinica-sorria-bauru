@@ -161,11 +161,24 @@ export type LeadsPorDiaPoint = {
   total: number
 }
 
+export type WhatsappMessageMedia = {
+  mimetype?: string | null
+  filename?: string | null
+  filesize?: number | null
+  omitted?: boolean
+  transcript?: string | null
+  description?: string | null
+  enriched_at?: string | null
+}
+
 export type WhatsappMessage = {
   id: number
   direction: 'in' | 'out' | 'inbound' | 'outbound' | string
   body?: string | null
+  type?: string | null
   has_media?: boolean
+  media?: WhatsappMessageMedia | null
+  media_url?: string | null
   whatsapp_jid: string
   contact_name?: string | null
   wa_timestamp?: string | null
@@ -199,6 +212,7 @@ export type WhatsappChat = {
     body?: string | null
     direction: string
     has_media: boolean
+    type?: string | null
     wa_timestamp?: string | null
     created_at?: string | null
   }

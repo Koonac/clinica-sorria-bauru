@@ -66,8 +66,20 @@ function chipClass(id: WhatsappChatFilter): string {
 }
 
 function preview(chat: WhatsappChat): string {
-  if (chat.last_message.has_media && !chat.last_message.body) return '[mídia]'
-  return chat.last_message.body?.trim() || '—'
+  const body = chat.last_message.body?.trim()
+  if (body) return body
+  if (!chat.last_message.has_media) return '—'
+
+  switch (chat.last_message.type) {
+    case 'image':
+    case 'sticker':
+      return '[imagem]'
+    case 'audio':
+    case 'ptt':
+      return '[áudio]'
+    default:
+      return '[mídia]'
+  }
 }
 
 function title(chat: WhatsappChat): string {

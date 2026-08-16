@@ -15,7 +15,7 @@ php artisan test
 ```
 
 - Postgres: `docker compose up -d postgres` na **raiz do monorepo** (ou local na 5432).
-- Seed imprime usuário Admin + senha + token Sanctum `interface` **uma vez** — copiar para `BACKEND_API_TOKEN` em `vekta-ai/interface/.env`.
+- Seed imprime usuário Admin + senha + token Sanctum `interface` **uma vez** — e também o usuário Developer (mesma role elevada, criação só via seed) — copiar token para `BACKEND_API_TOKEN` em `vekta-ai/interface/.env`.
 - Docs interativas: `GET /docs` (Swagger em `swagger.json`).
 
 ## Visão geral
@@ -114,7 +114,8 @@ backend/
 
 - Prefixo: **`/api/v1`** (`auth`, `users`, `crm`, `finance`).
 - Auth: Sanctum Bearer (`Authorization: Bearer {token}`). Login: `POST /api/v1/auth/login`.
-- Admin de usuários: middleware `role:admin` em `/api/v1/users`.
+- Admin de usuários: middleware `role:admin,developer` em `/api/v1/users`.
+- Roles: `admin` | `funcionario` | `developer`. `developer` tem o mesmo acesso de `admin`, mas **não** é atribuível via API (`User::ASSIGNABLE_ROLES`) — só criação interna (tinker/factory).
 - Webhooks WhatsApp **públicos** (sem Sanctum):  
   `POST /api/v1/crm/whatsapp/webhooks/{notifications,messages}` — auth por `?token=` = `connections.webhook_token`.
 - Contexto multi-clínica: header `X-Clinic-Id` (middleware `clinic`) nas rotas CRM/finance autenticadas. Funcionário usa `users.clinic_id`; admin pode trocar.
@@ -156,7 +157,7 @@ Fluxo WhatsApp → AI (não quebrar):
 | App / DB | `APP_KEY`, `APP_URL`, `DB_*` |
 | Queue | `QUEUE_CONNECTION=database` |
 | WhatsApp | `WHATSAPP_API_URL` |
-| LLM | `OPENROUTER_API_KEY`, `OPENROUTER_AGENT_MODEL` |
+| LLM | `OPENROUTER_API_KEY`, `OPENROUTER_AGENT_MODEL`, `OPENROUTER_TRANSCRIPTION_MODEL`, `OPENROUTER_TRANSCRIPTION_LANGUAGE`, `OPENROUTER_VISION_MODEL` |
 | Calendar | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALENDAR_*` |
 
 Detalhes em `.env.example`. Nunca commitar `.env`.

@@ -49,7 +49,11 @@ class UserController extends Controller
     {
         $data = $request->validated();
 
-        if (isset($data['role']) && $data['role'] !== User::ROLE_ADMIN && $user->isAdmin()) {
+        if (
+            isset($data['role'])
+            && $data['role'] !== User::ROLE_ADMIN
+            && $user->role === User::ROLE_ADMIN
+        ) {
             if ($this->ehUltimoAdmin($user)) {
                 return response()->json([
                     'message' => 'Não é possível remover o papel de admin do último administrador.',
@@ -70,7 +74,7 @@ class UserController extends Controller
             ], 422);
         }
 
-        if ($user->isAdmin() && $this->ehUltimoAdmin($user)) {
+        if ($user->role === User::ROLE_ADMIN && $this->ehUltimoAdmin($user)) {
             return response()->json([
                 'message' => 'Não é possível excluir o último administrador.',
             ], 422);

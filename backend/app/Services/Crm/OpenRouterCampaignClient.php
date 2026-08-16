@@ -2,6 +2,8 @@
 
 namespace App\Services\Crm;
 
+use App\Models\LlmTokenUsage;
+use App\Services\RecordLlmTokenUsage;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -9,7 +11,10 @@ class OpenRouterCampaignClient
 {
     private const CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-    private const MODELS_URL = 'https://openrouter.ai/api/v1/models';
+    public function __construct(
+        private RecordLlmTokenUsage $recordUsage,
+        private OpenRouterModelCatalog $catalog,
+    ) {}
 
     public function apiKey(): string
     {
@@ -27,68 +32,20 @@ class OpenRouterCampaignClient
      */
     public function listModels(bool $requireTools = false): array
     {
-        $headers = ['Content-Type' => 'application/json'];
-        $key = trim((string) config('services.openrouter.key', ''));
-        if ($key !== '') {
-            $headers['Authorization'] = 'Bearer '.$key;
-        }
-
-        $query = [];
-        if ($requireTools) {
-            $query['supported_parameters'] = 'tools';
-        }
-
-        $response = Http::withHeaders($headers)
-            ->timeout(30)
-            ->get(self::MODELS_URL, $query);
-
-        if ($response->failed()) {
-            $detail = $response->json('error.message')
-                ?? $response->json('message')
-                ?? $response->body();
-            throw new RuntimeException(
-                'OpenRouter retornou erro ao listar modelos ('.$response->status().'): '.mb_substr((string) $detail, 0, 300),
-            );
-        }
-
-        $rawModels = $response->json('data');
-        if (! is_array($rawModels)) {
-            $rawModels = $response->json();
-        }
-        if (! is_array($rawModels)) {
-            throw new RuntimeException('OpenRouter não retornou a lista de modelos.');
-        }
-
-        $models = [];
-        foreach ($rawModels as $item) {
-            if (! is_array($item)) {
-                continue;
-            }
-            $modelId = trim((string) ($item['id'] ?? ''));
-            if ($modelId === '' || ! $this->modelSupportsTextOutput($item)) {
-                continue;
-            }
-            if ($requireTools && ! $this->modelSupportsTools($item)) {
-                continue;
-            }
-            $name = trim((string) ($item['name'] ?? $modelId));
-            $models[] = [
-                'id' => $modelId,
-                'name' => $name,
-                'label' => "{$name} ({$modelId})",
-                'value' => $modelId,
-                'context_length' => $item['context_length'] ?? null,
-                'pricing' => is_array($item['pricing'] ?? null) ? $item['pricing'] : [],
-            ];
-        }
-
-        usort($models, fn (array $a, array $b): int => strcasecmp($a['name'], $b['name']));
-
-        return $models;
+        return $this->catalog->handle(
+            $requireTools
+                ? OpenRouterModelCatalog::CAPABILITY_TOOLS
+                : OpenRouterModelCatalog::CAPABILITY_TEXT,
+        );
     }
 
-    public function generate(string $systemPrompt, ?string $fullName, ?string $notes, string $model): string
-    {
+    public function generate(
+        string $systemPrompt,
+        ?string $fullName,
+        ?string $notes,
+        string $model,
+        ?int $clinicId = null,
+    ): string {
         $apiKey = $this->apiKey();
         $payload = [
             'model' => $model,
@@ -115,6 +72,14 @@ class OpenRouterCampaignClient
             );
         }
 
+        $usage = $response->json('usage');
+        $this->recordUsage->handle(
+            is_array($usage) ? $usage : null,
+            LlmTokenUsage::PURPOSE_CAMPAIGN,
+            $model,
+            $clinicId,
+        );
+
         $choices = $response->json('choices');
         if (! is_array($choices) || $choices === []) {
             throw new RuntimeException('OpenRouter não retornou conteúdo.');
@@ -140,45 +105,5 @@ class OpenRouterCampaignClient
         }
 
         return $text;
-    }
-
-    /**
-     * @param  array<string, mixed>  $model
-     */
-    private function modelSupportsTools(array $model): bool
-    {
-        $params = $model['supported_parameters'] ?? null;
-        if (! is_array($params)) {
-            return false;
-        }
-
-        foreach ($params as $param) {
-            if (is_string($param) && strtolower($param) === 'tools') {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param  array<string, mixed>  $model
-     */
-    private function modelSupportsTextOutput(array $model): bool
-    {
-        $architecture = $model['architecture'] ?? [];
-        if (! is_array($architecture)) {
-            return true;
-        }
-        $outputs = $architecture['output_modalities'] ?? [];
-        if (is_array($outputs) && $outputs !== []) {
-            return in_array('text', $outputs, true);
-        }
-        $modality = (string) ($architecture['modality'] ?? '');
-        if (str_contains($modality, '->')) {
-            return str_contains(explode('->', $modality, 2)[1], 'text');
-        }
-
-        return true;
     }
 }

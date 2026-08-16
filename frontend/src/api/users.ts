@@ -6,7 +6,7 @@ export type CreateUserPayload = {
   username: string
   email: string
   password: string
-  role: AuthUser['role']
+  role: 'admin' | 'funcionario'
   clinic_id?: number | null
 }
 

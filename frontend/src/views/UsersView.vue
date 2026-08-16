@@ -38,7 +38,9 @@ const totalLabel = computed(() => {
 })
 
 function roleLabel(role: AuthUser['role']) {
-  return role === 'admin' ? 'Administrador' : 'Funcionário'
+  if (role === 'admin') return 'Administrador'
+  if (role === 'developer') return 'Developer'
+  return 'Funcionário'
 }
 
 function clinicLabel(clinicId: number | null) {
@@ -227,7 +229,7 @@ onUnmounted(() => {
               <span
                 class="inline-flex rounded-lg px-2 py-1 text-xs font-medium"
                 :class="
-                  user.role === 'admin'
+                  user.role === 'admin' || user.role === 'developer'
                     ? 'bg-brand-blue/10 text-brand-blue'
                     : 'bg-brand-ink/5 text-brand-ink/70'
                 "

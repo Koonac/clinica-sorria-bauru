@@ -19,6 +19,9 @@ use App\Http\Controllers\Api\Crm\StatsController;
 use App\Http\Controllers\Api\Crm\TaskController;
 use App\Http\Controllers\Api\Crm\WhatsappCampaignController;
 use App\Http\Controllers\Api\Crm\WhatsappController;
+use App\Http\Controllers\Api\Dev\DevLogController;
+use App\Http\Controllers\Api\Dev\DevSettingsController;
+use App\Http\Controllers\Api\Dev\DevTokenController;
 use App\Http\Controllers\Api\Finance\FinanceStatsController;
 use App\Http\Controllers\Api\Finance\FinancialAccountController;
 use App\Http\Controllers\Api\Finance\FinancialEntryController;
@@ -36,7 +39,7 @@ Route::prefix('v1/auth')->group(function () {
     });
 });
 
-Route::prefix('v1/users')->middleware(['auth:sanctum', 'role:admin'])->group(function () {
+Route::prefix('v1/users')->middleware(['auth:sanctum', 'role:admin,developer'])->group(function () {
     Route::get('/', [UserController::class, 'index']);
     Route::post('/', [UserController::class, 'store']);
     Route::get('{user}', [UserController::class, 'show']);
@@ -46,9 +49,9 @@ Route::prefix('v1/users')->middleware(['auth:sanctum', 'role:admin'])->group(fun
 
 Route::prefix('v1/clinics')->middleware(['auth:sanctum'])->group(function () {
     Route::get('/', [ClinicController::class, 'index']);
-    Route::post('/', [ClinicController::class, 'store'])->middleware('role:admin');
+    Route::post('/', [ClinicController::class, 'store'])->middleware('role:admin,developer');
     Route::get('{clinic}', [ClinicController::class, 'show']);
-    Route::patch('{clinic}', [ClinicController::class, 'update'])->middleware('role:admin');
+    Route::patch('{clinic}', [ClinicController::class, 'update'])->middleware('role:admin,developer');
 });
 
 Route::prefix('v1/crm')->group(function () {
@@ -96,8 +99,8 @@ Route::prefix('v1/crm')->middleware(['auth:sanctum', 'clinic'])->group(function 
     Route::patch('services/{service}', [ClinicServiceController::class, 'update']);
     Route::delete('services/{service}', [ClinicServiceController::class, 'destroy']);
 
-    Route::get('stats/leads-por-dia', [StatsController::class, 'leadsPorDia'])->middleware('role:admin');
-    Route::get('stats/attendance', [StatsController::class, 'attendance'])->middleware('role:admin');
+    Route::get('stats/leads-por-dia', [StatsController::class, 'leadsPorDia'])->middleware('role:admin,developer');
+    Route::get('stats/attendance', [StatsController::class, 'attendance'])->middleware('role:admin,developer');
 
     Route::get('activities', [ActivityController::class, 'index']);
     Route::post('activities', [ActivityController::class, 'store']);
@@ -113,11 +116,11 @@ Route::prefix('v1/crm')->middleware(['auth:sanctum', 'clinic'])->group(function 
 
     Route::get('connection', [ConnectionController::class, 'show']);
     Route::get('connection/status', [ConnectionController::class, 'status']);
-    Route::put('connection/credentials', [ConnectionController::class, 'updateCredentials'])->middleware('role:admin');
-    Route::put('connection/settings', [ConnectionController::class, 'updateSettings'])->middleware('role:admin');
-    Route::post('connection/connect', [ConnectionController::class, 'connect'])->middleware('role:admin');
-    Route::get('connection/qrcode', [ConnectionController::class, 'qrcode'])->middleware('role:admin');
-    Route::delete('connection/disconnect', [ConnectionController::class, 'disconnect'])->middleware('role:admin');
+    Route::put('connection/credentials', [ConnectionController::class, 'updateCredentials'])->middleware('role:admin,developer');
+    Route::put('connection/settings', [ConnectionController::class, 'updateSettings'])->middleware('role:admin,developer');
+    Route::post('connection/connect', [ConnectionController::class, 'connect'])->middleware('role:admin,developer');
+    Route::get('connection/qrcode', [ConnectionController::class, 'qrcode'])->middleware('role:admin,developer');
+    Route::delete('connection/disconnect', [ConnectionController::class, 'disconnect'])->middleware('role:admin,developer');
 
     Route::get('attendants', [AttendantController::class, 'index']);
 
@@ -125,6 +128,7 @@ Route::prefix('v1/crm')->middleware(['auth:sanctum', 'clinic'])->group(function 
     Route::post('whatsapp/chats/read', [WhatsappController::class, 'markChatRead']);
     Route::get('whatsapp/avatars/{contact}', [WhatsappController::class, 'avatar']);
     Route::get('whatsapp/messages', [WhatsappController::class, 'messages']);
+    Route::get('whatsapp/messages/{message}/media', [WhatsappController::class, 'messageMedia']);
     Route::post('whatsapp/send', [WhatsappController::class, 'send']);
 
     Route::get('campaigns/openrouter-models', [WhatsappCampaignController::class, 'openrouterModels']);
@@ -157,4 +161,13 @@ Route::prefix('v1/finance')->middleware(['auth:sanctum', 'clinic'])->group(funct
     Route::delete('entries/{entry}/settle', [FinancialEntryController::class, 'unsettle']);
 
     Route::get('stats/overview', [FinanceStatsController::class, 'overview']);
+});
+
+Route::prefix('v1/dev')->middleware(['auth:sanctum', 'role:developer'])->group(function () {
+    Route::get('tokens/stats', [DevTokenController::class, 'stats']);
+    Route::get('logs', [DevLogController::class, 'index']);
+    Route::get('logs/{log}', [DevLogController::class, 'show']);
+    Route::get('settings', [DevSettingsController::class, 'show']);
+    Route::put('settings', [DevSettingsController::class, 'update']);
+    Route::get('openrouter-models', [DevSettingsController::class, 'openrouterModels']);
 });

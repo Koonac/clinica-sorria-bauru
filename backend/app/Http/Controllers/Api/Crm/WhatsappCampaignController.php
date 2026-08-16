@@ -316,6 +316,7 @@ class WhatsappCampaignController extends Controller
                     $recipient->full_name,
                     $recipient->notes,
                     $data['model'],
+                    $campaign->clinic_id,
                 );
                 $sequence = $this->renderer->splitAiMessages($aiText);
                 if ($sequence === []) {

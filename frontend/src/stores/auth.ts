@@ -7,7 +7,7 @@ export type AuthUser = {
   name: string
   username: string
   email: string
-  role: 'admin' | 'funcionario'
+  role: 'admin' | 'funcionario' | 'developer'
   clinic_id: number | null
 }
 
@@ -39,7 +39,10 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(loadStoredUser())
 
   const isAuthenticated = computed(() => Boolean(token.value))
-  const isAdmin = computed(() => user.value?.role === 'admin')
+  const isAdmin = computed(
+    () => user.value?.role === 'admin' || user.value?.role === 'developer',
+  )
+  const isDeveloper = computed(() => user.value?.role === 'developer')
 
   function persist(nextToken: string, nextUser: AuthUser) {
     token.value = nextToken
@@ -104,6 +107,7 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     isAuthenticated,
     isAdmin,
+    isDeveloper,
     login,
     logout,
     changePassword,

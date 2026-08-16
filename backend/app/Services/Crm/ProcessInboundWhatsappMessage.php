@@ -16,6 +16,7 @@ class ProcessInboundWhatsappMessage
         private ClinicContext $clinicContext,
         private ReopenWhatsappConversationForLead $reopener,
         private ScheduleWhatsappAttendanceAutoClose $autoClose,
+        private WhatsappMediaStore $mediaStore,
     ) {}
 
     /**
@@ -89,21 +90,18 @@ class ProcessInboundWhatsappMessage
             $resolved['lead'] = $lead;
         }
 
-        $media = $payload['media'] ?? null;
-        if (is_array($media) && isset($media['data']) && is_string($media['data']) && strlen($media['data']) > 200_000) {
-            $media = [
-                'mimetype' => $media['mimetype'] ?? null,
-                'filename' => $media['filename'] ?? null,
-                'filesize' => $media['filesize'] ?? null,
-                'omitted' => true,
-            ];
+        $mediaPayload = $payload['media'] ?? null;
+        $mediaMeta = $this->mediaStore->metadata($mediaPayload);
+        $mediaBase64 = $this->mediaStore->rawBase64($mediaPayload);
+        if ($mediaBase64 !== null && $mediaMeta === null) {
+            $mediaMeta = [];
         }
 
         $raw = $payload;
         unset($raw['message'], $raw['media']);
 
         try {
-            return WhatsappMessage::create([
+            $message = WhatsappMessage::create([
                 'clinic_id' => $connection->clinic_id,
                 'connection_id' => $connection->id,
                 'user_id' => $connection->created_by,
@@ -117,7 +115,7 @@ class ProcessInboundWhatsappMessage
                 'message_id' => $messageId,
                 'type' => filled($payload['type'] ?? null) ? (string) $payload['type'] : null,
                 'has_media' => (bool) ($payload['has_media'] ?? false),
-                'media' => is_array($media) ? $media : null,
+                'media' => $mediaMeta,
                 'lead_id' => $resolved['lead']?->id,
                 'deal_id' => $resolved['deal']?->id,
                 'contact_id' => $resolved['contact']?->id,
@@ -127,6 +125,14 @@ class ProcessInboundWhatsappMessage
         } catch (UniqueConstraintViolationException) {
             return null;
         }
+
+        if ($mediaBase64 !== null) {
+            $message->forceFill([
+                'media' => $this->mediaStore->store($message, $mediaBase64, $mediaMeta),
+            ])->save();
+        }
+
+        return $message;
     }
 
     /**

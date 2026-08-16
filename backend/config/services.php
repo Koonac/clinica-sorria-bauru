@@ -42,6 +42,10 @@ return [
     'openrouter' => [
         'key' => env('OPENROUTER_API_KEY'),
         'agent_model' => env('OPENROUTER_AGENT_MODEL', 'deepseek/deepseek-v4-pro'),
+        // Pré-processamento de mídia do WhatsApp (o modelo do agent não é multimodal)
+        'transcription_model' => env('OPENROUTER_TRANSCRIPTION_MODEL', 'openai/whisper-1'),
+        'transcription_language' => env('OPENROUTER_TRANSCRIPTION_LANGUAGE', 'pt'),
+        'vision_model' => env('OPENROUTER_VISION_MODEL', 'openai/gpt-4o-mini'),
     ],
 
     'google_calendar' => [

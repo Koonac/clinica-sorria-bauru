@@ -20,9 +20,11 @@ const auth = useAuthStore()
 const clinics = useClinicsStore()
 
 const greetingName = computed(() => auth.user?.name || auth.user?.username || 'usuário')
-const roleLabel = computed(() =>
-  auth.user?.role === 'admin' ? 'Administrador' : 'Funcionário',
-)
+const roleLabel = computed(() => {
+  if (auth.user?.role === 'admin') return 'Administrador'
+  if (auth.user?.role === 'developer') return 'Developer'
+  return 'Funcionário'
+})
 
 const loading = ref(true)
 const error = ref('')

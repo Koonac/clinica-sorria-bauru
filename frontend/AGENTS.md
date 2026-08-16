@@ -125,17 +125,20 @@ import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
 
 Páginas estáticas sem fetch (ex.: Início sem API) não precisam de skeleton.
 
-## Rotas e roles (`admin` | `funcionario`)
+## Rotas e roles (`admin` | `funcionario` | `developer`)
 
-Roles da API: `'admin' | 'funcionario'` (`stores/auth.ts`).
+Roles da API: `'admin' | 'funcionario' | 'developer'` (`stores/auth.ts`).
+
+- `developer` equivale a `admin` no frontend (`auth.isAdmin`) e nas rotas elevadas.
+- `developer` **não** aparece no formulário de criar usuário (criação só interna no backend).
 
 **Sempre validar** se uma rota é de:
 
 | Escopo | Quem acessa |
 |--------|-------------|
-| `admin` | só admin |
+| `admin` / elevado | admin **e** developer |
 | `funcionario` | só funcionario |
-| `ambos` | admin **e** funcionario (autenticados) |
+| `ambos` | admin, developer e funcionario (autenticados) |
 
 ### Ao criar ou alterar rota
 
@@ -145,9 +148,9 @@ Roles da API: `'admin' | 'funcionario'` (`stores/auth.ts`).
 ```ts
 meta: {
   requiresAuth: true,
-  roles: ['admin'],                    // só admin
-  // roles: ['funcionario'],           // só funcionario
-  // roles: ['admin', 'funcionario'],  // ambos
+  roles: ['admin', 'developer'],         // elevado
+  // roles: ['funcionario'],             // só funcionario
+  // roles: ['admin', 'funcionario', 'developer'],  // ambos
 }
 ```
 
@@ -159,7 +162,7 @@ meta: {
 
 4. Rotas `guest` (ex.: login): só visitantes; autenticado redireciona para a home.
 
-5. UI sensível a role: usar `auth.isAdmin` / `user.role` para **esconder** ações — a **fonte de verdade** continua sendo o backend (`role:admin`, Sanctum). Frontend sem check de role ≠ segurança.
+5. UI sensível a role: usar `auth.isAdmin` / `user.role` para **esconder** ações — a **fonte de verdade** continua sendo o backend (`role:admin,developer`, Sanctum). Frontend sem check de role ≠ segurança.
 
 Hoje o guard cobre auth/guest; **roles em `meta` + enforcement no guard são obrigatórios** em toda rota nova ou existente ao evoluir o app.
 
@@ -191,7 +194,7 @@ Hoje o guard cobre auth/guest; **roles em `meta` + enforcement no guard são obr
 - Estilizar com **Tailwind**; CSS custom só se Tailwind não resolver ou animação complexa exigir.
 - Ícones com **Iconify** (`@iconify/vue`).
 - Conteúdo assíncrono com **skeleton** (`ContentSkeleton` / `Skeleton`) — não texto “Carregando…” no lugar do layout.
-- Declarar e validar **role** de cada rota (`admin`, `funcionario` ou ambos).
+- Declarar e validar **role** de cada rota (`admin`/`developer`, `funcionario` ou ambos).
 - Tipar props/estado relevante; rodar `npm run type-check` em mudanças estruturais.
 - Tratar erros de API via `toApiError`.
 

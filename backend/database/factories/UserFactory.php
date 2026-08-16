@@ -44,6 +44,14 @@ class UserFactory extends Factory
         ]);
     }
 
+    public function developer(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => User::ROLE_DEVELOPER,
+            'clinic_id' => null,
+        ]);
+    }
+
     public function funcionario(): static
     {
         return $this->state(fn (array $attributes) => [

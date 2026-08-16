@@ -4,11 +4,16 @@ import type { LeadsPorDiaPoint } from '@/api/crm/types'
 export type AttendanceStatsByUser = {
   user_id: number | null
   name: string
+  mode: 'ai' | 'human'
+  clients: number
   total_seconds: number
 }
 
 export type AttendanceStats = {
   dias: number
+  clients_ai: number
+  clients_human: number
+  clients_total: number
   total_ai_seconds: number
   total_human_seconds: number
   avg_human_seconds: number | null

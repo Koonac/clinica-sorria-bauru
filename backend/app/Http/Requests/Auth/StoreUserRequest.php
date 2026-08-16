@@ -27,7 +27,7 @@ class StoreUserRequest extends FormRequest
             ],
             'email' => ['required', 'email', 'max:190', 'unique:users,email'],
             'password' => ['required', 'string', Password::defaults()],
-            'role' => ['required', Rule::in(User::ROLES)],
+            'role' => ['required', Rule::in(User::ASSIGNABLE_ROLES)],
             'clinic_id' => [
                 Rule::requiredIf(fn () => $this->input('role') === User::ROLE_FUNCIONARIO),
                 'nullable',

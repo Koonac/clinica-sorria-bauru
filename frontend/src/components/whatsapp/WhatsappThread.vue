@@ -11,6 +11,7 @@ import type { WhatsappMessage } from '@/api/crm/types'
 import Button from '@/components/Buttons/Button.vue'
 import Skeleton from '@/components/Feedback/Skeleton.vue'
 import ConfirmModal from '@/components/Modals/ConfirmModal.vue'
+import WhatsappMediaAttachment from '@/components/whatsapp/WhatsappMediaAttachment.vue'
 import { useAuthStore } from '@/stores/auth'
 import { formatDateTime, inputClass } from '@/utils/crmFormat'
 import { formatWhatsappText, whatsappSenderPrefix } from '@/utils/whatsappFormat'
@@ -92,9 +93,22 @@ function formatOutboundBody(raw: string): string {
   return name ? `${whatsappSenderPrefix(name)}${raw}` : raw
 }
 
-function bubbleHtml(body: string | null | undefined, hasMedia?: boolean): string {
-  const text = body || (hasMedia ? '[mídia]' : '')
+function mediaPlaceholder(m: ChatBubble): string {
+  const mime = (m.media?.mimetype || '').toLowerCase()
+  if (mime.startsWith('image/') || m.type === 'image' || m.type === 'sticker') return '[imagem]'
+  if (mime.startsWith('audio/') || m.type === 'audio' || m.type === 'ptt') return '[áudio]'
+  return '[mídia]'
+}
+
+function bubbleHtml(m: ChatBubble): string {
+  const text = m.body || (m.has_media && !m.media_url ? mediaPlaceholder(m) : '')
   return formatWhatsappText(text)
+}
+
+function aiTextLabel(m: ChatBubble): string | null {
+  if (m.media?.transcript) return 'Transcrição por IA'
+  if (m.media?.description) return 'Descrição por IA'
+  return null
 }
 
 function onComposerKeydown(event: KeyboardEvent) {
@@ -408,9 +422,15 @@ defineExpose({ reload: () => load(true) })
             m.send_status === 'pending' ? 'opacity-45' : 'opacity-100',
           ]"
         >
+          <WhatsappMediaAttachment v-if="m.media_url" :message="m" />
+          <p v-if="aiTextLabel(m)" class="mb-0.5 flex items-center gap-1 text-[10px] opacity-60">
+            <Icon icon="lucide:sparkles" class="size-3" aria-hidden="true" />
+            {{ aiTextLabel(m) }}
+          </p>
           <p
+            v-if="m.body || (m.has_media && !m.media_url)"
             class="whitespace-pre-wrap break-words [&_em]:italic [&_strong]:font-semibold"
-            v-html="bubbleHtml(m.body, m.has_media)"
+            v-html="bubbleHtml(m)"
           />
           <p
             class="mt-1 text-[10px]"

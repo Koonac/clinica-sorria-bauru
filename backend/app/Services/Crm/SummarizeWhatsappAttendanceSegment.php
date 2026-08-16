@@ -6,6 +6,8 @@ use App\Models\Crm\Agent;
 use App\Models\Crm\Connection;
 use App\Models\Crm\WhatsappAttendanceSegment;
 use App\Models\Crm\WhatsappMessage;
+use App\Models\LlmTokenUsage;
+use App\Models\SystemSetting;
 use App\Services\Crm\Agent\Tools\EscalarHumanoTool;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -59,13 +61,9 @@ class SummarizeWhatsappAttendanceSegment
         $systemNotices = $this->systemNoticeBodies($connection);
         $lines = [];
         foreach ($messages as $msg) {
-            $body = trim((string) ($msg->body ?? ''));
+            $body = $msg->textForAgent();
             if ($body === '') {
-                if ($msg->has_media) {
-                    $body = '[mídia]';
-                } else {
-                    continue;
-                }
+                continue;
             }
             if ($this->isSystemNoticeBody($body, $systemNotices)) {
                 continue;
@@ -87,17 +85,21 @@ class SummarizeWhatsappAttendanceSegment
         $model = $agent?->resolvedModel()
             ?? (string) config('services.openrouter.agent_model', 'deepseek/deepseek-v4-pro');
 
-        $system = <<<'PROMPT'
-Você resume atendimentos WhatsApp de uma clínica odontológica.
-Escreva em português brasileiro, em 3 a 6 bullets factuais curtos.
-Inclua: motivo do contato, o que foi feito/combinado e pendências (se houver).
-Não invente fatos. Não mencione tools, CRM, transferindo/finalizando chamado nem IDs internos.
-PROMPT;
+        $system = SystemSetting::getValue(
+            SystemSetting::KEY_AI_ATTENDANCE_SUMMARY_SYSTEM_PROMPT,
+            SystemSetting::DEFAULT_AI_ATTENDANCE_SUMMARY_SYSTEM_PROMPT,
+        ) ?? SystemSetting::DEFAULT_AI_ATTENDANCE_SUMMARY_SYSTEM_PROMPT;
 
         $user = "Resuma este atendimento:\n\n".implode("\n", $lines);
 
         try {
-            $summary = $this->openRouter->complete($system, $user, $model);
+            $summary = $this->openRouter->complete(
+                $system,
+                $user,
+                $model,
+                LlmTokenUsage::PURPOSE_ATTENDANCE_SUMMARY,
+                (int) $segment->clinic_id,
+            );
         } catch (Throwable $e) {
             Log::warning('Falha ao resumir segmento WhatsApp.', [
                 'segment_id' => $segment->id,

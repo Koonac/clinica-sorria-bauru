@@ -31,16 +31,28 @@ function canSeeNavItem(item: NavItem, role: AppRole | undefined) {
 function isAdminOnlyNavItem(item: NavItem) {
   const roles = item.roles
   if (!roles?.length) return false
-  return roles.every((role) => role === 'admin')
+  if (roles.length === 1 && roles[0] === 'developer') return false
+  return roles.every((role) => role === 'admin' || role === 'developer')
+}
+
+function isDeveloperOnlyNavItem(item: NavItem) {
+  const roles = item.roles
+  return Boolean(roles?.length === 1 && roles[0] === 'developer')
 }
 
 const navGroups = computed(() => {
   const role = auth.user?.role
   const clinicItems = NAV_ITEMS.filter(
-    (item) => canSeeNavItem(item, role) && !isAdminOnlyNavItem(item),
+    (item) =>
+      canSeeNavItem(item, role) &&
+      !isAdminOnlyNavItem(item) &&
+      !isDeveloperOnlyNavItem(item),
   )
   const adminItems = auth.isAdmin
-    ? NAV_ITEMS.filter((item) => isAdminOnlyNavItem(item) && canSeeNavItem(item, 'admin'))
+    ? NAV_ITEMS.filter((item) => isAdminOnlyNavItem(item) && canSeeNavItem(item, role))
+    : []
+  const developerItems = auth.isDeveloper
+    ? NAV_ITEMS.filter((item) => isDeveloperOnlyNavItem(item) && canSeeNavItem(item, role))
     : []
 
   const groups: { key: string; label?: string; items: NavItem[] }[] = [
@@ -49,6 +61,10 @@ const navGroups = computed(() => {
 
   if (adminItems.length) {
     groups.push({ key: 'admin', label: 'Admin', items: adminItems })
+  }
+
+  if (developerItems.length) {
+    groups.push({ key: 'developer', label: 'Developer', items: developerItems })
   }
 
   return groups

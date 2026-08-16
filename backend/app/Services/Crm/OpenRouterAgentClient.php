@@ -2,12 +2,16 @@
 
 namespace App\Services\Crm;
 
+use App\Models\LlmTokenUsage;
+use App\Services\RecordLlmTokenUsage;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 class OpenRouterAgentClient
 {
     private const CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+    public function __construct(private RecordLlmTokenUsage $recordUsage) {}
 
     public function apiKey(): string
     {
@@ -22,10 +26,15 @@ class OpenRouterAgentClient
     /**
      * @param  list<array<string, mixed>>  $messages
      * @param  list<array<string, mixed>>  $tools
-     * @return array{content: ?string, tool_calls: list<array<string, mixed>>}
+     * @return array{content: ?string, tool_calls: list<array<string, mixed>>, raw_message: array<string, mixed>}
      */
-    public function chat(array $messages, array $tools, string $model): array
-    {
+    public function chat(
+        array $messages,
+        array $tools,
+        string $model,
+        string $purpose = LlmTokenUsage::PURPOSE_OTHER,
+        ?int $clinicId = null,
+    ): array {
         $payload = [
             'model' => $model,
             'messages' => $messages,
@@ -48,6 +57,14 @@ class OpenRouterAgentClient
                 'OpenRouter retornou erro ('.$response->status().'): '.$detail,
             );
         }
+
+        $usage = $response->json('usage');
+        $this->recordUsage->handle(
+            is_array($usage) ? $usage : null,
+            $purpose,
+            $model,
+            $clinicId,
+        );
 
         $choices = $response->json('choices');
         if (! is_array($choices) || $choices === []) {
@@ -100,12 +117,17 @@ class OpenRouterAgentClient
     /**
      * Completion simples sem tools (ex.: resumo de atendimento).
      */
-    public function complete(string $system, string $user, string $model): string
-    {
+    public function complete(
+        string $system,
+        string $user,
+        string $model,
+        string $purpose = LlmTokenUsage::PURPOSE_ATTENDANCE_SUMMARY,
+        ?int $clinicId = null,
+    ): string {
         $result = $this->chat([
             ['role' => 'system', 'content' => $system],
             ['role' => 'user', 'content' => $user],
-        ], [], $model);
+        ], [], $model, $purpose, $clinicId);
 
         $content = is_string($result['content'] ?? null) ? trim((string) $result['content']) : '';
         if ($content === '') {

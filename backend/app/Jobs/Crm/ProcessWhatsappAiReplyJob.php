@@ -7,9 +7,11 @@ use App\Models\Crm\Agent;
 use App\Models\Crm\Connection;
 use App\Models\Crm\Lead;
 use App\Models\Crm\PipelineStage;
+use App\Models\Crm\WhatsappMessage;
 use App\Models\User;
 use App\Services\Crm\Agent\AgentContext;
 use App\Services\Crm\Agent\WhatsappAgentRunner;
+use App\Services\Crm\EnrichWhatsappInboundMedia;
 use App\Services\Crm\WhatsappChatHistory;
 use App\Support\ClinicContext;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
@@ -25,6 +27,12 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
 
     public int $uniqueFor = 120;
 
+    /** Mensagens recentes verificadas em busca de mídia pendente de leitura. */
+    private const MEDIA_LOOKBACK = 20;
+
+    /** Teto de chamadas de transcrição/visão por execução. */
+    private const MEDIA_ENRICH_LIMIT = 5;
+
     public function __construct(
         public int $connectionId,
         public string $chatKey,
@@ -35,8 +43,12 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
         return 'whatsapp-ai:'.$this->connectionId.':'.$this->chatKey;
     }
 
-    public function handle(WhatsappAgentRunner $runner, WhatsappChatHistory $history, ClinicContext $clinicContext): void
-    {
+    public function handle(
+        WhatsappAgentRunner $runner,
+        WhatsappChatHistory $history,
+        ClinicContext $clinicContext,
+        EnrichWhatsappInboundMedia $enrichMedia,
+    ): void {
         $connection = Connection::withoutGlobalScopes()->find($this->connectionId);
         if (! $connection) {
             return;
@@ -100,6 +112,8 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
             return;
         }
 
+        $this->enrichPendingMedia($enrichMedia, $history, $connection->id, $lead?->id ?? $leadId, $jid);
+
         $stages = PipelineStage::ofKind('lead')
             ->where('active', true)
             ->orderBy('position')
@@ -135,6 +149,29 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Áudio/imagem viram texto antes do runner, já que o modelo do agent é só texto.
+     * Só roda aqui: com humano no controle o job nem chega neste ponto.
+     */
+    private function enrichPendingMedia(
+        EnrichWhatsappInboundMedia $enrichMedia,
+        WhatsappChatHistory $history,
+        int $connectionId,
+        ?int $leadId,
+        ?string $jid,
+    ): void {
+        $pending = $history->messages($connectionId, $leadId, $jid, self::MEDIA_LOOKBACK)
+            ->filter(fn (WhatsappMessage $message) => $enrichMedia->shouldEnrich($message))
+            ->sortByDesc('id')
+            ->values();
+
+        if ($pending->isEmpty()) {
+            return;
+        }
+
+        $enrichMedia->handleMany($pending, self::MEDIA_ENRICH_LIMIT);
     }
 
     /**

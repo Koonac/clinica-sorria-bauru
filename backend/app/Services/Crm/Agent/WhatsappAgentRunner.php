@@ -8,6 +8,7 @@ use App\Models\Crm\WhatsappAttendanceSegment;
 use App\Models\Crm\WhatsappMessage;
 use App\Services\Crm\Agent\Tools\EscalarHumanoTool;
 use App\Services\Crm\FinalizeWhatsappConversationForLead;
+use App\Models\LlmTokenUsage;
 use App\Services\Crm\OpenRouterAgentClient;
 use App\Services\Crm\WhatsappChatHistory;
 use Illuminate\Support\Facades\Log;
@@ -35,7 +36,13 @@ class WhatsappAgentRunner
         $enviouResposta = false;
 
         for ($round = 0; $round < self::MAX_ROUNDS; $round++) {
-            $response = $this->openRouter->chat($messages, $openAiTools, $model);
+            $response = $this->openRouter->chat(
+                $messages,
+                $openAiTools,
+                $model,
+                LlmTokenUsage::PURPOSE_AGENT_CHAT,
+                $context->connection->clinic_id,
+            );
             $toolCalls = $response['tool_calls'];
 
             if ($toolCalls === []) {
@@ -135,13 +142,9 @@ class WhatsappAgentRunner
         $chatMessages = [];
         foreach ($history as $msg) {
             /** @var WhatsappMessage $msg */
-            $body = trim((string) ($msg->body ?? ''));
+            $body = $msg->textForAgent();
             if ($body === '') {
-                if ($msg->has_media) {
-                    $body = '[mídia]';
-                } else {
-                    continue;
-                }
+                continue;
             }
             // Histórico outbound já vem com assinatura do sistema; remove para o
             // modelo não aprender a repetir o nome no texto de enviar_resposta.
