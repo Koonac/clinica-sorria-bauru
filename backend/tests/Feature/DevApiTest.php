@@ -67,6 +67,10 @@ class DevApiTest extends TestCase
                     SystemSetting::KEY_OPENROUTER_TRANSCRIPTION_MODEL,
                     SystemSetting::KEY_OPENROUTER_TRANSCRIPTION_LANGUAGE,
                     SystemSetting::KEY_OPENROUTER_VISION_MODEL,
+                    SystemSetting::KEY_OPENROUTER_VISION_SYSTEM_PROMPT,
+                    SystemSetting::KEY_OPENROUTER_VISION_INSTRUCTION,
+                    SystemSetting::KEY_WHATSAPP_MEDIA_RETENTION_DAYS,
+                    SystemSetting::KEY_WHATSAPP_MEDIA_MAX_MB_PER_CLINIC,
                 ],
             ]);
     }
@@ -85,7 +89,15 @@ class DevApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.'.SystemSetting::KEY_OPENROUTER_TRANSCRIPTION_MODEL, 'openai/whisper-1')
             ->assertJsonPath('data.'.SystemSetting::KEY_OPENROUTER_TRANSCRIPTION_LANGUAGE, 'pt')
-            ->assertJsonPath('data.'.SystemSetting::KEY_OPENROUTER_VISION_MODEL, 'openai/gpt-4o-mini');
+            ->assertJsonPath('data.'.SystemSetting::KEY_OPENROUTER_VISION_MODEL, 'openai/gpt-4o-mini')
+            ->assertJsonPath(
+                'data.'.SystemSetting::KEY_OPENROUTER_VISION_SYSTEM_PROMPT,
+                SystemSetting::DEFAULT_OPENROUTER_VISION_SYSTEM_PROMPT,
+            )
+            ->assertJsonPath(
+                'data.'.SystemSetting::KEY_OPENROUTER_VISION_INSTRUCTION,
+                SystemSetting::DEFAULT_OPENROUTER_VISION_INSTRUCTION,
+            );
     }
 
     public function test_developer_atualiza_modelos_de_midia(): void
@@ -185,6 +197,45 @@ class DevApiTest extends TestCase
             SystemSetting::KEY_OPENROUTER_VISION_MODEL => 'modelo inválido!',
         ])->assertStatus(422)
             ->assertJsonValidationErrors(SystemSetting::KEY_OPENROUTER_VISION_MODEL);
+
+        $this->putJson('/api/v1/dev/settings', [
+            SystemSetting::KEY_WHATSAPP_MEDIA_RETENTION_DAYS => 0,
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(SystemSetting::KEY_WHATSAPP_MEDIA_RETENTION_DAYS);
+    }
+
+    public function test_developer_atualiza_retencao_de_midia(): void
+    {
+        Sanctum::actingAs(User::factory()->developer()->create());
+
+        $this->putJson('/api/v1/dev/settings', [
+            SystemSetting::KEY_WHATSAPP_MEDIA_RETENTION_DAYS => 60,
+            SystemSetting::KEY_WHATSAPP_MEDIA_MAX_MB_PER_CLINIC => 1024,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.'.SystemSetting::KEY_WHATSAPP_MEDIA_RETENTION_DAYS, '60')
+            ->assertJsonPath('data.'.SystemSetting::KEY_WHATSAPP_MEDIA_MAX_MB_PER_CLINIC, '1024');
+    }
+
+    public function test_developer_atualiza_prompts_de_visao(): void
+    {
+        Sanctum::actingAs(User::factory()->developer()->create());
+
+        $system = 'Descreva imagens de exames odontológicos em português, sem diagnóstico.';
+        $instruction = 'O que aparece nesta foto?';
+
+        $this->putJson('/api/v1/dev/settings', [
+            SystemSetting::KEY_OPENROUTER_VISION_SYSTEM_PROMPT => $system,
+            SystemSetting::KEY_OPENROUTER_VISION_INSTRUCTION => $instruction,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.'.SystemSetting::KEY_OPENROUTER_VISION_SYSTEM_PROMPT, $system)
+            ->assertJsonPath('data.'.SystemSetting::KEY_OPENROUTER_VISION_INSTRUCTION, $instruction);
+
+        $this->assertDatabaseHas('system_settings', [
+            'key' => SystemSetting::KEY_OPENROUTER_VISION_SYSTEM_PROMPT,
+            'value' => $system,
+        ]);
     }
 
     public function test_developer_atualiza_prompt_de_anotacoes(): void

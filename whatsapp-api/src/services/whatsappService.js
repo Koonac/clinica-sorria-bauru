@@ -956,36 +956,56 @@ class WhatsAppService {
     };
 
     if (message.hasMedia) {
-      try {
-        const media = await message.downloadMedia();
+      const { media, error } = await this.downloadMessageMedia(message);
 
-        if (media) {
-          payload.media = {
-            mimetype: media.mimetype,
-            data: media.data,
-            filename: media.filename,
-            filesize: media.filesize,
-          };
-          console.log(
-            `📎 Mídia baixada: ${media.mimetype} (${media.filesize ?? "tamanho desconhecido"} bytes)`,
-          );
-        } else {
-          payload.media = null;
-          payload.media_error = "download_failed";
-          console.warn(
-            `⚠️ Falha ao baixar mídia da mensagem ${payload.message_id}`,
-          );
-        }
-      } catch (error) {
+      if (media) {
+        payload.media = {
+          mimetype: media.mimetype,
+          data: media.data,
+          filename: media.filename,
+          filesize: media.filesize,
+        };
+        console.log(
+          `📎 Mídia baixada: ${media.mimetype} (${media.filesize ?? "tamanho desconhecido"} bytes)`,
+        );
+      } else {
         payload.media = null;
         payload.media_error = this.truncatePayloadMessage(
-          error?.message || "download_failed",
+          error || "download_failed",
         );
-        console.error(`❌ Erro ao baixar mídia: ${error.message}`);
+        console.warn(
+          `⚠️ Falha ao baixar mídia da mensagem ${payload.message_id}: ${payload.media_error}`,
+        );
       }
     }
 
     return payload;
+  }
+
+  /**
+   * O WhatsApp Web às vezes ainda está resolvendo a mídia quando o evento chega,
+   * então tentamos algumas vezes antes de desistir.
+   */
+  async downloadMessageMedia(message, attempts = 3, delayMs = 1500) {
+    let lastError = "download_failed";
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        const media = await message.downloadMedia();
+        if (media?.data) {
+          return { media, error: null };
+        }
+        lastError = "download_failed";
+      } catch (error) {
+        lastError = error?.message || "download_failed";
+      }
+
+      if (attempt < attempts) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+      }
+    }
+
+    return { media: null, error: lastError };
   }
 
   // Handler para evento de mensagem (inbound via "message"; outbound fromMe via "message_create")
@@ -1357,7 +1377,7 @@ class WhatsAppService {
     }, chatId);
   }
 
-  // Enviar mensagem (texto e/ou imagem)
+  // Enviar mensagem (texto e/ou mídia: imagem, áudio ou documento)
   sendMessage(sessionId, to, message, media = null) {
     return this.enqueueSend(sessionId, to, () =>
       this._sendMessageWithTyping(sessionId, to, message, media),
@@ -1378,10 +1398,16 @@ class WhatsAppService {
 
     const mimetype = String(media.mimetype || "").trim().toLowerCase();
     const data = String(media.data || "").replace(/^data:[^;]+;base64,/, "");
-    const filename = String(media.filename || "image.jpg").trim() || "image.jpg";
+    const isAudio = mimetype.startsWith("audio/");
+    const isImage = mimetype.startsWith("image/");
+    const isDocument = !isImage && !isAudio;
+    const fallbackName = isAudio ? "audio.ogg" : isImage ? "image.jpg" : "arquivo.pdf";
+    const filename = String(media.filename || fallbackName).trim() || fallbackName;
 
-    if (!mimetype.startsWith("image/")) {
-      throw new Error("Apenas imagens são suportadas no envio de mídia.");
+    if (!isImage && !isAudio && !this.isDocumentMime(mimetype)) {
+      throw new Error(
+        "Apenas imagens, áudios e documentos são suportados no envio de mídia.",
+      );
     }
     if (!data) {
       throw new Error("media.data (base64) é obrigatório.");
@@ -1389,17 +1415,49 @@ class WhatsAppService {
 
     const mediaObj = new MessageMedia(mimetype, data, filename);
     const options = { waitUntilMsgSent: true };
-    if (caption) {
+    // Áudio como mensagem de voz não aceita legenda no WhatsApp.
+    const asVoice = isAudio && media.voice !== false;
+    if (asVoice) {
+      options.sendAudioAsVoice = true;
+    } else if (isDocument) {
+      options.sendMediaAsDocument = true;
+    }
+    if (!asVoice && caption) {
       options.caption = caption;
     }
 
+    const kind = isAudio ? "audio" : isImage ? "image" : "document";
     return {
       content: mediaObj,
       options,
-      pendingBody: caption || `[image:${filename}]`,
+      pendingBody: caption || `[${kind}:${filename}]`,
       hasMedia: true,
-      mediaMeta: { mimetype, filename },
+      mediaMeta: { mimetype, filename, voice: asVoice, document: isDocument },
     };
+  }
+
+  isDocumentMime(mimetype) {
+    const mime = String(mimetype || "")
+      .toLowerCase()
+      .split(";")[0]
+      .trim();
+    return [
+      "application/pdf",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-powerpoint",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "application/vnd.oasis.opendocument.text",
+      "application/vnd.oasis.opendocument.spreadsheet",
+      "application/rtf",
+      "application/zip",
+      "application/x-zip-compressed",
+      "application/octet-stream",
+      "text/plain",
+      "text/csv",
+    ].includes(mime);
   }
 
   async _sendMessageWithTyping(sessionId, to, message, media = null) {
@@ -1434,7 +1492,7 @@ class WhatsAppService {
       let chatId = await this.resolveOutboundChatId(client, originalTo);
 
       console.log(
-        `📤 Enviando ${outbound.hasMedia ? "imagem" : "mensagem"} para ${originalTo} (chatId=${chatId}): ${outbound.pendingBody}`,
+        `📤 Enviando ${outbound.hasMedia ? "mídia" : "mensagem"} para ${originalTo} (chatId=${chatId}): ${outbound.pendingBody}`,
       );
 
       // Marca antes do sendMessage para cobrir o message_create (race com o CRM).

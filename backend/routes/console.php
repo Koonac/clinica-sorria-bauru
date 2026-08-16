@@ -10,3 +10,4 @@ Artisan::command('inspire', function () {
 
 Schedule::command('crm:resume-whatsapp-agents')->everyMinute();
 Schedule::command('crm:auto-close-whatsapp-conversations')->everyMinute();
+Schedule::command('crm:prune-whatsapp-media')->dailyAt('03:15');

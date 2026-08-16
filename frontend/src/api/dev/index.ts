@@ -64,6 +64,10 @@ export type SystemSettings = {
   openrouter_transcription_model: string
   openrouter_transcription_language: string
   openrouter_vision_model: string
+  openrouter_vision_system_prompt: string
+  openrouter_vision_instruction: string
+  whatsapp_media_retention_days: string
+  whatsapp_media_max_mb_per_clinic: string
 }
 
 export async function getTokenUsageStats(dias = 30): Promise<TokenUsageStats> {

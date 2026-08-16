@@ -42,6 +42,34 @@ class UpdateSystemSettingsRequest extends FormRequest
                 'max:120',
                 'regex:/^[A-Za-z0-9._\/:-]+$/',
             ],
+            SystemSetting::KEY_OPENROUTER_VISION_SYSTEM_PROMPT => [
+                'sometimes',
+                'required',
+                'string',
+                'min:20',
+                'max:20000',
+            ],
+            SystemSetting::KEY_OPENROUTER_VISION_INSTRUCTION => [
+                'sometimes',
+                'required',
+                'string',
+                'min:5',
+                'max:2000',
+            ],
+            SystemSetting::KEY_WHATSAPP_MEDIA_RETENTION_DAYS => [
+                'sometimes',
+                'required',
+                'integer',
+                'min:1',
+                'max:3650',
+            ],
+            SystemSetting::KEY_WHATSAPP_MEDIA_MAX_MB_PER_CLINIC => [
+                'sometimes',
+                'required',
+                'integer',
+                'min:50',
+                'max:102400',
+            ],
         ];
     }
 
@@ -51,6 +79,8 @@ class UpdateSystemSettingsRequest extends FormRequest
             SystemSetting::KEY_OPENROUTER_TRANSCRIPTION_MODEL.'.regex' => 'Informe um modelo válido (ex.: openai/whisper-1).',
             SystemSetting::KEY_OPENROUTER_VISION_MODEL.'.regex' => 'Informe um modelo válido (ex.: openai/gpt-4o-mini).',
             SystemSetting::KEY_OPENROUTER_TRANSCRIPTION_LANGUAGE.'.regex' => 'Informe o código ISO-639-1 com 2 letras minúsculas (ex.: pt).',
+            SystemSetting::KEY_WHATSAPP_MEDIA_RETENTION_DAYS.'.min' => 'A retenção deve ser de pelo menos 1 dia.',
+            SystemSetting::KEY_WHATSAPP_MEDIA_MAX_MB_PER_CLINIC.'.min' => 'O teto por clínica deve ser de pelo menos 50 MB.',
         ];
     }
 

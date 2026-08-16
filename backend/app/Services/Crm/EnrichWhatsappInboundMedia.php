@@ -3,6 +3,7 @@
 namespace App\Services\Crm;
 
 use App\Models\Crm\WhatsappMessage;
+use App\Models\SystemSetting;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -13,14 +14,20 @@ use Throwable;
  */
 class EnrichWhatsappInboundMedia
 {
-    public const VISION_SYSTEM = 'Você descreve imagens recebidas por WhatsApp em uma clínica odontológica. Responda em português, em no máximo 3 frases objetivas, focando no que é relevante para o atendimento (o que aparece, textos legíveis, região da boca/dente, documentos, exames). Não faça diagnóstico nem suposições sobre o paciente.';
-
-    public const VISION_INSTRUCTION = 'Descreva esta imagem enviada pelo paciente.';
-
     public function __construct(
         private WhatsappMediaStore $mediaStore,
         private OpenRouterMediaClient $client,
     ) {}
+
+    public function visionSystemPrompt(): string
+    {
+        return (string) SystemSetting::resolve(SystemSetting::KEY_OPENROUTER_VISION_SYSTEM_PROMPT);
+    }
+
+    public function visionInstruction(): string
+    {
+        return (string) SystemSetting::resolve(SystemSetting::KEY_OPENROUTER_VISION_INSTRUCTION);
+    }
 
     /**
      * Enriquece as mensagens pendentes de um histórico (mais recentes primeiro).
@@ -70,8 +77,8 @@ class EnrichWhatsappInboundMedia
                 : $this->client->describeImage(
                     $base64,
                     (string) $message->mediaMimetype(),
-                    self::VISION_SYSTEM,
-                    self::VISION_INSTRUCTION,
+                    $this->visionSystemPrompt(),
+                    $this->visionInstruction(),
                     (int) $message->clinic_id,
                 );
         } catch (Throwable $e) {

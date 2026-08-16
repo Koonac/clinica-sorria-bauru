@@ -183,9 +183,15 @@ class WhatsappOutboundSyncTest extends TestCase
         $this->assertDatabaseHas('whatsapp_messages', [
             'connection_id' => $connection->id,
             'direction' => 'outbound',
-            'body' => 'Resposta humana pela plataforma',
             'lead_id' => $lead->id,
         ]);
+        $this->assertStringContainsString(
+            'Resposta humana pela plataforma',
+            (string) WhatsappMessage::query()
+                ->where('connection_id', $connection->id)
+                ->where('direction', 'outbound')
+                ->value('body'),
+        );
         $this->assertNotNull($lead->fresh()->whatsapp_agent_paused_at);
         $this->assertNotNull($lead->fresh()->whatsapp_agent_resume_at);
         $this->assertDatabaseHas('activities', [
@@ -235,15 +241,113 @@ class WhatsappOutboundSyncTest extends TestCase
         $this->assertDatabaseHas('whatsapp_messages', [
             'connection_id' => $connection->id,
             'direction' => 'outbound',
-            'body' => 'Segue a foto',
             'type' => 'image',
             'has_media' => true,
             'lead_id' => $lead->id,
         ]);
+        $this->assertStringContainsString(
+            'Segue a foto',
+            (string) WhatsappMessage::query()
+                ->where('connection_id', $connection->id)
+                ->where('type', 'image')
+                ->value('body'),
+        );
         $this->assertNotNull($lead->fresh()->whatsapp_agent_paused_at);
     }
 
-    public function test_send_rejeita_media_nao_imagem(): void
+    public function test_send_com_audio_persiste_has_media(): void
+    {
+        Http::fake([
+            'whatsapp.test/*' => Http::response([
+                'success' => true,
+                'to' => '5511999990000@c.us',
+                'messageId' => 'out-aud-1',
+                'hasMedia' => true,
+                'media' => ['mimetype' => 'audio/ogg', 'filename' => 'voz.ogg', 'voice' => true],
+            ], 200),
+        ]);
+
+        [$user, $connection] = $this->userConectado();
+        $lead = $this->leadComWhatsapp($user);
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/v1/crm/whatsapp/send', [
+            'to' => '5511999990000@c.us',
+            'media' => [
+                'mimetype' => 'audio/ogg',
+                'data' => base64_encode('fake-ogg'),
+                'filename' => 'voz.ogg',
+            ],
+        ])->assertCreated();
+
+        Http::assertSent(function ($request) {
+            $data = $request->data();
+
+            return str_contains($request->url(), '/send/')
+                && ($data['media']['mimetype'] ?? null) === 'audio/ogg'
+                && ($data['media']['voice'] ?? null) === true;
+        });
+
+        $this->assertDatabaseHas('whatsapp_messages', [
+            'connection_id' => $connection->id,
+            'direction' => 'outbound',
+            'type' => 'ptt',
+            'has_media' => true,
+            'lead_id' => $lead->id,
+        ]);
+
+        $stored = WhatsappMessage::query()
+            ->where('connection_id', $connection->id)
+            ->where('type', 'ptt')
+            ->first();
+        $this->assertNotNull($stored);
+        $this->assertNotEmpty($stored->media['path'] ?? null);
+        $this->assertNotNull($stored->media_url);
+    }
+
+    public function test_send_com_documento_persiste_has_media(): void
+    {
+        Http::fake([
+            'whatsapp.test/*' => Http::response([
+                'success' => true,
+                'to' => '5511999990000@c.us',
+                'messageId' => 'out-doc-1',
+                'hasMedia' => true,
+                'media' => ['mimetype' => 'application/pdf', 'filename' => 'exame.pdf'],
+            ], 200),
+        ]);
+
+        [$user, $connection] = $this->userConectado();
+        $lead = $this->leadComWhatsapp($user);
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/v1/crm/whatsapp/send', [
+            'to' => '5511999990000@c.us',
+            'message' => 'Segue o exame',
+            'media' => [
+                'mimetype' => 'application/pdf',
+                'data' => base64_encode('%PDF-fake'),
+                'filename' => 'exame.pdf',
+            ],
+        ])->assertCreated();
+
+        Http::assertSent(function ($request) {
+            $data = $request->data();
+
+            return str_contains($request->url(), '/send/')
+                && ($data['media']['mimetype'] ?? null) === 'application/pdf';
+        });
+
+        $this->assertDatabaseHas('whatsapp_messages', [
+            'connection_id' => $connection->id,
+            'direction' => 'outbound',
+            'type' => 'document',
+            'has_media' => true,
+            'lead_id' => $lead->id,
+        ]);
+    }
+
+    public function test_send_rejeita_media_nao_suportada(): void
     {
         [$user] = $this->userConectado();
         Sanctum::actingAs($user);
@@ -251,9 +355,9 @@ class WhatsappOutboundSyncTest extends TestCase
         $this->postJson('/api/v1/crm/whatsapp/send', [
             'to' => '5511999990000@c.us',
             'media' => [
-                'mimetype' => 'application/pdf',
+                'mimetype' => 'video/mp4',
                 'data' => base64_encode('fake'),
-                'filename' => 'doc.pdf',
+                'filename' => 'clip.mp4',
             ],
         ])->assertStatus(422);
     }

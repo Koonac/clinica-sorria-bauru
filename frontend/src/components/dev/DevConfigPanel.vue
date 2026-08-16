@@ -10,14 +10,17 @@ import {
 } from '@/api/dev'
 import Button from '@/components/Buttons/Button.vue'
 import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
-import Select, { type SelectOption } from '@/components/Forms/Select.vue'
+import { type SelectOption } from '@/components/Forms/Select.vue'
+import SelectSearch from '@/components/Forms/SelectSearch.vue'
 
 const loading = ref(true)
 const saving = ref(false)
 const savingMedia = ref(false)
+const savingRetention = ref(false)
 const error = ref('')
 const success = ref('')
 const mediaSuccess = ref('')
+const retentionSuccess = ref('')
 const prompt = ref('')
 const fieldError = ref('')
 
@@ -25,9 +28,17 @@ const media = ref({
   openrouter_transcription_model: '',
   openrouter_transcription_language: '',
   openrouter_vision_model: '',
+  openrouter_vision_system_prompt: '',
+  openrouter_vision_instruction: '',
+})
+
+const retention = ref({
+  whatsapp_media_retention_days: '90',
+  whatsapp_media_max_mb_per_clinic: '2048',
 })
 
 const mediaErrors = ref<Record<string, string>>({})
+const retentionErrors = ref<Record<string, string>>({})
 
 const transcriptionModels = ref<SelectOption[]>([])
 const visionModels = ref<SelectOption[]>([])
@@ -67,6 +78,12 @@ function applySettings(settings: SystemSettings) {
   media.value.openrouter_transcription_model = settings.openrouter_transcription_model || ''
   media.value.openrouter_transcription_language = settings.openrouter_transcription_language || ''
   media.value.openrouter_vision_model = settings.openrouter_vision_model || ''
+  media.value.openrouter_vision_system_prompt = settings.openrouter_vision_system_prompt || ''
+  media.value.openrouter_vision_instruction = settings.openrouter_vision_instruction || ''
+  retention.value.whatsapp_media_retention_days = String(settings.whatsapp_media_retention_days || '90')
+  retention.value.whatsapp_media_max_mb_per_clinic = String(
+    settings.whatsapp_media_max_mb_per_clinic || '2048',
+  )
 }
 
 async function loadModels(capability: OpenRouterModelCapability): Promise<SelectOption[]> {
@@ -99,7 +116,9 @@ async function load() {
   error.value = ''
   success.value = ''
   mediaSuccess.value = ''
+  retentionSuccess.value = ''
   mediaErrors.value = {}
+  retentionErrors.value = {}
   try {
     applySettings(await getSystemSettings())
   } catch (e) {
@@ -157,6 +176,8 @@ async function saveMedia() {
         .trim()
         .toLowerCase(),
       openrouter_vision_model: media.value.openrouter_vision_model.trim(),
+      openrouter_vision_system_prompt: media.value.openrouter_vision_system_prompt.trim(),
+      openrouter_vision_instruction: media.value.openrouter_vision_instruction.trim(),
     })
     applySettings(settings)
     mediaSuccess.value = 'Configurações de mídia salvas.'
@@ -167,6 +188,8 @@ async function saveMedia() {
         openrouter_transcription_model: details.openrouter_transcription_model?.[0] || '',
         openrouter_transcription_language: details.openrouter_transcription_language?.[0] || '',
         openrouter_vision_model: details.openrouter_vision_model?.[0] || '',
+        openrouter_vision_system_prompt: details.openrouter_vision_system_prompt?.[0] || '',
+        openrouter_vision_instruction: details.openrouter_vision_instruction?.[0] || '',
       }
       if (!Object.values(mediaErrors.value).some(Boolean)) {
         error.value = e.message
@@ -176,6 +199,42 @@ async function saveMedia() {
     }
   } finally {
     savingMedia.value = false
+  }
+}
+
+async function saveRetention() {
+  if (savingRetention.value) return
+  retentionErrors.value = {}
+  retentionSuccess.value = ''
+  error.value = ''
+
+  savingRetention.value = true
+  try {
+    const settings = await updateSystemSettings({
+      whatsapp_media_retention_days: String(
+        Number.parseInt(retention.value.whatsapp_media_retention_days, 10) || 0,
+      ),
+      whatsapp_media_max_mb_per_clinic: String(
+        Number.parseInt(retention.value.whatsapp_media_max_mb_per_clinic, 10) || 0,
+      ),
+    })
+    applySettings(settings)
+    retentionSuccess.value = 'Retenção de mídia salva.'
+  } catch (e) {
+    if (e instanceof ApiError) {
+      const details = e.details ?? {}
+      retentionErrors.value = {
+        whatsapp_media_retention_days: details.whatsapp_media_retention_days?.[0] || '',
+        whatsapp_media_max_mb_per_clinic: details.whatsapp_media_max_mb_per_clinic?.[0] || '',
+      }
+      if (!Object.values(retentionErrors.value).some(Boolean)) {
+        error.value = e.message
+      }
+    } else {
+      error.value = 'Não foi possível salvar.'
+    }
+  } finally {
+    savingRetention.value = false
   }
 }
 
@@ -241,11 +300,13 @@ onMounted(() => {
       <div class="mt-5 grid gap-4 sm:grid-cols-2">
         <label class="flex flex-col gap-1.5">
           <span class="text-sm font-medium text-brand-ink/80">Modelo de transcrição</span>
-          <Select
+          <SelectSearch
             v-model="media.openrouter_transcription_model"
             :options="transcriptionOptions"
             :disabled="modelsLoading"
             :placeholder="modelsLoading ? 'Carregando modelos…' : 'Selecione um modelo…'"
+            search-placeholder="Pesquisar modelo…"
+            empty-label="Nenhum modelo de transcrição encontrado."
           />
           <span class="text-xs text-brand-ink/50">
             Só modelos com saída de transcrição (speech-to-text).
@@ -261,10 +322,12 @@ onMounted(() => {
 
         <label class="flex flex-col gap-1.5">
           <span class="text-sm font-medium text-brand-ink/80">Idioma do áudio</span>
-          <Select
+          <SelectSearch
             v-model="media.openrouter_transcription_language"
             :options="languageSelectOptions"
             placeholder="Selecione o idioma…"
+            search-placeholder="Pesquisar idioma…"
+            empty-label="Nenhum idioma encontrado."
           />
           <span class="text-xs text-brand-ink/50">Código ISO-639-1 enviado na transcrição.</span>
           <span
@@ -278,11 +341,13 @@ onMounted(() => {
 
         <label class="flex flex-col gap-1.5 sm:col-span-2">
           <span class="text-sm font-medium text-brand-ink/80">Modelo de visão (imagens)</span>
-          <Select
+          <SelectSearch
             v-model="media.openrouter_vision_model"
             :options="visionOptions"
             :disabled="modelsLoading"
             :placeholder="modelsLoading ? 'Carregando modelos…' : 'Selecione um modelo…'"
+            search-placeholder="Pesquisar modelo…"
+            empty-label="Nenhum modelo de visão encontrado."
           />
           <span class="text-xs text-brand-ink/50">
             Só modelos que aceitam imagem na entrada e respondem em texto.
@@ -293,6 +358,44 @@ onMounted(() => {
             role="alert"
           >
             {{ mediaErrors.openrouter_vision_model }}
+          </span>
+        </label>
+
+        <label class="flex flex-col gap-1.5 sm:col-span-2">
+          <span class="text-sm font-medium text-brand-ink/80">System prompt da visão</span>
+          <textarea
+            v-model="media.openrouter_vision_system_prompt"
+            rows="5"
+            class="w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
+          />
+          <span class="text-xs text-brand-ink/50">
+            Instrução de sistema enviada ao modelo ao descrever imagens do paciente.
+          </span>
+          <span
+            v-if="mediaErrors.openrouter_vision_system_prompt"
+            class="text-sm text-brand-ink/70"
+            role="alert"
+          >
+            {{ mediaErrors.openrouter_vision_system_prompt }}
+          </span>
+        </label>
+
+        <label class="flex flex-col gap-1.5 sm:col-span-2">
+          <span class="text-sm font-medium text-brand-ink/80">Instrução do usuário (visão)</span>
+          <textarea
+            v-model="media.openrouter_vision_instruction"
+            rows="2"
+            class="w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
+          />
+          <span class="text-xs text-brand-ink/50">
+            Texto enviado junto com a imagem no papel de usuário.
+          </span>
+          <span
+            v-if="mediaErrors.openrouter_vision_instruction"
+            class="text-sm text-brand-ink/70"
+            role="alert"
+          >
+            {{ mediaErrors.openrouter_vision_instruction }}
           </span>
         </label>
       </div>
@@ -306,6 +409,72 @@ onMounted(() => {
         <Button
           variant="secondary"
           :disabled="savingMedia || modelsLoading"
+          icon="lucide:refresh-cw"
+          @click="load"
+        >
+          Recarregar
+        </Button>
+      </div>
+    </div>
+
+    <div class="rounded-2xl border border-brand-ink/10 bg-white p-5">
+      <h2 class="text-base font-semibold text-brand-ink">Armazenamento de mídia</h2>
+      <p class="mt-1 text-sm text-brand-ink/60">
+        Arquivos de áudio, imagem e documento são apagados automaticamente. A mensagem, a
+        transcrição e a descrição da IA permanecem no histórico.
+      </p>
+
+      <div class="mt-5 grid gap-4 sm:grid-cols-2">
+        <label class="flex flex-col gap-1.5">
+          <span class="text-sm font-medium text-brand-ink/80">Retenção (dias)</span>
+          <input
+            v-model="retention.whatsapp_media_retention_days"
+            type="number"
+            min="1"
+            max="3650"
+            class="w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
+          />
+          <span class="text-xs text-brand-ink/50">Arquivos mais velhos que isso saem do disco.</span>
+          <span
+            v-if="retentionErrors.whatsapp_media_retention_days"
+            class="text-sm text-brand-ink/70"
+            role="alert"
+          >
+            {{ retentionErrors.whatsapp_media_retention_days }}
+          </span>
+        </label>
+
+        <label class="flex flex-col gap-1.5">
+          <span class="text-sm font-medium text-brand-ink/80">Teto por clínica (MB)</span>
+          <input
+            v-model="retention.whatsapp_media_max_mb_per_clinic"
+            type="number"
+            min="50"
+            max="102400"
+            class="w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
+          />
+          <span class="text-xs text-brand-ink/50">
+            Se passar do teto, os arquivos mais antigos daquela clínica saem primeiro.
+          </span>
+          <span
+            v-if="retentionErrors.whatsapp_media_max_mb_per_clinic"
+            class="text-sm text-brand-ink/70"
+            role="alert"
+          >
+            {{ retentionErrors.whatsapp_media_max_mb_per_clinic }}
+          </span>
+        </label>
+      </div>
+
+      <p v-if="retentionSuccess" class="mt-3 text-sm text-brand-cyan-ink" role="status">
+        {{ retentionSuccess }}
+      </p>
+
+      <div class="mt-4 flex flex-wrap gap-2">
+        <Button :loading="savingRetention" icon="lucide:save" @click="saveRetention">Salvar</Button>
+        <Button
+          variant="secondary"
+          :disabled="savingRetention"
           icon="lucide:refresh-cw"
           @click="load"
         >

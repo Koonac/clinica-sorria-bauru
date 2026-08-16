@@ -29,6 +29,7 @@ use App\Services\Crm\WhatsappMediaStore;
 use App\Support\ClinicContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -71,19 +72,29 @@ class WhatsappController extends Controller
 
         $mediaPayload = null;
         $mediaStored = null;
+        $mediaType = null;
         if ($hasMedia) {
             $rawData = (string) $mediaInput['data'];
             $rawData = preg_replace('#^data:[^;]+;base64,#', '', $rawData) ?: $rawData;
             $mimetype = strtolower((string) ($mediaInput['mimetype'] ?? 'image/jpeg'));
+            $isAudio = str_starts_with($mimetype, 'audio/');
+            $isImage = str_starts_with($mimetype, 'image/');
             $filename = filled($mediaInput['filename'] ?? null)
                 ? (string) $mediaInput['filename']
-                : 'image.jpg';
+                : 'arquivo.'.$this->mediaStore->extension($mimetype);
+
+            // Mensagem de voz é o padrão para áudio, e o WhatsApp não aceita legenda nela.
+            $asVoice = $isAudio && (bool) ($mediaInput['voice'] ?? true);
+            $mediaType = $isAudio ? ($asVoice ? 'ptt' : 'audio') : ($isImage ? 'image' : 'document');
 
             $mediaPayload = [
                 'mimetype' => $mimetype,
                 'data' => $rawData,
                 'filename' => $filename,
             ];
+            if ($isAudio) {
+                $mediaPayload['voice'] = $asVoice;
+            }
             $mediaStored = [
                 'mimetype' => $mimetype,
                 'filename' => $filename,
@@ -131,7 +142,7 @@ class WhatsappController extends Controller
             'direction' => 'outbound',
             'body' => $message !== '' ? $message : ($hasMedia ? null : ''),
             'message_id' => $messageId ?: null,
-            'type' => $hasMedia ? 'image' : 'chat',
+            'type' => $mediaType ?? 'chat',
             'has_media' => $hasMedia,
             'media' => $mediaStored,
             'lead_id' => $resolved['lead']?->id,
@@ -153,7 +164,7 @@ class WhatsappController extends Controller
                 $user,
                 'platform',
                 $connection,
-                mb_substr($message !== '' ? $message : '[imagem]', 0, 500),
+                mb_substr($message !== '' ? $message : $this->mediaSnippet($mediaType), 0, 500),
             );
             $this->autoClose->handle($resolved['lead']->fresh() ?? $resolved['lead'], $connection);
         }
@@ -166,6 +177,16 @@ class WhatsappController extends Controller
                 'contact' => $resolved['contact'],
             ],
         ], 201);
+    }
+
+    private function mediaSnippet(?string $type): string
+    {
+        return match ($type) {
+            'ptt', 'audio' => '[áudio]',
+            'image' => '[imagem]',
+            'document' => '[documento]',
+            default => '[mídia]',
+        };
     }
 
     public function chats(Request $request): JsonResponse
@@ -830,8 +851,8 @@ class WhatsappController extends Controller
 
     /**
      * @param  list<array<string, mixed>>  $chats
-     * @param  \Illuminate\Support\Collection<int|string, Contact>  $contactsById
-     * @param  \Illuminate\Support\Collection<string, Contact>  $contactsByJid
+     * @param  Collection<int|string, Contact>  $contactsById
+     * @param  Collection<string, Contact>  $contactsByJid
      */
     private function dispatchAvatarFetches(
         Connection $connection,

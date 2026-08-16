@@ -37,6 +37,8 @@ return [
 
     'whatsapp' => [
         'url' => rtrim((string) env('WHATSAPP_API_URL', 'http://localhost:3000'), '/'),
+        'media_retention_days' => (int) env('WHATSAPP_MEDIA_RETENTION_DAYS', 90),
+        'media_max_mb_per_clinic' => (int) env('WHATSAPP_MEDIA_MAX_MB_PER_CLINIC', 2048),
     ],
 
     'openrouter' => [

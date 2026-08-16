@@ -137,10 +137,14 @@ class WhatsAppController {
 
       if (hasMedia) {
         const mimetype = String(media.mimetype || "").toLowerCase();
-        if (!mimetype.startsWith("image/")) {
+        if (
+          !mimetype.startsWith("image/") &&
+          !mimetype.startsWith("audio/") &&
+          !this.isDocumentMime(mimetype)
+        ) {
           return res.status(400).json({
             success: false,
-            error: "Apenas imagens são suportadas (image/*).",
+            error: "Apenas imagens, áudios e documentos são suportados.",
           });
         }
       }
@@ -386,6 +390,10 @@ class WhatsAppController {
         error: "Erro interno do servidor",
       });
     }
+  }
+
+  isDocumentMime(mimetype) {
+    return whatsappService.isDocumentMime(mimetype);
   }
 }
 

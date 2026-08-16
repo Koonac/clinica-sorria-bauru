@@ -70,10 +70,20 @@ export async function listWhatsappMessages(params: {
   }
 }
 
+export type SendWhatsappMedia = {
+  mimetype: string
+  /** base64 puro, sem data URI */
+  data: string
+  filename?: string
+  /** Áudio como mensagem de voz (padrão no backend) */
+  voice?: boolean
+}
+
 export async function sendWhatsappMessage(payload: {
   to: string
   message: string
   contact_name?: string
+  media?: SendWhatsappMedia
 }): Promise<WhatsappMessage> {
   try {
     const { data } = await api.post<{

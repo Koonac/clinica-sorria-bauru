@@ -3,6 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { api } from '@/api/client'
 import type { WhatsappMessage } from '@/api/crm/types'
+import WhatsappImagePreview from '@/components/whatsapp/WhatsappImagePreview.vue'
 
 const props = defineProps<{
   message: WhatsappMessage
@@ -77,26 +78,24 @@ onUnmounted(() => {
   <div class="mb-1.5">
     <div
       v-if="loading"
-      class="flex items-center gap-2 rounded-xl bg-brand-ink/[0.06] px-3 py-2 text-xs text-brand-ink/55"
+      class="flex size-52 items-center justify-center gap-2 rounded-xl bg-brand-ink/[0.06] text-xs text-brand-ink/55"
     >
       <Icon icon="lucide:loader-circle" class="size-4 animate-spin" aria-hidden="true" />
-      Carregando mídia…
+      Carregando…
     </div>
 
     <div
       v-else-if="failed || !blobUrl"
-      class="flex items-center gap-2 rounded-xl bg-brand-ink/[0.06] px-3 py-2 text-xs text-brand-ink/55"
+      class="flex size-52 flex-col items-center justify-center gap-2 rounded-xl bg-brand-ink/[0.06] px-3 text-center text-xs text-brand-ink/55"
     >
-      <Icon icon="lucide:file-x" class="size-4" aria-hidden="true" />
+      <Icon icon="lucide:file-x" class="size-5" aria-hidden="true" />
       Mídia indisponível
     </div>
 
-    <img
+    <WhatsappImagePreview
       v-else-if="kind === 'image'"
       :src="blobUrl"
       :alt="fileLabel"
-      class="max-h-72 w-full rounded-xl object-cover"
-      @error="failed = true"
     />
 
     <audio v-else-if="kind === 'audio'" :src="blobUrl" controls class="w-64 max-w-full" />

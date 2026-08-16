@@ -77,6 +77,8 @@ function preview(chat: WhatsappChat): string {
     case 'audio':
     case 'ptt':
       return '[áudio]'
+    case 'document':
+      return '[documento]'
     default:
       return '[mídia]'
   }

@@ -19,7 +19,7 @@ class WhatsappMediaStore
 
     public const KIND_AUDIO = 'audio';
 
-    private const DIRECTORY = 'whatsapp-media';
+    public const DIRECTORY = 'whatsapp-media';
 
     /**
      * Metadados do payload do webhook, sem o base64.
@@ -118,7 +118,7 @@ class WhatsappMediaStore
         return $meta;
     }
 
-    public function path(WhatsappMessage $message): ?string
+    public function storedPath(WhatsappMessage $message): ?string
     {
         $media = $message->media;
         if (! is_array($media)) {
@@ -130,12 +130,38 @@ class WhatsappMediaStore
             return null;
         }
 
-        return Storage::disk('local')->exists($path) ? $path : null;
+        return $path;
+    }
+
+    public function path(WhatsappMessage $message): ?string
+    {
+        $path = $this->storedPath($message);
+
+        return $path !== null && Storage::disk('local')->exists($path) ? $path : null;
     }
 
     public function exists(WhatsappMessage $message): bool
     {
         return $this->path($message) !== null;
+    }
+
+    public function storedBytes(WhatsappMessage $message): int
+    {
+        $media = is_array($message->media) ? $message->media : [];
+        if (is_numeric($media['filesize'] ?? null) && (int) $media['filesize'] > 0) {
+            return (int) $media['filesize'];
+        }
+
+        $path = $this->path($message);
+        if ($path === null) {
+            return 0;
+        }
+
+        try {
+            return (int) Storage::disk('local')->size($path);
+        } catch (Throwable) {
+            return 0;
+        }
     }
 
     public function absolutePath(WhatsappMessage $message): ?string
@@ -159,10 +185,41 @@ class WhatsappMediaStore
 
     public function delete(WhatsappMessage $message): void
     {
-        $path = $this->path($message);
-        if ($path !== null) {
+        $path = $this->storedPath($message);
+        if ($path !== null && Storage::disk('local')->exists($path)) {
             Storage::disk('local')->delete($path);
         }
+    }
+
+    /**
+     * Apaga o arquivo e tira o path da mensagem. O registro e a transcrição/descrição ficam.
+     */
+    public function purge(WhatsappMessage $message): bool
+    {
+        $path = $this->storedPath($message);
+        if ($path === null) {
+            return false;
+        }
+
+        try {
+            if (Storage::disk('local')->exists($path)) {
+                Storage::disk('local')->delete($path);
+            }
+        } catch (Throwable $e) {
+            Log::warning('WhatsappMediaStore: falha ao apagar mídia.', [
+                'message_id' => $message->id,
+                'message' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+
+        $media = is_array($message->media) ? $message->media : [];
+        unset($media['path']);
+        $media['purged_at'] = now()->toIso8601String();
+        $message->forceFill(['media' => $media])->save();
+
+        return true;
     }
 
     /**
@@ -191,6 +248,16 @@ class WhatsappMediaStore
             'audio/flac' => 'flac',
             'video/mp4' => 'mp4',
             'application/pdf' => 'pdf',
+            'application/msword' => 'doc',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+            'application/vnd.ms-excel' => 'xls',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+            'application/vnd.ms-powerpoint' => 'ppt',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
+            'application/zip' => 'zip',
+            'application/x-zip-compressed' => 'zip',
+            'text/plain' => 'txt',
+            'text/csv' => 'csv',
         ];
 
         if (isset($byMime[$mimetype])) {

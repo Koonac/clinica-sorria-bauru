@@ -103,3 +103,220 @@ index 525c403..88b88b1 100644
      }
  
      /**
+diff --git a/node_modules/whatsapp-web.js/src/structures/Message.js b/node_modules/whatsapp-web.js/src/structures/Message.js
+index dd977e8..a03f4d1 100644
+--- a/node_modules/whatsapp-web.js/src/structures/Message.js
++++ b/node_modules/whatsapp-web.js/src/structures/Message.js
+@@ -510,19 +510,118 @@ class Message extends Base {
+      * Downloads and returns the attatched message media
+      * @returns {Promise<MessageMedia>}
+      */
++    /**
++     * O WhatsApp Web parou de expor `_serialized` no objeto que chega ao Node
++     * (é getter de protótipo e some na serialização), então remontamos a chave
++     * a partir das partes.
++     * @returns {string|null}
++     */
++    get serializedId() {
++        const id = this.id || {};
++        if (typeof id._serialized === 'string' && id._serialized) {
++            return id._serialized;
++        }
++
++        const asString = (value) =>
++            typeof value === 'string' ? value : (value?._serialized ?? null);
++
++        const remote = asString(id.remote);
++        if (!remote || !id.id) return null;
++
++        const participant = asString(id.participant);
++
++        return [
++            id.fromMe ? 'true' : 'false',
++            remote,
++            id.id,
++            ...(participant ? [participant] : []),
++        ].join('_');
++    }
++
+     async downloadMedia() {
+         if (!this.hasMedia) {
+             return undefined;
+         }
+ 
++        const serializedId = this.serializedId;
++        if (!serializedId) {
++            throw new Error(
++                'downloadMedia falhou: não foi possível serializar o id da mensagem.',
++            );
++        }
++
+         const result = await this.client.pupPage.evaluate(async (msgId) => {
+-            const msg =
+-                window.require('WAWebCollections').Msg.get(msgId) ||
+-                (
+-                    await window
+-                        .require('WAWebCollections')
+-                        .Msg.getMessagesById([msgId])
+-                )?.messages?.[0];
++            // Erros do WhatsApp Web são minificados; devolvemos os campos úteis
++            // em vez de deixar o puppeteer serializar como "r".
++            const describeError = (error) => {
++                const detail = {
++                    name: error?.name ?? null,
++                    message: error?.message ?? null,
++                    status: error?.status ?? null,
++                };
++                if (!detail.message) {
++                    try {
++                        detail.message = JSON.stringify(error);
++                    } catch (_) {
++                        detail.message = String(error);
++                    }
++                }
++                return detail;
++            };
++
++            const blobToBase64 = (blob) =>
++                new Promise((resolve, reject) => {
++                    const reader = new FileReader();
++                    reader.onload = () => {
++                        const [, data] = String(reader.result).split(',');
++                        resolve(data);
++                    };
++                    reader.onerror = () => reject(reader.error);
++                    reader.readAsDataURL(blob);
++                });
++
++            // Mídia já decodificada pelo próprio WhatsApp Web (OpaqueData).
++            const opaqueToBlob = async (opaque) => {
++                if (!opaque) return null;
++                if (opaque instanceof Blob) return opaque;
++                if (opaque._blob instanceof Blob) return opaque._blob;
++                if (typeof opaque.forceToBlob === 'function') {
++                    const blob = await opaque.forceToBlob();
++                    if (blob) return blob;
++                }
++                if (typeof opaque.url === 'function') {
++                    const url = opaque.url();
++                    if (url) return await (await fetch(url)).blob();
++                }
++                return null;
++            };
++
++            // A coleção é indexada por MsgKey; buscar só pela string quebra o
++            // IndexedDB ("No key or key range specified").
++            let msg = null;
++            try {
++                const collections = window.require('WAWebCollections');
++                msg = collections.Msg.get(msgId) ?? null;
++
++                if (!msg) {
++                    const msgKey = window
++                        .require('WAWebMsgKey')
++                        .fromString(msgId);
++                    msg =
++                        collections.Msg.get(msgKey) ??
++                        collections.Msg.get(msgKey.toString()) ??
++                        null;
++
++                    if (!msg) {
++                        const found = await collections.Msg.getMessagesById([
++                            msgKey,
++                        ]);
++                        msg = found?.messages?.[0] ?? null;
++                    }
++                }
++            } catch (e) {
++                return { __error: describeError(e), stage: 'lookup' };
++            }
+ 
+             // REUPLOADING mediaStage means the media is expired and the download button is spinning, cannot be downloaded now
+             if (
+@@ -534,20 +633,32 @@ class Message extends Base {
+             }
+             if (msg.mediaData.mediaStage != 'RESOLVED') {
+                 // try to resolve media
+-                await msg.downloadMedia({
+-                    downloadEvenIfExpensive: true,
+-                    rmrReason: 1,
+-                });
++                try {
++                    await msg.downloadMedia({
++                        downloadEvenIfExpensive: true,
++                        rmrReason: 1,
++                    });
++                } catch (e) {
++                    return {
++                        __error: describeError(e),
++                        stage: String(msg.mediaData.mediaStage ?? 'resolve'),
++                    };
++                }
+             }
+ 
+-            if (
+-                msg.mediaData.mediaStage.includes('ERROR') ||
+-                msg.mediaData.mediaStage === 'FETCHING'
+-            ) {
++            const stage = String(msg.mediaData.mediaStage ?? '');
++            if (stage.includes('ERROR') || stage === 'FETCHING') {
+                 // media could not be downloaded
+                 return undefined;
+             }
+ 
++            const meta = {
++                mimetype: msg.mimetype,
++                filename: msg.filename,
++                filesize: msg.size,
++            };
++
++            let downloadError = null;
+             try {
+                 const mockQpl = {
+                     addAnnotations: function () {
+@@ -575,17 +686,36 @@ class Message extends Base {
+                         decryptedMedia,
+                     );
+ 
+-                return {
+-                    data,
+-                    mimetype: msg.mimetype,
+-                    filename: msg.filename,
+-                    filesize: msg.size,
+-                };
++                return { ...meta, data };
+             } catch (e) {
+-                if (e.status && e.status === 404) return undefined;
+-                throw e;
++                if (e?.status === 404) return undefined;
++                downloadError = e;
+             }
+-        }, this.id._serialized);
++
++            // Fallback: aproveita o blob que o WhatsApp Web já resolveu.
++            try {
++                const blob = await opaqueToBlob(msg.mediaData.mediaBlob);
++                if (blob) {
++                    return {
++                        ...meta,
++                        mimetype: msg.mimetype || blob.type,
++                        filesize: msg.size ?? blob.size,
++                        data: await blobToBase64(blob),
++                    };
++                }
++            } catch (e) {
++                // mantém o erro original do downloadAndMaybeDecrypt
++            }
++
++            return { __error: describeError(downloadError), stage };
++        }, serializedId);
++
++        if (result?.__error) {
++            const { name, message, status } = result.__error;
++            throw new Error(
++                `downloadMedia falhou (stage=${result.stage ?? '?'}${status ? `, status=${status}` : ''}): ${name ? `${name}: ` : ''}${message}`,
++            );
++        }
+ 
+         if (!result) return undefined;
+         return new MessageMedia(
