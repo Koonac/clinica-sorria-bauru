@@ -5,7 +5,6 @@ import {
   disconnectWhatsapp,
   getConnection,
   getConnectionStatus,
-  updateConnectionCredentials,
   updateConnectionSettings,
   type ClinicConnection,
 } from '@/api/crm/connection'
@@ -26,11 +25,6 @@ const actionLoading = ref(false)
 const statusLoading = ref(false)
 const errorMessage = ref('')
 const flash = ref('')
-
-const credentials = ref({
-  api_username: '',
-  api_password: '',
-})
 
 const settings = ref({
   name: '',
@@ -80,7 +74,6 @@ const statusTone = computed(() => {
 
 function applyConnection(next: ClinicConnection) {
   connection.value = next
-  credentials.value.api_username = next.api_username ?? ''
   settings.value.name = next.name ?? ''
   settings.value.ai_display_name = next.ai_display_name ?? ''
   settings.value.default_lead_stage_id = next.default_lead_stage_id
@@ -148,27 +141,6 @@ async function onDisconnect() {
   }
 }
 
-async function saveCredentials() {
-  if (actionLoading.value) return
-  actionLoading.value = true
-  errorMessage.value = ''
-  flash.value = ''
-  try {
-    const next = await updateConnectionCredentials({
-      api_username: credentials.value.api_username.trim(),
-      api_password: credentials.value.api_password,
-    })
-    applyConnection(next)
-    credentials.value.api_password = ''
-    flash.value = 'Credenciais salvas.'
-  } catch (error) {
-    errorMessage.value =
-      error instanceof ApiError ? error.message : 'Não foi possível salvar as credenciais.'
-  } finally {
-    actionLoading.value = false
-  }
-}
-
 async function saveSettings() {
   if (actionLoading.value) return
   actionLoading.value = true
@@ -215,8 +187,11 @@ onMounted(() => {
       <div class="min-w-0">
         <h3 class="text-lg font-semibold text-brand-ink">WhatsApp</h3>
         <p class="mt-1 text-sm leading-relaxed text-brand-ink/65">
-          Credenciais e opções da conexão WhatsApp da clínica
+          Opções da conexão WhatsApp da clínica
           <strong class="font-medium text-brand-ink">{{ clinicName }}</strong>.
+          <span v-if="connection?.phone" class="block mt-0.5 text-brand-ink/55">
+            Número: {{ connection.phone }}
+          </span>
         </p>
       </div>
       <div
@@ -268,59 +243,17 @@ onMounted(() => {
     </p>
 
     <div v-if="loading" class="flex flex-col gap-4" aria-busy="true">
-      <Skeleton class="h-5 w-40 rounded-md" />
-      <div class="grid gap-3 sm:grid-cols-2">
-        <Skeleton class="h-12 w-full rounded-xl" />
-        <Skeleton class="h-12 w-full rounded-xl" />
-      </div>
-      <Skeleton class="h-11 w-44 rounded-full" />
-      <Skeleton class="mt-2 h-px w-full rounded-none" />
       <Skeleton class="h-5 w-36 rounded-md" />
       <div class="grid gap-3 sm:grid-cols-2">
         <Skeleton class="h-12 w-full rounded-xl" />
         <Skeleton class="h-12 w-full rounded-xl" />
       </div>
+      <Skeleton class="h-12 w-full rounded-xl sm:col-span-2" />
+      <Skeleton class="h-11 w-44 rounded-full" />
     </div>
 
     <template v-else>
-      <form class="flex flex-col gap-3" @submit.prevent="saveCredentials">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h4 class="text-base font-semibold tracking-tight text-brand-ink">Credenciais da API</h4>
-          <p v-if="connection?.phone" class="text-sm text-brand-ink/55">
-            Número: {{ connection.phone }}
-          </p>
-        </div>
-        <div class="grid gap-3 sm:grid-cols-2">
-          <label class="flex flex-col gap-1.5">
-            <span class="text-sm font-medium text-brand-ink/80">Usuário</span>
-            <input
-              v-model="credentials.api_username"
-              type="text"
-              autocomplete="off"
-              required
-              :class="inputClass"
-            />
-          </label>
-          <label class="flex flex-col gap-1.5">
-            <span class="text-sm font-medium text-brand-ink/80">Senha</span>
-            <input
-              v-model="credentials.api_password"
-              type="password"
-              autocomplete="new-password"
-              required
-              :class="inputClass"
-              :placeholder="connection?.has_credentials ? '••••••••' : ''"
-            />
-          </label>
-        </div>
-        <div>
-          <Button type="submit" :disabled="actionLoading || statusLoading" icon="lucide:save">
-            Salvar credenciais
-          </Button>
-        </div>
-      </form>
-
-      <form class="flex flex-col gap-3 border-t border-brand-ink/10 pt-5" @submit.prevent="saveSettings">
+      <form class="flex flex-col gap-3" @submit.prevent="saveSettings">
         <h4 class="text-base font-semibold tracking-tight text-brand-ink">Configurações</h4>
         <div class="grid gap-3 sm:grid-cols-2">
           <label class="flex flex-col gap-1.5">

@@ -1,6 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ApiError } from '@/api/client'
+import {
+  getConnection,
+  updateConnectionCredentials,
+  type ClinicConnection,
+} from '@/api/crm/connection'
 import {
   getSystemSettings,
   listOpenRouterModels,
@@ -10,8 +15,12 @@ import {
 } from '@/api/dev'
 import Button from '@/components/Buttons/Button.vue'
 import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
+import Skeleton from '@/components/Feedback/Skeleton.vue'
 import { type SelectOption } from '@/components/Forms/Select.vue'
 import SelectSearch from '@/components/Forms/SelectSearch.vue'
+import { useClinicsStore } from '@/stores/clinics'
+
+const clinics = useClinicsStore()
 
 const loading = ref(true)
 const saving = ref(false)
@@ -23,6 +32,16 @@ const mediaSuccess = ref('')
 const retentionSuccess = ref('')
 const prompt = ref('')
 const fieldError = ref('')
+
+const credentialsLoading = ref(true)
+const credentialsSaving = ref(false)
+const credentialsError = ref('')
+const credentialsSuccess = ref('')
+const connection = ref<ClinicConnection | null>(null)
+const credentials = ref({
+  api_username: '',
+  api_password: '',
+})
 
 const media = ref({
   openrouter_transcription_model: '',
@@ -54,6 +73,11 @@ const languageOptions: SelectOption[] = [
   { value: 'de', label: 'Alemão (de)' },
 ]
 
+const clinicName = computed(() => clinics.activeClinic?.name ?? 'Clínica ativa')
+
+const inputClass =
+  'w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25'
+
 /** Mantém o valor salvo na lista mesmo se ele não vier mais do catálogo. */
 function withCurrent(options: SelectOption[], current: string): SelectOption[] {
   const value = current.trim()
@@ -84,6 +108,51 @@ function applySettings(settings: SystemSettings) {
   retention.value.whatsapp_media_max_mb_per_clinic = String(
     settings.whatsapp_media_max_mb_per_clinic || '2048',
   )
+}
+
+function applyConnection(next: ClinicConnection) {
+  connection.value = next
+  credentials.value.api_username = next.api_username ?? ''
+}
+
+async function loadCredentials() {
+  credentialsLoading.value = true
+  credentialsError.value = ''
+  credentialsSuccess.value = ''
+  try {
+    applyConnection(await getConnection())
+  } catch (e) {
+    connection.value = null
+    credentials.value.api_username = ''
+    credentials.value.api_password = ''
+    credentialsError.value =
+      e instanceof ApiError
+        ? e.message
+        : 'Não foi possível carregar as credenciais do WhatsApp.'
+  } finally {
+    credentialsLoading.value = false
+  }
+}
+
+async function saveCredentials() {
+  if (credentialsSaving.value) return
+  credentialsSaving.value = true
+  credentialsError.value = ''
+  credentialsSuccess.value = ''
+  try {
+    const next = await updateConnectionCredentials({
+      api_username: credentials.value.api_username.trim(),
+      api_password: credentials.value.api_password,
+    })
+    applyConnection(next)
+    credentials.value.api_password = ''
+    credentialsSuccess.value = 'Credenciais salvas.'
+  } catch (e) {
+    credentialsError.value =
+      e instanceof ApiError ? e.message : 'Não foi possível salvar as credenciais.'
+  } finally {
+    credentialsSaving.value = false
+  }
 }
 
 async function loadModels(capability: OpenRouterModelCapability): Promise<SelectOption[]> {
@@ -238,249 +307,335 @@ async function saveRetention() {
   }
 }
 
+watch(
+  () => clinics.activeClinicId,
+  () => {
+    void loadCredentials()
+  },
+)
+
 onMounted(() => {
   void load()
+  void loadCredentials()
 })
 </script>
 
 <template>
-  <ContentSkeleton v-if="loading" variant="detail" />
-
-  <div
-    v-else-if="error"
-    class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 text-sm text-brand-ink"
-  >
-    {{ error }}
-  </div>
-
-  <div v-else class="max-w-3xl space-y-5">
+  <div class="max-w-3xl space-y-5">
     <div class="rounded-2xl border border-brand-ink/10 bg-white p-5">
-      <h2 class="text-base font-semibold text-brand-ink">Anotações IA</h2>
+      <h2 class="text-base font-semibold text-brand-ink">Credenciais da API WhatsApp</h2>
       <p class="mt-1 text-sm text-brand-ink/60">
-        System prompt global usado ao gerar o resumo do atendimento WhatsApp (todas as clínicas).
+        Usuário e senha da API WhatsApp da clínica
+        <strong class="font-medium text-brand-ink">{{ clinicName }}</strong>.
+        Troque a clínica no seletor do menu para editar outra.
       </p>
 
-      <label class="mt-5 flex flex-col gap-1.5">
-        <span class="text-sm font-medium text-brand-ink/80">System prompt</span>
-        <textarea
-          v-model="prompt"
-          rows="12"
-          class="w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
-        />
-        <span v-if="fieldError" class="text-sm text-brand-ink/70" role="alert">
-          {{ fieldError }}
-        </span>
-      </label>
-
-      <p v-if="success" class="mt-3 text-sm text-brand-cyan-ink" role="status">{{ success }}</p>
-
-      <div class="mt-4 flex flex-wrap gap-2">
-        <Button :loading="saving" icon="lucide:save" @click="save">Salvar</Button>
-        <Button variant="secondary" :disabled="saving" icon="lucide:refresh-cw" @click="load">
-          Recarregar
-        </Button>
-      </div>
-    </div>
-
-    <div class="rounded-2xl border border-brand-ink/10 bg-white p-5">
-      <h2 class="text-base font-semibold text-brand-ink">Mídia do WhatsApp (OpenRouter)</h2>
-      <p class="mt-1 text-sm text-brand-ink/60">
-        Modelos usados para transcrever áudios e descrever imagens do paciente antes do agent
-        responder. Só rodam quando o agent está no controle da conversa.
-      </p>
-
-      <p
-        v-if="modelsError"
-        class="mt-3 rounded-xl bg-brand-ink/[0.04] px-3 py-2 text-sm text-brand-ink/70"
-        role="alert"
-      >
-        {{ modelsError }}
-      </p>
-
-      <div class="mt-5 grid gap-4 sm:grid-cols-2">
-        <label class="flex flex-col gap-1.5">
-          <span class="text-sm font-medium text-brand-ink/80">Modelo de transcrição</span>
-          <SelectSearch
-            v-model="media.openrouter_transcription_model"
-            :options="transcriptionOptions"
-            :disabled="modelsLoading"
-            :placeholder="modelsLoading ? 'Carregando modelos…' : 'Selecione um modelo…'"
-            search-placeholder="Pesquisar modelo…"
-            empty-label="Nenhum modelo de transcrição encontrado."
-          />
-          <span class="text-xs text-brand-ink/50">
-            Só modelos com saída de transcrição (speech-to-text).
-          </span>
-          <span
-            v-if="mediaErrors.openrouter_transcription_model"
-            class="text-sm text-brand-ink/70"
-            role="alert"
-          >
-            {{ mediaErrors.openrouter_transcription_model }}
-          </span>
-        </label>
-
-        <label class="flex flex-col gap-1.5">
-          <span class="text-sm font-medium text-brand-ink/80">Idioma do áudio</span>
-          <SelectSearch
-            v-model="media.openrouter_transcription_language"
-            :options="languageSelectOptions"
-            placeholder="Selecione o idioma…"
-            search-placeholder="Pesquisar idioma…"
-            empty-label="Nenhum idioma encontrado."
-          />
-          <span class="text-xs text-brand-ink/50">Código ISO-639-1 enviado na transcrição.</span>
-          <span
-            v-if="mediaErrors.openrouter_transcription_language"
-            class="text-sm text-brand-ink/70"
-            role="alert"
-          >
-            {{ mediaErrors.openrouter_transcription_language }}
-          </span>
-        </label>
-
-        <label class="flex flex-col gap-1.5 sm:col-span-2">
-          <span class="text-sm font-medium text-brand-ink/80">Modelo de visão (imagens)</span>
-          <SelectSearch
-            v-model="media.openrouter_vision_model"
-            :options="visionOptions"
-            :disabled="modelsLoading"
-            :placeholder="modelsLoading ? 'Carregando modelos…' : 'Selecione um modelo…'"
-            search-placeholder="Pesquisar modelo…"
-            empty-label="Nenhum modelo de visão encontrado."
-          />
-          <span class="text-xs text-brand-ink/50">
-            Só modelos que aceitam imagem na entrada e respondem em texto.
-          </span>
-          <span
-            v-if="mediaErrors.openrouter_vision_model"
-            class="text-sm text-brand-ink/70"
-            role="alert"
-          >
-            {{ mediaErrors.openrouter_vision_model }}
-          </span>
-        </label>
-
-        <label class="flex flex-col gap-1.5 sm:col-span-2">
-          <span class="text-sm font-medium text-brand-ink/80">System prompt da visão</span>
-          <textarea
-            v-model="media.openrouter_vision_system_prompt"
-            rows="5"
-            class="w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
-          />
-          <span class="text-xs text-brand-ink/50">
-            Instrução de sistema enviada ao modelo ao descrever imagens do paciente.
-          </span>
-          <span
-            v-if="mediaErrors.openrouter_vision_system_prompt"
-            class="text-sm text-brand-ink/70"
-            role="alert"
-          >
-            {{ mediaErrors.openrouter_vision_system_prompt }}
-          </span>
-        </label>
-
-        <label class="flex flex-col gap-1.5 sm:col-span-2">
-          <span class="text-sm font-medium text-brand-ink/80">Instrução do usuário (visão)</span>
-          <textarea
-            v-model="media.openrouter_vision_instruction"
-            rows="2"
-            class="w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
-          />
-          <span class="text-xs text-brand-ink/50">
-            Texto enviado junto com a imagem no papel de usuário.
-          </span>
-          <span
-            v-if="mediaErrors.openrouter_vision_instruction"
-            class="text-sm text-brand-ink/70"
-            role="alert"
-          >
-            {{ mediaErrors.openrouter_vision_instruction }}
-          </span>
-        </label>
+      <div v-if="credentialsLoading" class="mt-5 flex flex-col gap-3" aria-busy="true">
+        <div class="grid gap-3 sm:grid-cols-2">
+          <Skeleton class="h-11 w-full rounded-xl" />
+          <Skeleton class="h-11 w-full rounded-xl" />
+        </div>
+        <Skeleton class="h-10 w-40 rounded-full" />
       </div>
 
-      <p v-if="mediaSuccess" class="mt-3 text-sm text-brand-cyan-ink" role="status">
-        {{ mediaSuccess }}
-      </p>
-
-      <div class="mt-4 flex flex-wrap gap-2">
-        <Button :loading="savingMedia" icon="lucide:save" @click="saveMedia">Salvar</Button>
-        <Button
-          variant="secondary"
-          :disabled="savingMedia || modelsLoading"
-          icon="lucide:refresh-cw"
-          @click="load"
+      <template v-else>
+        <p
+          v-if="credentialsError"
+          class="mt-3 rounded-xl bg-brand-ink/[0.04] px-3 py-2 text-sm text-brand-ink/70"
+          role="alert"
         >
-          Recarregar
-        </Button>
-      </div>
+          {{ credentialsError }}
+        </p>
+
+        <form class="mt-5 flex flex-col gap-4" @submit.prevent="saveCredentials">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="flex flex-col gap-1.5">
+              <span class="text-sm font-medium text-brand-ink/80">Usuário</span>
+              <input
+                v-model="credentials.api_username"
+                type="text"
+                autocomplete="off"
+                required
+                :class="inputClass"
+              />
+            </label>
+            <label class="flex flex-col gap-1.5">
+              <span class="text-sm font-medium text-brand-ink/80">Senha</span>
+              <input
+                v-model="credentials.api_password"
+                type="password"
+                autocomplete="new-password"
+                required
+                :class="inputClass"
+                :placeholder="connection?.has_credentials ? '••••••••' : ''"
+              />
+            </label>
+          </div>
+
+          <p v-if="connection?.phone" class="text-sm text-brand-ink/55">
+            Número conectado: {{ connection.phone }}
+          </p>
+
+          <p v-if="credentialsSuccess" class="text-sm text-brand-cyan-ink" role="status">
+            {{ credentialsSuccess }}
+          </p>
+
+          <div class="flex flex-wrap gap-2">
+            <Button type="submit" :loading="credentialsSaving" icon="lucide:save">
+              Salvar credenciais
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              :disabled="credentialsSaving"
+              icon="lucide:refresh-cw"
+              @click="loadCredentials"
+            >
+              Recarregar
+            </Button>
+          </div>
+        </form>
+      </template>
     </div>
 
-    <div class="rounded-2xl border border-brand-ink/10 bg-white p-5">
-      <h2 class="text-base font-semibold text-brand-ink">Armazenamento de mídia</h2>
-      <p class="mt-1 text-sm text-brand-ink/60">
-        Arquivos de áudio, imagem e documento são apagados automaticamente. A mensagem, a
-        transcrição e a descrição da IA permanecem no histórico.
-      </p>
+    <ContentSkeleton v-if="loading" variant="detail" />
 
-      <div class="mt-5 grid gap-4 sm:grid-cols-2">
-        <label class="flex flex-col gap-1.5">
-          <span class="text-sm font-medium text-brand-ink/80">Retenção (dias)</span>
-          <input
-            v-model="retention.whatsapp_media_retention_days"
-            type="number"
-            min="1"
-            max="3650"
+    <div
+      v-else-if="error"
+      class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 text-sm text-brand-ink"
+    >
+      {{ error }}
+    </div>
+
+    <template v-else>
+      <div class="rounded-2xl border border-brand-ink/10 bg-white p-5">
+        <h2 class="text-base font-semibold text-brand-ink">Anotações IA</h2>
+        <p class="mt-1 text-sm text-brand-ink/60">
+          System prompt global usado ao gerar o resumo do atendimento WhatsApp (todas as clínicas).
+        </p>
+
+        <label class="mt-5 flex flex-col gap-1.5">
+          <span class="text-sm font-medium text-brand-ink/80">System prompt</span>
+          <textarea
+            v-model="prompt"
+            rows="12"
             class="w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
           />
-          <span class="text-xs text-brand-ink/50">Arquivos mais velhos que isso saem do disco.</span>
-          <span
-            v-if="retentionErrors.whatsapp_media_retention_days"
-            class="text-sm text-brand-ink/70"
-            role="alert"
-          >
-            {{ retentionErrors.whatsapp_media_retention_days }}
+          <span v-if="fieldError" class="text-sm text-brand-ink/70" role="alert">
+            {{ fieldError }}
           </span>
         </label>
 
-        <label class="flex flex-col gap-1.5">
-          <span class="text-sm font-medium text-brand-ink/80">Teto por clínica (MB)</span>
-          <input
-            v-model="retention.whatsapp_media_max_mb_per_clinic"
-            type="number"
-            min="50"
-            max="102400"
-            class="w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
-          />
-          <span class="text-xs text-brand-ink/50">
-            Se passar do teto, os arquivos mais antigos daquela clínica saem primeiro.
-          </span>
-          <span
-            v-if="retentionErrors.whatsapp_media_max_mb_per_clinic"
-            class="text-sm text-brand-ink/70"
-            role="alert"
-          >
-            {{ retentionErrors.whatsapp_media_max_mb_per_clinic }}
-          </span>
-        </label>
+        <p v-if="success" class="mt-3 text-sm text-brand-cyan-ink" role="status">{{ success }}</p>
+
+        <div class="mt-4 flex flex-wrap gap-2">
+          <Button :loading="saving" icon="lucide:save" @click="save">Salvar</Button>
+          <Button variant="secondary" :disabled="saving" icon="lucide:refresh-cw" @click="load">
+            Recarregar
+          </Button>
+        </div>
       </div>
 
-      <p v-if="retentionSuccess" class="mt-3 text-sm text-brand-cyan-ink" role="status">
-        {{ retentionSuccess }}
-      </p>
+      <div class="rounded-2xl border border-brand-ink/10 bg-white p-5">
+        <h2 class="text-base font-semibold text-brand-ink">Mídia do WhatsApp (OpenRouter)</h2>
+        <p class="mt-1 text-sm text-brand-ink/60">
+          Modelos usados para transcrever áudios e descrever imagens do paciente antes do agent
+          responder. Só rodam quando o agent está no controle da conversa.
+        </p>
 
-      <div class="mt-4 flex flex-wrap gap-2">
-        <Button :loading="savingRetention" icon="lucide:save" @click="saveRetention">Salvar</Button>
-        <Button
-          variant="secondary"
-          :disabled="savingRetention"
-          icon="lucide:refresh-cw"
-          @click="load"
+        <p
+          v-if="modelsError"
+          class="mt-3 rounded-xl bg-brand-ink/[0.04] px-3 py-2 text-sm text-brand-ink/70"
+          role="alert"
         >
-          Recarregar
-        </Button>
+          {{ modelsError }}
+        </p>
+
+        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+          <label class="flex flex-col gap-1.5">
+            <span class="text-sm font-medium text-brand-ink/80">Modelo de transcrição</span>
+            <SelectSearch
+              v-model="media.openrouter_transcription_model"
+              :options="transcriptionOptions"
+              :disabled="modelsLoading"
+              :placeholder="modelsLoading ? 'Carregando modelos…' : 'Selecione um modelo…'"
+              search-placeholder="Pesquisar modelo…"
+              empty-label="Nenhum modelo de transcrição encontrado."
+            />
+            <span class="text-xs text-brand-ink/50">
+              Só modelos com saída de transcrição (speech-to-text).
+            </span>
+            <span
+              v-if="mediaErrors.openrouter_transcription_model"
+              class="text-sm text-brand-ink/70"
+              role="alert"
+            >
+              {{ mediaErrors.openrouter_transcription_model }}
+            </span>
+          </label>
+
+          <label class="flex flex-col gap-1.5">
+            <span class="text-sm font-medium text-brand-ink/80">Idioma do áudio</span>
+            <SelectSearch
+              v-model="media.openrouter_transcription_language"
+              :options="languageSelectOptions"
+              placeholder="Selecione o idioma…"
+              search-placeholder="Pesquisar idioma…"
+              empty-label="Nenhum idioma encontrado."
+            />
+            <span class="text-xs text-brand-ink/50">Código ISO-639-1 enviado na transcrição.</span>
+            <span
+              v-if="mediaErrors.openrouter_transcription_language"
+              class="text-sm text-brand-ink/70"
+              role="alert"
+            >
+              {{ mediaErrors.openrouter_transcription_language }}
+            </span>
+          </label>
+
+          <label class="flex flex-col gap-1.5 sm:col-span-2">
+            <span class="text-sm font-medium text-brand-ink/80">Modelo de visão (imagens)</span>
+            <SelectSearch
+              v-model="media.openrouter_vision_model"
+              :options="visionOptions"
+              :disabled="modelsLoading"
+              :placeholder="modelsLoading ? 'Carregando modelos…' : 'Selecione um modelo…'"
+              search-placeholder="Pesquisar modelo…"
+              empty-label="Nenhum modelo de visão encontrado."
+            />
+            <span class="text-xs text-brand-ink/50">
+              Só modelos que aceitam imagem na entrada e respondem em texto.
+            </span>
+            <span
+              v-if="mediaErrors.openrouter_vision_model"
+              class="text-sm text-brand-ink/70"
+              role="alert"
+            >
+              {{ mediaErrors.openrouter_vision_model }}
+            </span>
+          </label>
+
+          <label class="flex flex-col gap-1.5 sm:col-span-2">
+            <span class="text-sm font-medium text-brand-ink/80">System prompt da visão</span>
+            <textarea
+              v-model="media.openrouter_vision_system_prompt"
+              rows="5"
+              class="w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
+            />
+            <span class="text-xs text-brand-ink/50">
+              Instrução de sistema enviada ao modelo ao descrever imagens do paciente.
+            </span>
+            <span
+              v-if="mediaErrors.openrouter_vision_system_prompt"
+              class="text-sm text-brand-ink/70"
+              role="alert"
+            >
+              {{ mediaErrors.openrouter_vision_system_prompt }}
+            </span>
+          </label>
+
+          <label class="flex flex-col gap-1.5 sm:col-span-2">
+            <span class="text-sm font-medium text-brand-ink/80">Instrução do usuário (visão)</span>
+            <textarea
+              v-model="media.openrouter_vision_instruction"
+              rows="2"
+              class="w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
+            />
+            <span class="text-xs text-brand-ink/50">
+              Texto enviado junto com a imagem no papel de usuário.
+            </span>
+            <span
+              v-if="mediaErrors.openrouter_vision_instruction"
+              class="text-sm text-brand-ink/70"
+              role="alert"
+            >
+              {{ mediaErrors.openrouter_vision_instruction }}
+            </span>
+          </label>
+        </div>
+
+        <p v-if="mediaSuccess" class="mt-3 text-sm text-brand-cyan-ink" role="status">
+          {{ mediaSuccess }}
+        </p>
+
+        <div class="mt-4 flex flex-wrap gap-2">
+          <Button :loading="savingMedia" icon="lucide:save" @click="saveMedia">Salvar</Button>
+          <Button
+            variant="secondary"
+            :disabled="savingMedia || modelsLoading"
+            icon="lucide:refresh-cw"
+            @click="load"
+          >
+            Recarregar
+          </Button>
+        </div>
       </div>
-    </div>
+
+      <div class="rounded-2xl border border-brand-ink/10 bg-white p-5">
+        <h2 class="text-base font-semibold text-brand-ink">Armazenamento de mídia</h2>
+        <p class="mt-1 text-sm text-brand-ink/60">
+          Arquivos de áudio, imagem e documento são apagados automaticamente. A mensagem, a
+          transcrição e a descrição da IA permanecem no histórico.
+        </p>
+
+        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+          <label class="flex flex-col gap-1.5">
+            <span class="text-sm font-medium text-brand-ink/80">Retenção (dias)</span>
+            <input
+              v-model="retention.whatsapp_media_retention_days"
+              type="number"
+              min="1"
+              max="3650"
+              class="w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
+            />
+            <span class="text-xs text-brand-ink/50">Arquivos mais velhos que isso saem do disco.</span>
+            <span
+              v-if="retentionErrors.whatsapp_media_retention_days"
+              class="text-sm text-brand-ink/70"
+              role="alert"
+            >
+              {{ retentionErrors.whatsapp_media_retention_days }}
+            </span>
+          </label>
+
+          <label class="flex flex-col gap-1.5">
+            <span class="text-sm font-medium text-brand-ink/80">Teto por clínica (MB)</span>
+            <input
+              v-model="retention.whatsapp_media_max_mb_per_clinic"
+              type="number"
+              min="50"
+              max="102400"
+              class="w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-sm text-brand-ink outline-none transition focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
+            />
+            <span class="text-xs text-brand-ink/50">
+              Se passar do teto, os arquivos mais antigos daquela clínica saem primeiro.
+            </span>
+            <span
+              v-if="retentionErrors.whatsapp_media_max_mb_per_clinic"
+              class="text-sm text-brand-ink/70"
+              role="alert"
+            >
+              {{ retentionErrors.whatsapp_media_max_mb_per_clinic }}
+            </span>
+          </label>
+        </div>
+
+        <p v-if="retentionSuccess" class="mt-3 text-sm text-brand-cyan-ink" role="status">
+          {{ retentionSuccess }}
+        </p>
+
+        <div class="mt-4 flex flex-wrap gap-2">
+          <Button :loading="savingRetention" icon="lucide:save" @click="saveRetention">Salvar</Button>
+          <Button
+            variant="secondary"
+            :disabled="savingRetention"
+            icon="lucide:refresh-cw"
+            @click="load"
+          >
+            Recarregar
+          </Button>
+        </div>
+      </div>
+    </template>
   </div>
 </template>

@@ -250,9 +250,16 @@ onUnmounted(() => {
         v-if="canManageConnection && !connection?.has_credentials"
         class="text-sm text-brand-ink/55"
       >
-        Configure as credenciais da API em
-        <strong class="font-medium text-brand-ink">Configurações → WhatsApp</strong>
-        antes de conectar.
+        <template v-if="auth.isDeveloper">
+          Configure as credenciais da API em
+          <strong class="font-medium text-brand-ink">Dev → Configuração</strong>
+          antes de conectar.
+        </template>
+        <template v-else>
+          As credenciais da API ainda não foram configuradas. Peça a um developer para
+          defini-las em
+          <strong class="font-medium text-brand-ink">Dev → Configuração</strong>.
+        </template>
       </p>
 
       <div

@@ -63,10 +63,11 @@ class AdminUserSeeder extends Seeder
         if (! $developer) {
             $senha = Str::password(24);
 
-            User::factory()->developer()->create([
+            User::query()->create([
                 'username' => 'henrique',
                 'name' => 'Henrique',
                 'email' => 'henrique@dev.com',
+                'role' => User::ROLE_DEVELOPER,
                 'password' => $senha,
             ]);
 
