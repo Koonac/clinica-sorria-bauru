@@ -12,7 +12,6 @@ use App\Models\LlmTokenUsage;
 use App\Services\Crm\OpenRouterAgentClient;
 use App\Services\Crm\WhatsappChatHistory;
 use Illuminate\Support\Facades\Log;
-use RuntimeException;
 
 class WhatsappAgentRunner
 {
@@ -31,6 +30,16 @@ class WhatsappAgentRunner
     public function run(AgentContext $context): void
     {
         $messages = $this->buildMessages($context);
+        if ($messages === []) {
+            Log::info('WhatsApp agent sem mensagens com conteúdo.', [
+                'user_id' => $context->user->id,
+                'agent_id' => $context->agent->id,
+                'chat_key' => $context->chatKey,
+            ]);
+
+            return;
+        }
+
         $openAiTools = $this->tools->openAiTools();
         $model = $context->agent->resolvedModel();
         $enviouResposta = false;
@@ -164,7 +173,7 @@ class WhatsappAgentRunner
         }
 
         if ($chatMessages === []) {
-            throw new RuntimeException('Sem mensagens com conteúdo para o agent responder.');
+            return [];
         }
 
         return [

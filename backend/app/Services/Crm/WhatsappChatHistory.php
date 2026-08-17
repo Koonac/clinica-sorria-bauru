@@ -9,6 +9,13 @@ use Illuminate\Support\Collection;
 class WhatsappChatHistory
 {
     /**
+     * Folga ao recortar pelo started_at do segmento: o reopen persiste o inbound
+     * depois de abrir o atendimento, e o wa_timestamp do WhatsApp chega alguns
+     * segundos atrasado em relação ao relógio do servidor.
+     */
+    public const SEGMENT_START_SKEW_SECONDS = 10;
+
+    /**
      * JIDs/@lid relacionados ao mesmo chat (inbound @c.us + outbound @lid).
      *
      * @return list<string>
@@ -120,11 +127,14 @@ class WhatsappChatHistory
             });
 
         if ($since !== null) {
-            $query->where(function ($q) use ($since) {
-                $q->where('wa_timestamp', '>=', $since)
-                    ->orWhere(function ($inner) use ($since) {
+            // Reopen grava o segmento com started_at = now() e só depois persiste
+            // o inbound. O wa_timestamp do WhatsApp costuma ser 1–3s anterior.
+            $sinceFloor = $since->copy()->startOfSecond()->subSeconds(self::SEGMENT_START_SKEW_SECONDS);
+            $query->where(function ($q) use ($sinceFloor) {
+                $q->where('wa_timestamp', '>=', $sinceFloor)
+                    ->orWhere(function ($inner) use ($sinceFloor) {
                         $inner->whereNull('wa_timestamp')
-                            ->where('created_at', '>=', $since);
+                            ->where('created_at', '>=', $sinceFloor);
                     });
             });
         }

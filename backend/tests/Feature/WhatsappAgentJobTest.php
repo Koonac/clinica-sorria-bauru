@@ -827,4 +827,133 @@ class WhatsappAgentJobTest extends TestCase
         $this->assertStringContainsString('Cliente perguntou sobre clareamento', $encoded);
         $this->assertStringContainsString('Histórico de atendimentos anteriores', $encoded);
     }
+
+    public function test_agent_responde_inbound_que_reabre_com_wa_timestamp_anterior_ao_segmento(): void
+    {
+        $captured = null;
+        Http::fake(function ($request) use (&$captured) {
+            if (str_contains($request->url(), 'openrouter.ai')) {
+                $captured = $request->data();
+
+                return Http::response([
+                    'choices' => [[
+                        'message' => [
+                            'role' => 'assistant',
+                            'content' => null,
+                            'tool_calls' => [[
+                                'id' => 'call_reopen',
+                                'type' => 'function',
+                                'function' => [
+                                    'name' => 'enviar_resposta',
+                                    'arguments' => json_encode(['texto' => 'Oi! Como posso ajudar?']),
+                                ],
+                            ]],
+                        ],
+                    ]],
+                ], 200);
+            }
+
+            return Http::response([
+                'success' => true,
+                'to' => '5511999990000@c.us',
+                'messageId' => 'out-reopen-1',
+            ], 200);
+        });
+
+        [$user, $connection] = $this->userConectado();
+        $this->agentAtivo($user);
+        $lead = Lead::create([
+            'title' => 'L',
+            'name' => 'Ana',
+            'mobile' => '5511999990000',
+            'whatsapp_jid' => '5511999990000@c.us',
+            'owner_id' => $user->id,
+        ]);
+
+        $openStart = now();
+        WhatsappAttendanceSegment::create([
+            'clinic_id' => $lead->clinic_id,
+            'lead_id' => $lead->id,
+            'mode' => WhatsappAttendanceSegment::MODE_AI,
+            'started_at' => $openStart,
+            'ended_at' => null,
+            'source' => 'reopen',
+        ]);
+
+        WhatsappMessage::create([
+            'clinic_id' => $connection->clinic_id,
+            'connection_id' => $connection->id,
+            'user_id' => $user->id,
+            'session_id' => $connection->session_id,
+            'whatsapp_jid' => '5511999990000@c.us',
+            'phone_number' => '5511999990000',
+            'direction' => 'inbound',
+            'body' => 'Oiii',
+            'message_id' => 'msg-reopen-skew',
+            'type' => 'chat',
+            'has_media' => false,
+            'lead_id' => $lead->id,
+            'wa_timestamp' => $openStart->copy()->subSeconds(2),
+            'created_at' => $openStart,
+            'updated_at' => $openStart,
+        ]);
+
+        $job = new ProcessWhatsappAiReplyJob($connection->id, 'lead:'.$lead->id);
+        $this->runAiJob($job);
+
+        $this->assertNotNull($captured);
+        $encoded = json_encode($captured['messages'] ?? [], JSON_UNESCAPED_UNICODE);
+        $this->assertStringContainsString('Oiii', $encoded);
+        $this->assertDatabaseHas('whatsapp_messages', [
+            'connection_id' => $connection->id,
+            'direction' => 'outbound',
+            'lead_id' => $lead->id,
+        ]);
+    }
+
+    public function test_job_nao_falha_quando_historico_do_segmento_nao_tem_conteudo(): void
+    {
+        Http::fake();
+
+        [$user, $connection] = $this->userConectado();
+        $this->agentAtivo($user);
+        $lead = Lead::create([
+            'title' => 'L',
+            'name' => 'Ana',
+            'mobile' => '5511999990000',
+            'whatsapp_jid' => '5511999990000@c.us',
+            'owner_id' => $user->id,
+        ]);
+
+        WhatsappAttendanceSegment::create([
+            'clinic_id' => $lead->clinic_id,
+            'lead_id' => $lead->id,
+            'mode' => WhatsappAttendanceSegment::MODE_AI,
+            'started_at' => now(),
+            'ended_at' => null,
+            'source' => 'reopen',
+        ]);
+
+        WhatsappMessage::create([
+            'clinic_id' => $connection->clinic_id,
+            'connection_id' => $connection->id,
+            'user_id' => $user->id,
+            'session_id' => $connection->session_id,
+            'whatsapp_jid' => '5511999990000@c.us',
+            'direction' => 'inbound',
+            'body' => 'msg antiga',
+            'message_id' => 'msg-old-only',
+            'type' => 'chat',
+            'has_media' => false,
+            'lead_id' => $lead->id,
+            'wa_timestamp' => now()->subHours(2),
+            'created_at' => now()->subHours(2),
+            'updated_at' => now()->subHours(2),
+        ]);
+
+        $job = new ProcessWhatsappAiReplyJob($connection->id, 'lead:'.$lead->id);
+        $this->runAiJob($job);
+
+        Http::assertNothingSent();
+    }
 }

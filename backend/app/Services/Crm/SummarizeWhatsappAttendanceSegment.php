@@ -124,13 +124,15 @@ class SummarizeWhatsappAttendanceSegment
         return WhatsappMessage::query()
             ->where('lead_id', $leadId)
             ->where(function ($q) use ($segment) {
-                $q->where(function ($inner) use ($segment) {
-                    $inner->where('wa_timestamp', '>=', $segment->started_at)
-                        ->where('wa_timestamp', '<=', $segment->ended_at);
-                })->orWhere(function ($inner) use ($segment) {
+                $started = $segment->started_at->copy()->startOfSecond()->subSeconds(WhatsappChatHistory::SEGMENT_START_SKEW_SECONDS);
+                $ended = $segment->ended_at->copy()->endOfSecond();
+                $q->where(function ($inner) use ($started, $ended) {
+                    $inner->where('wa_timestamp', '>=', $started)
+                        ->where('wa_timestamp', '<=', $ended);
+                })->orWhere(function ($inner) use ($started, $ended) {
                     $inner->whereNull('wa_timestamp')
-                        ->where('created_at', '>=', $segment->started_at)
-                        ->where('created_at', '<=', $segment->ended_at);
+                        ->where('created_at', '>=', $started)
+                        ->where('created_at', '<=', $ended);
                 });
             })
             ->orderBy('wa_timestamp')
