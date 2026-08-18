@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Database\Seeders\ClinicSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -77,6 +78,23 @@ class WhatsappConnectionCredentialsTest extends TestCase
             ->assertJsonPath('data.has_credentials', true);
 
         $this->assertSame('wa-pass', $connection->fresh()->api_password);
+    }
+
+    public function test_developer_salva_credenciais_mesmo_se_encriptacao_falhar(): void
+    {
+        $this->userWithWhatsappConnection(['api_username' => 'antigo']);
+        Sanctum::actingAs(User::factory()->developer()->create());
+
+        Crypt::shouldReceive('encrypt')->andThrow(new \RuntimeException('No application encryption key'));
+        Crypt::shouldReceive('decrypt')->andThrow(new \RuntimeException('No application encryption key'));
+
+        $this->putJson('/api/v1/crm/connection/credentials', [
+            'api_username' => 'wa-user',
+            'api_password' => 'wa-pass',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.api_username', 'wa-user')
+            ->assertJsonPath('data.has_credentials', true);
     }
 
     public function test_funcionario_nao_atualiza_credenciais(): void

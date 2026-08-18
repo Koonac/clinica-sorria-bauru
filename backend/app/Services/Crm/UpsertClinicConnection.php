@@ -21,7 +21,7 @@ class UpsertClinicConnection
         $connection = Connection::query()->first();
 
         if (! $connection) {
-            $connection = Connection::create([
+            return Connection::create([
                 'clinic_id' => $clinic->id,
                 'name' => $attrs['name'] ?? 'WhatsApp principal',
                 'status' => 'disconnected',
@@ -29,13 +29,15 @@ class UpsertClinicConnection
                 'default_lead_stage_id' => $attrs['default_lead_stage_id'] ?? null,
                 'created_by' => $userId,
             ]);
-        } elseif ($attrs !== []) {
+        }
+
+        if ($attrs !== []) {
             $connection->fill(array_intersect_key($attrs, array_flip([
                 'name',
                 'default_lead_stage_id',
             ])))->save();
         }
 
-        return $connection->fresh();
+        return $connection;
     }
 }

@@ -14,6 +14,7 @@ use App\Services\Crm\UpsertClinicConnection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
+use Throwable;
 
 class ConnectionController extends Controller
 {
@@ -29,9 +30,19 @@ class ConnectionController extends Controller
         UpdateWhatsappConnectionCredentials $service,
         GetWhatsappConnectionStatus $status,
     ): JsonResponse {
-        $connection = $service->handle($request->validated(), $request->user()?->id);
+        try {
+            $connection = $service->handle($request->validated(), $request->user()?->id);
 
-        return response()->json(['data' => $status->publicState($connection)]);
+            return response()->json(['data' => $status->publicState($connection)]);
+        } catch (Throwable $e) {
+            report($e);
+            $code = $e->getCode();
+            $http = ($code >= 400 && $code < 600) ? $code : 500;
+
+            return response()->json([
+                'message' => $e->getMessage() ?: 'Não foi possível salvar as credenciais.',
+            ], $http);
+        }
     }
 
     public function updateSettings(

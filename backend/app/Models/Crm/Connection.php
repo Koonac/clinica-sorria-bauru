@@ -4,11 +4,11 @@ namespace App\Models\Crm;
 
 use App\Models\Concerns\BelongsToClinic;
 use App\Models\User;
-use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Crypt;
+use Throwable;
 
 class Connection extends Model
 {
@@ -68,7 +68,7 @@ class Connection extends Model
 
                 try {
                     return Crypt::decrypt($value, false);
-                } catch (DecryptException) {
+                } catch (Throwable) {
                     return $value;
                 }
             },
@@ -77,7 +77,11 @@ class Connection extends Model
                     return $value;
                 }
 
-                return Crypt::encrypt($value, false);
+                try {
+                    return Crypt::encrypt($value, false);
+                } catch (Throwable) {
+                    return $value;
+                }
             },
         );
     }
