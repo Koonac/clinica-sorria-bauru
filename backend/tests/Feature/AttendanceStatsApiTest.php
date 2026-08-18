@@ -94,6 +94,58 @@ class AttendanceStatsApiTest extends TestCase
             ->assertJsonPath('data.by_user', []);
     }
 
+    public function test_segmento_ia_aberto_sem_processamento_nao_conta_tempo(): void
+    {
+        $admin = User::factory()->admin()->create();
+        Sanctum::actingAs($admin);
+
+        $lead = Lead::create(['title' => 'L', 'name' => 'Pedro']);
+
+        WhatsappAttendanceSegment::create([
+            'clinic_id' => $lead->clinic_id,
+            'lead_id' => $lead->id,
+            'mode' => WhatsappAttendanceSegment::MODE_AI,
+            'user_id' => null,
+            'started_at' => now()->subHours(3),
+            'ended_at' => null,
+            'duration_seconds' => null,
+            'active_seconds' => 0,
+            'active_started_at' => null,
+            'source' => 'lead_created',
+        ]);
+
+        $this->getJson('/api/v1/crm/stats/attendance?dias=30')
+            ->assertOk()
+            ->assertJsonPath('data.total_ai_seconds', 0)
+            ->assertJsonPath('data.clients_ai', 0)
+            ->assertJsonPath('data.open_ai', 1);
+    }
+
+    public function test_tempo_ia_usa_active_seconds_quando_disponivel(): void
+    {
+        $admin = User::factory()->admin()->create();
+        Sanctum::actingAs($admin);
+
+        $lead = Lead::create(['title' => 'L', 'name' => 'Ana']);
+
+        WhatsappAttendanceSegment::create([
+            'clinic_id' => $lead->clinic_id,
+            'lead_id' => $lead->id,
+            'mode' => WhatsappAttendanceSegment::MODE_AI,
+            'user_id' => null,
+            'started_at' => now()->subHours(2),
+            'ended_at' => now()->subHour(),
+            'duration_seconds' => 3600,
+            'active_seconds' => 95,
+            'source' => 'lead_created',
+        ]);
+
+        $this->getJson('/api/v1/crm/stats/attendance?dias=30')
+            ->assertOk()
+            ->assertJsonPath('data.total_ai_seconds', 95)
+            ->assertJsonPath('data.by_user.0.total_seconds', 95);
+    }
+
     public function test_funcionario_nao_acessa_metricas_de_atendimento(): void
     {
         Sanctum::actingAs(User::factory()->funcionario()->create([

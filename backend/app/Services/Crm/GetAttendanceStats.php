@@ -45,17 +45,22 @@ class GetAttendanceStats
         $humanLeadIds = [];
 
         foreach ($segments as $segment) {
-            $seconds = $this->overlapSeconds($segment, $windowStart, $now);
-            if ($seconds <= 0) {
-                continue;
-            }
-
             $leadId = (int) $segment->lead_id;
 
             if ($segment->mode === WhatsappAttendanceSegment::MODE_AI) {
+                $seconds = $this->aiActiveSeconds($segment, $windowStart, $now);
+                if ($seconds <= 0) {
+                    continue;
+                }
+
                 $totalAi += $seconds;
                 $aiLeadIds[$leadId] = true;
 
+                continue;
+            }
+
+            $seconds = $this->overlapSeconds($segment, $windowStart, $now);
+            if ($seconds <= 0) {
                 continue;
             }
 
@@ -155,5 +160,41 @@ class GetAttendanceStats
         }
 
         return max(0, (int) $start->diffInSeconds($end));
+    }
+
+    /**
+     * Tempo em que a IA esteve de fato processando (job ativo), não o tempo ocioso da sessão.
+     */
+    private function aiActiveSeconds(
+        WhatsappAttendanceSegment $segment,
+        Carbon $windowStart,
+        Carbon $now,
+    ): int {
+        if ($this->overlapSeconds($segment, $windowStart, $now) <= 0) {
+            return 0;
+        }
+
+        $seconds = (int) ($segment->active_seconds ?? 0);
+
+        if ($segment->active_started_at !== null) {
+            $activeStart = $segment->active_started_at->copy()->timezone($windowStart->timezoneName);
+            if ($activeStart->lt($windowStart)) {
+                $activeStart = $windowStart->copy();
+            }
+            if ($now->gt($activeStart)) {
+                $seconds += (int) $activeStart->diffInSeconds($now);
+            }
+        }
+
+        if ($seconds > 0) {
+            return $seconds;
+        }
+
+        // Segmentos legados (antes do tempo ativo): usa duração fechada proporcional à janela.
+        if ($segment->ended_at !== null && (int) ($segment->duration_seconds ?? 0) > 0) {
+            return $this->overlapSeconds($segment, $windowStart, $now);
+        }
+
+        return 0;
     }
 }

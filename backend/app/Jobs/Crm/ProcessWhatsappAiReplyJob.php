@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\Crm\Agent\AgentContext;
 use App\Services\Crm\Agent\WhatsappAgentRunner;
 use App\Services\Crm\EnrichWhatsappInboundMedia;
+use App\Services\Crm\TrackWhatsappAttendanceSegment;
 use App\Services\Crm\WhatsappChatHistory;
 use App\Support\ClinicContext;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
@@ -48,6 +49,7 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
         WhatsappChatHistory $history,
         ClinicContext $clinicContext,
         EnrichWhatsappInboundMedia $enrichMedia,
+        TrackWhatsappAttendanceSegment $attendance,
     ): void {
         $connection = Connection::withoutGlobalScopes()->find($this->connectionId);
         if (! $connection) {
@@ -138,6 +140,10 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
         );
 
         try {
+            if ($lead) {
+                $attendance->startActiveAiTime($lead);
+            }
+
             $runner->run($context);
         } catch (Throwable $e) {
             Cache::forget($idempotencyKey);
@@ -148,6 +154,10 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
                 'error' => $e->getMessage(),
             ]);
             throw $e;
+        } finally {
+            if ($lead) {
+                $attendance->stopActiveAiTime($lead);
+            }
         }
     }
 
