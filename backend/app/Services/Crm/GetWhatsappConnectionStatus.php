@@ -100,8 +100,14 @@ class GetWhatsappConnectionStatus
      */
     public function publicState(Connection $connection): array
     {
-        return array_merge($connection->toPublicArray(), [
+        $state = array_merge($connection->toPublicArray(), [
             'has_qr' => filled($connection->qr),
         ]);
+
+        if (auth()->user()?->isDeveloper()) {
+            $state['api_username'] = $connection->api_username;
+        }
+
+        return $state;
     }
 }

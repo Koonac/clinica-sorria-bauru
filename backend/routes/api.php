@@ -116,7 +116,7 @@ Route::prefix('v1/crm')->middleware(['auth:sanctum', 'clinic'])->group(function 
 
     Route::get('connection', [ConnectionController::class, 'show']);
     Route::get('connection/status', [ConnectionController::class, 'status']);
-    Route::put('connection/credentials', [ConnectionController::class, 'updateCredentials'])->middleware('role:admin,developer');
+    Route::put('connection/credentials', [ConnectionController::class, 'updateCredentials'])->middleware('role:developer');
     Route::put('connection/settings', [ConnectionController::class, 'updateSettings'])->middleware('role:admin,developer');
     Route::post('connection/connect', [ConnectionController::class, 'connect'])->middleware('role:admin,developer');
     Route::get('connection/qrcode', [ConnectionController::class, 'qrcode'])->middleware('role:admin,developer');

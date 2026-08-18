@@ -3,10 +3,14 @@
 namespace App\Http\Requests\Crm;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class UpdateConnectionCredentialsRequest extends FormRequest
 {
+    public function authorize(): bool
+    {
+        return $this->user()?->isDeveloper() === true;
+    }
+
     public function rules(): array
     {
         return [

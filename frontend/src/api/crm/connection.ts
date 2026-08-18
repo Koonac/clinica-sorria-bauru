@@ -18,7 +18,7 @@ export type ClinicConnection = {
   whatsapp_attendance_auto_close_minutes: number
   whatsapp_finalize_notice: string
   whatsapp_agent_history_limit: number
-  api_username: string | null
+  api_username?: string | null
   has_qr?: boolean
 }
 

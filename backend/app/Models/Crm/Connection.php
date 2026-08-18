@@ -4,8 +4,11 @@ namespace App\Models\Crm;
 
 use App\Models\Concerns\BelongsToClinic;
 use App\Models\User;
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Crypt;
 
 class Connection extends Model
 {
@@ -47,9 +50,36 @@ class Connection extends Model
     protected function casts(): array
     {
         return [
-            'api_password' => 'encrypted',
             'is_business' => 'boolean',
         ];
+    }
+
+    /**
+     * Senhas migradas em texto puro (insert via Query Builder) quebram o cast
+     * `encrypted` no save — o dirty-check tenta descriptografar o valor antigo.
+     */
+    protected function apiPassword(): Attribute
+    {
+        return Attribute::make(
+            get: function (?string $value): ?string {
+                if (! filled($value)) {
+                    return $value;
+                }
+
+                try {
+                    return Crypt::decrypt($value, false);
+                } catch (DecryptException) {
+                    return $value;
+                }
+            },
+            set: function (?string $value): ?string {
+                if (! filled($value)) {
+                    return $value;
+                }
+
+                return Crypt::encrypt($value, false);
+            },
+        );
     }
 
     public function hasCredentials(): bool
@@ -125,7 +155,6 @@ class Connection extends Model
             'whatsapp_attendance_auto_close_minutes' => (int) ($this->whatsapp_attendance_auto_close_minutes ?? 10),
             'whatsapp_finalize_notice' => (string) ($this->whatsapp_finalize_notice ?? '_finalizando chamado_'),
             'whatsapp_agent_history_limit' => $this->resolvedAgentHistoryLimit(),
-            'api_username' => $this->api_username,
         ];
     }
 
