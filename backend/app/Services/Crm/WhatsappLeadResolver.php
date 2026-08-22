@@ -91,6 +91,21 @@ class WhatsappLeadResolver
                 $contact->update(['whatsapp_jid' => $jid]);
             }
 
+            $contact = $contact ?? $lead?->contact ?? $deal?->contact;
+
+            // Contact/deal existem (ex.: lead convertido/excluído) mas não há lead aberto:
+            // reabre o pipeline criando um lead novo vinculado ao contact.
+            if (! $lead && ($jid !== '' || $phone)) {
+                $lead = $this->createLead(
+                    $connection,
+                    $jid,
+                    $phone,
+                    $this->resolveDisplayName($name, $phone, $jid, $contact, $deal),
+                    $owner,
+                    $contact,
+                );
+            }
+
             if ($lead && ! $lead->contact_id) {
                 $contact = $this->ensureContact->handle($lead->fresh() ?? $lead);
                 $lead = $lead->fresh() ?? $lead;
@@ -110,27 +125,52 @@ class WhatsappLeadResolver
             return ['lead' => null, 'deal' => null, 'contact' => null];
         }
 
-        $displayName = $this->isPhoneLikeName($name, $phone, $jid)
-            ? ($phone ?: $jid)
-            : ($name !== '' ? $name : ($phone ?: $jid));
+        $lead = $this->createLead(
+            $connection,
+            $jid,
+            $phone,
+            $this->resolveDisplayName($name, $phone, $jid),
+            $owner,
+        );
 
+        return [
+            'lead' => $lead->fresh(),
+            'deal' => null,
+            'contact' => $lead->contact?->fresh() ?? $this->ensureContact->handle($lead)->fresh(),
+        ];
+    }
+
+    private function createLead(
+        Connection $connection,
+        string $jid,
+        ?string $phone,
+        string $displayName,
+        ?User $owner = null,
+        ?Contact $existingContact = null,
+    ): Lead {
         $sourceId = Source::query()->where('slug', 'whatsapp')->value('id');
         $stageId = $this->resolveDefaultLeadStageId($connection);
         $ownerId = $owner?->id ?? $connection->created_by;
+        $mobile = $phone ?: ($existingContact?->mobile ? preg_replace('/\D+/', '', (string) $existingContact->mobile) ?: null : null);
 
         $lead = Lead::create([
             'title' => $displayName,
             'name' => $displayName,
             'status' => 'new',
-            'mobile' => $phone,
-            'whatsapp_jid' => $jid !== '' ? $jid : null,
+            'mobile' => $mobile,
+            'whatsapp_jid' => $jid !== '' ? $jid : ($existingContact?->whatsapp_jid),
+            'contact_id' => $existingContact?->id,
             'owner_id' => $ownerId,
             'source_id' => $sourceId,
             'stage_id' => $stageId,
             'clinic_id' => $connection->clinic_id,
         ]);
 
-        $contact = $this->ensureContact->handle($lead);
+        if (! $lead->contact_id) {
+            $this->ensureContact->handle($lead);
+            $lead = $lead->fresh() ?? $lead;
+        }
+
         $this->attendance->handle(
             $lead->fresh() ?? $lead,
             WhatsappAttendanceSegment::MODE_AI,
@@ -138,18 +178,37 @@ class WhatsappLeadResolver
             'lead_created',
         );
 
-        if ($stageId && $jid !== '') {
+        $labelJid = $lead->whatsapp_jid ?: $jid;
+        if ($stageId && $labelJid !== '') {
             $stage = PipelineStage::find($stageId);
             if ($stage) {
-                $this->labelSync->applyStageLabel($connection, $jid, $stage);
+                $this->labelSync->applyStageLabel($connection, $labelJid, $stage);
             }
         }
 
-        return [
-            'lead' => $lead->fresh(),
-            'deal' => null,
-            'contact' => $contact->fresh(),
-        ];
+        return $lead->fresh() ?? $lead;
+    }
+
+    private function resolveDisplayName(
+        string $name,
+        ?string $phone,
+        string $jid,
+        ?Contact $contact = null,
+        ?Deal $deal = null,
+    ): string {
+        if ($contact && ! $this->isPhoneLikeName($contact->name, $phone, $jid)) {
+            return (string) $contact->name;
+        }
+
+        if ($deal && ! $this->isPhoneLikeName($deal->title, $phone, $jid)) {
+            return (string) $deal->title;
+        }
+
+        if ($name !== '' && ! $this->isPhoneLikeName($name, $phone, $jid)) {
+            return $name;
+        }
+
+        return $phone ?: ($jid !== '' ? $jid : 'WhatsApp');
     }
 
     /**

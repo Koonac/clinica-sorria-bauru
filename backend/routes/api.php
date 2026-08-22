@@ -125,6 +125,7 @@ Route::prefix('v1/crm')->middleware(['auth:sanctum', 'clinic'])->group(function 
     Route::get('attendants', [AttendantController::class, 'index']);
 
     Route::get('whatsapp/chats', [WhatsappController::class, 'chats']);
+    Route::post('whatsapp/chats/ensure-lead', [WhatsappController::class, 'ensureChatLead']);
     Route::post('whatsapp/chats/read', [WhatsappController::class, 'markChatRead']);
     Route::get('whatsapp/avatars/{contact}', [WhatsappController::class, 'avatar']);
     Route::get('whatsapp/messages', [WhatsappController::class, 'messages']);

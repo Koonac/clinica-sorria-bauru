@@ -94,3 +94,32 @@ export async function sendWhatsappMessage(payload: {
     throw toApiError(error)
   }
 }
+
+export type EnsureWhatsappChatLeadResult = {
+  lead_id: number
+  contact_id?: number | null
+  deal_id?: number | null
+  owner_id?: number | null
+  owner_name?: string | null
+  contact_name?: string | null
+  whatsapp_jid?: string | null
+  whatsapp_agent_paused_at?: string | null
+  whatsapp_agent_resume_at?: string | null
+  whatsapp_conversation_closed_at?: string | null
+}
+
+export async function ensureWhatsappChatLead(payload: {
+  jid: string
+  phone_number?: string | null
+  contact_name?: string | null
+}): Promise<EnsureWhatsappChatLeadResult> {
+  try {
+    const { data } = await api.post<DataResponse<EnsureWhatsappChatLeadResult>>(
+      '/v1/crm/whatsapp/chats/ensure-lead',
+      payload,
+    )
+    return data.data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}

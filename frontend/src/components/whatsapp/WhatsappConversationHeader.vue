@@ -22,6 +22,7 @@ const emit = defineEmits<{
   finalize: []
   toggleLeadSidebar: []
   rename: [name: string]
+  ensureLead: []
 }>()
 
 const auth = useAuthStore()
@@ -268,14 +269,17 @@ function toggleAgent() {
         <Icon icon="lucide:circle-help" class="size-4" aria-hidden="true" />
       </button>
 
-      <span
+      <Button
         v-if="!canAssign"
-        class="inline-flex items-center gap-1 text-xs text-brand-ink/40"
-        title="Envie uma mensagem para vincular um lead"
+        size="sm"
+        variant="secondary"
+        :loading="busy"
+        icon="lucide:link"
+        title="Criar ou recuperar o lead desta conversa"
+        @click="emit('ensureLead')"
       >
-        <Icon icon="lucide:info" class="size-3.5" />
-        Atribuição após lead
-      </span>
+        Vincular lead
+      </Button>
     </div>
   </header>
 </template>

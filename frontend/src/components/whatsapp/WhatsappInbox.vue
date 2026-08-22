@@ -3,7 +3,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { ApiError } from '@/api/client'
 import { listAttendants } from '@/api/crm/attendants'
 import { pauseLeadAgent, resumeLeadAgent, finalizeLeadWhatsapp, updateLead } from '@/api/crm/leads'
-import { listWhatsappChats, markWhatsappChatRead } from '@/api/crm/whatsapp'
+import { listWhatsappChats, markWhatsappChatRead, ensureWhatsappChatLead } from '@/api/crm/whatsapp'
 import type { CrmAttendant, WhatsappChat, WhatsappChatFilter } from '@/api/crm/types'
 import WhatsappChatList from '@/components/whatsapp/WhatsappChatList.vue'
 import WhatsappConversationHeader from '@/components/whatsapp/WhatsappConversationHeader.vue'
@@ -295,6 +295,43 @@ async function renameLead(name: string) {
   }
 }
 
+async function ensureLead() {
+  if (!selected.value || selected.value.lead_id || actionBusy.value) return
+  actionBusy.value = true
+  errorMessage.value = ''
+  try {
+    const result = await ensureWhatsappChatLead({
+      jid: selected.value.whatsapp_jid,
+      phone_number: selected.value.phone_number,
+      contact_name: selected.value.contact_name,
+    })
+    const patched: WhatsappChat = {
+      ...selected.value,
+      lead_id: result.lead_id,
+      contact_id: result.contact_id ?? selected.value.contact_id,
+      deal_id: result.deal_id ?? selected.value.deal_id,
+      owner_id: result.owner_id ?? null,
+      owner_name: result.owner_name ?? null,
+      contact_name: result.contact_name || selected.value.contact_name,
+      whatsapp_agent_paused_at: result.whatsapp_agent_paused_at ?? null,
+      whatsapp_agent_resume_at: result.whatsapp_agent_resume_at ?? null,
+      whatsapp_conversation_closed_at: result.whatsapp_conversation_closed_at ?? null,
+    }
+    selected.value = patched
+    chats.value = chats.value.map((c) =>
+      c.conversation_key === patched.conversation_key || c.whatsapp_jid === patched.whatsapp_jid
+        ? { ...c, ...patched, last_message: c.last_message, unread_count: c.unread_count }
+        : c,
+    )
+    rememberOwnerLocally(patched, patched.owner_id ?? null)
+  } catch (e) {
+    errorMessage.value =
+      e instanceof ApiError ? e.message : 'Não foi possível vincular o lead desta conversa.'
+  } finally {
+    actionBusy.value = false
+  }
+}
+
 function onSent() {
   void loadChats(true)
 }
@@ -409,6 +446,7 @@ onUnmounted(() => {
             @finalize="finalizeChat"
             @toggle-lead-sidebar="toggleLeadSidebar"
             @rename="renameLead"
+            @ensure-lead="ensureLead"
           />
           <div class="flex min-h-0 flex-1 flex-col md:flex-row">
             <div class="flex min-h-0 min-w-0 flex-1 flex-col p-3 md:p-4">

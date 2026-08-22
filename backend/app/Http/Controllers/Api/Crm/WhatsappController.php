@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Crm;
 
 use App\Events\Crm\WhatsappInboundMessageReceived;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Crm\EnsureWhatsappChatLeadRequest;
 use App\Http\Requests\Crm\MarkWhatsappChatReadRequest;
 use App\Http\Requests\Crm\SendWhatsappMessageRequest;
 use App\Jobs\Crm\FetchWhatsappAvatarJob;
@@ -16,6 +17,7 @@ use App\Models\Crm\WhatsappMessage;
 use App\Models\User;
 use App\Services\Crm\EnsureContactForLead;
 use App\Services\Crm\EnsureWhatsappAvatar;
+use App\Services\Crm\EnsureWhatsappChatLead;
 use App\Services\Crm\MarkWhatsappChatRead;
 use App\Services\Crm\PauseWhatsappAgentForLead;
 use App\Services\Crm\ScheduleWhatsappAttendanceAutoClose;
@@ -47,9 +49,30 @@ class WhatsappController extends Controller
         private MarkWhatsappChatRead $markChatRead,
         private EnsureWhatsappAvatar $ensureAvatar,
         private EnsureContactForLead $ensureContact,
+        private EnsureWhatsappChatLead $ensureWhatsappChatLead,
         private ScheduleWhatsappAttendanceAutoClose $autoClose,
         private WhatsappMediaStore $mediaStore,
     ) {}
+
+    public function ensureChatLead(EnsureWhatsappChatLeadRequest $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $connection = $this->upsertConnection->handle([], $user->id);
+        $validated = $request->validated();
+
+        try {
+            $data = $this->ensureWhatsappChatLead->handle($connection, [
+                'jid' => (string) $validated['jid'],
+                'phone_number' => $validated['phone_number'] ?? null,
+                'contact_name' => $validated['contact_name'] ?? null,
+            ], $user);
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['data' => $data]);
+    }
 
     public function send(SendWhatsappMessageRequest $request): JsonResponse
     {
@@ -247,10 +270,24 @@ class WhatsappController extends Controller
         $leadIds = [];
         $contactIds = [];
         $chatJids = [];
+        $orphanJids = [];
+        $orphanPhones = [];
+        $orphanContactIds = [];
         foreach ($rows as $row) {
             $conversationKeys[] = (string) $row->conversation_key;
             if ($row->lead_id) {
                 $leadIds[] = (int) $row->lead_id;
+            } else {
+                if (is_string($row->whatsapp_jid) && $row->whatsapp_jid !== '') {
+                    $orphanJids[] = $row->whatsapp_jid;
+                }
+                if ($row->contact_id) {
+                    $orphanContactIds[] = (int) $row->contact_id;
+                }
+                $phoneDigits = preg_replace('/\D+/', '', (string) ($row->phone_number ?? '')) ?: null;
+                if ($phoneDigits) {
+                    $orphanPhones[] = $phoneDigits;
+                }
             }
             if ($row->contact_id) {
                 $contactIds[] = (int) $row->contact_id;
@@ -269,6 +306,9 @@ class WhatsappController extends Controller
         $leadIds = array_values(array_unique($leadIds));
         $contactIds = array_values(array_unique($contactIds));
         $chatJids = array_values(array_unique($chatJids));
+        $orphanJids = array_values(array_unique($orphanJids));
+        $orphanPhones = array_values(array_unique($orphanPhones));
+        $orphanContactIds = array_values(array_unique($orphanContactIds));
 
         $phoneJidByLid = [];
         if ($lidKeys !== []) {
@@ -291,6 +331,56 @@ class WhatsappController extends Controller
                     ];
                 }
             }
+        }
+
+        foreach ($orphanJids as $orphanJid) {
+            if (str_ends_with($orphanJid, '@lid') && isset($phoneJidByLid[$orphanJid]['jid'])) {
+                $orphanJids[] = (string) $phoneJidByLid[$orphanJid]['jid'];
+            }
+        }
+        $orphanJids = array_values(array_unique($orphanJids));
+
+        // Fallback: última msg sem lead_id, mas existe lead aberto por JID/contato/telefone.
+        $openLeadsByJid = collect();
+        $openLeadsByContactId = collect();
+        $openLeadsByPhone = collect();
+        if ($orphanJids !== [] || $orphanContactIds !== [] || $orphanPhones !== []) {
+            $openLeads = Lead::query()
+                ->with('owner:id,name')
+                ->where('status', '!=', 'converted')
+                ->where(function ($q) use ($orphanJids, $orphanContactIds, $orphanPhones) {
+                    if ($orphanJids !== []) {
+                        $q->orWhereIn('whatsapp_jid', $orphanJids);
+                    }
+                    if ($orphanContactIds !== []) {
+                        $q->orWhereIn('contact_id', $orphanContactIds);
+                    }
+                    if ($orphanPhones !== []) {
+                        $q->orWhere(function ($phoneQ) use ($orphanPhones) {
+                            foreach ($orphanPhones as $phone) {
+                                $phoneQ->orWhere('mobile', $phone)
+                                    ->orWhere('mobile', 'like', '%'.$phone);
+                            }
+                        });
+                    }
+                })
+                ->orderByDesc('id')
+                ->get(['id', 'owner_id', 'whatsapp_agent_paused_at', 'whatsapp_agent_resume_at', 'whatsapp_conversation_closed_at', 'name', 'contact_id', 'whatsapp_jid', 'email', 'mobile', 'instagram', 'organization_id', 'clinic_id', 'status']);
+
+            foreach ($openLeads as $openLead) {
+                if (filled($openLead->whatsapp_jid) && ! $openLeadsByJid->has($openLead->whatsapp_jid)) {
+                    $openLeadsByJid[$openLead->whatsapp_jid] = $openLead;
+                }
+                if ($openLead->contact_id && ! $openLeadsByContactId->has((int) $openLead->contact_id)) {
+                    $openLeadsByContactId[(int) $openLead->contact_id] = $openLead;
+                }
+                $leadPhone = preg_replace('/\D+/', '', (string) ($openLead->mobile ?? '')) ?: null;
+                if ($leadPhone && ! $openLeadsByPhone->has($leadPhone)) {
+                    $openLeadsByPhone[$leadPhone] = $openLead;
+                }
+                $leadIds[] = (int) $openLead->id;
+            }
+            $leadIds = array_values(array_unique($leadIds));
         }
 
         $leadsById = [];
@@ -388,6 +478,31 @@ class WhatsappController extends Controller
             $leadId = $row->lead_id ? (int) $row->lead_id : null;
             /** @var Lead|null $lead */
             $lead = $leadId ? ($leadsById[$leadId] ?? null) : null;
+            if (! $lead) {
+                $fallbackLead = $openLeadsByJid->get($jid)
+                    ?? ($row->contact_id ? $openLeadsByContactId->get((int) $row->contact_id) : null);
+                if (! $fallbackLead) {
+                    $rowPhone = preg_replace('/\D+/', '', (string) ($phone ?? '')) ?: null;
+                    if ($rowPhone) {
+                        $fallbackLead = $openLeadsByPhone->get($rowPhone);
+                        if (! $fallbackLead) {
+                            foreach ($openLeadsByPhone as $leadPhone => $candidate) {
+                                if (
+                                    str_ends_with((string) $leadPhone, $rowPhone)
+                                    || str_ends_with($rowPhone, (string) $leadPhone)
+                                ) {
+                                    $fallbackLead = $candidate;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if ($fallbackLead) {
+                    $lead = $leadsById[(int) $fallbackLead->id] ?? $fallbackLead;
+                    $leadId = (int) $lead->id;
+                }
+            }
             $unread = (int) ($unreadByKey[$key] ?? 0);
             // Sem registro de leitura: conta como não lida se última msg for inbound
             if (! isset($readsByKey[$key]) && in_array($row->direction, ['in', 'inbound'], true)) {
