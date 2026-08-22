@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Clinic;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
@@ -14,10 +15,18 @@ class AdminUserSeeder extends Seeder
         $this->seedDeveloper();
     }
 
+    private function defaultClinicId(): ?int
+    {
+        return Clinic::query()->where('slug', 'sorria-bauru')->value('id')
+            ?? Clinic::query()->orderBy('id')->value('id');
+    }
+
     private function seedAdmin(): void
     {
         $admin = User::query()->where('username', 'Admin')->first()
             ?? User::query()->where('email', 'admin@vekta.local')->first();
+
+        $clinicId = $this->defaultClinicId();
 
         if (! $admin) {
             $senha = Str::password(24);
@@ -27,6 +36,7 @@ class AdminUserSeeder extends Seeder
                 'name' => 'Admin',
                 'email' => 'admin@vekta.local',
                 'role' => User::ROLE_ADMIN,
+                'clinic_id' => $clinicId,
                 'password' => $senha,
             ]);
 
@@ -38,6 +48,7 @@ class AdminUserSeeder extends Seeder
                 'username' => 'Admin',
                 'name' => 'Admin',
                 'role' => User::ROLE_ADMIN,
+                'clinic_id' => $admin->clinic_id ?? $clinicId,
             ])->save();
 
             $this->command?->info('Admin já existe (User: Admin). Use a rota de alteração de senha se precisar trocar.');

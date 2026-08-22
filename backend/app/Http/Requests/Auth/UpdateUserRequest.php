@@ -14,12 +14,18 @@ class UpdateUserRequest extends FormRequest
         return $this->user()?->isAdmin() === true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $actor = $this->user();
+        if ($actor && $actor->isClinicScoped()) {
+            $this->merge(['clinic_id' => $actor->clinic_id]);
+        }
+    }
+
     public function rules(): array
     {
         /** @var User $user */
         $user = $this->route('user');
-
-        $role = $this->input('role', $user->role);
 
         return [
             'name' => ['sometimes', 'string', 'max:190'],
@@ -39,8 +45,8 @@ class UpdateUserRequest extends FormRequest
             'password' => ['sometimes', 'string', Password::defaults()],
             'role' => ['sometimes', Rule::in(User::ASSIGNABLE_ROLES)],
             'clinic_id' => [
-                Rule::requiredIf(fn () => $role === User::ROLE_FUNCIONARIO),
-                'nullable',
+                'sometimes',
+                'required',
                 'integer',
                 'exists:clinics,id',
             ],

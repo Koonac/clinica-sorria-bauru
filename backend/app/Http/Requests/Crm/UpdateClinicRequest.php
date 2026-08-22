@@ -2,13 +2,27 @@
 
 namespace App\Http\Requests\Crm;
 
+use App\Models\Clinic;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateClinicRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->isAdmin() === true;
+        $user = $this->user();
+        if (! $user?->isAdmin()) {
+            return false;
+        }
+
+        if ($user->isDeveloper()) {
+            return true;
+        }
+
+        /** @var Clinic $clinic */
+        $clinic = $this->route('clinic');
+
+        return $user->clinic_id !== null
+            && (int) $user->clinic_id === (int) $clinic->id;
     }
 
     public function rules(): array

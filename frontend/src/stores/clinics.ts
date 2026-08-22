@@ -55,7 +55,10 @@ export const useClinicsStore = defineStore('clinics', () => {
       const list = await listClinics({ active: true })
       clinics.value = list
 
-      if (auth.user?.role === 'funcionario' && auth.user.clinic_id) {
+      if (
+        (auth.user?.role === 'funcionario' || auth.user?.role === 'admin') &&
+        auth.user.clinic_id
+      ) {
         persistActive(auth.user.clinic_id)
       } else {
         const stored = readStoredId()
@@ -74,6 +77,8 @@ export const useClinicsStore = defineStore('clinics', () => {
   }
 
   function setActiveClinic(id: number) {
+    const auth = useAuthStore()
+    if (!auth.isDeveloper) return
     if (!clinics.value.some((c) => c.id === id)) return
     persistActive(id)
   }

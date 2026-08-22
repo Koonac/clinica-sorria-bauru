@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Clinic;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -36,11 +37,25 @@ class UserFactory extends Factory
         ];
     }
 
+    public function configure(): static
+    {
+        return $this->afterMaking(function (User $user) {
+            if (
+                $user->isClinicScoped()
+                && $user->clinic_id === null
+            ) {
+                $clinicId = Clinic::query()->orderBy('id')->value('id');
+                if ($clinicId) {
+                    $user->clinic_id = $clinicId;
+                }
+            }
+        });
+    }
+
     public function admin(): static
     {
         return $this->state(fn (array $attributes) => [
             'role' => User::ROLE_ADMIN,
-            'clinic_id' => null,
         ]);
     }
 

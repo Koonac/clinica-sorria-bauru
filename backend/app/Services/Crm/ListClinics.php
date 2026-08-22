@@ -19,7 +19,7 @@ class ListClinics
             $query->where('is_active', true);
         }
 
-        if ($user?->isFuncionario()) {
+        if ($user?->isClinicScoped()) {
             if (! $user->clinic_id) {
                 return collect();
             }

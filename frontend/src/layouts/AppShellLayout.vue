@@ -70,7 +70,7 @@ const navGroups = computed(() => {
   return groups
 })
 
-const showClinicSwitcher = computed(() => auth.isAdmin)
+const showClinicSwitcher = computed(() => auth.isDeveloper)
 
 onMounted(() => {
   try {

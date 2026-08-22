@@ -75,11 +75,16 @@ class AuthApiTest extends TestCase
             'username' => 'Admin',
             'name' => 'Admin',
             'role' => User::ROLE_ADMIN,
+            'clinic_id' => Clinic::query()->where('slug', 'sorria-bauru')->value('id'),
         ]);
         $this->assertDatabaseHas('users', [
             'username' => 'henrique',
             'name' => 'Henrique',
             'role' => User::ROLE_DEVELOPER,
+        ]);
+        $this->assertDatabaseHas('users', [
+            'username' => 'henrique',
+            'clinic_id' => null,
         ]);
     }
 

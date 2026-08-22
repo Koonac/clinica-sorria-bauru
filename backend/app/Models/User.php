@@ -91,6 +91,12 @@ class User extends Authenticatable
         return $this->role === self::ROLE_DEVELOPER;
     }
 
+    /** Admin e funcionário ficam presos à própria clínica; só developer troca. */
+    public function isClinicScoped(): bool
+    {
+        return ! $this->isDeveloper();
+    }
+
     public function hasRole(string $role): bool
     {
         return $this->role === $role;

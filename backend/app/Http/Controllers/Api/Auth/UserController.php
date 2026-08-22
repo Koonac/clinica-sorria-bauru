@@ -6,91 +6,56 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\StoreUserRequest;
 use App\Http\Requests\Auth\UpdateUserRequest;
 use App\Models\User;
+use App\Services\Auth\AssertUserAccessible;
+use App\Services\Auth\CreateUser;
+use App\Services\Auth\DeleteUser;
+use App\Services\Auth\ListUsers;
+use App\Services\Auth\UpdateUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, ListUsers $list): JsonResponse
     {
-        $query = User::query()->orderBy('name');
-
-        if ($role = $request->query('role')) {
-            $query->where('role', $role);
-        }
-
-        if ($search = trim((string) $request->query('search'))) {
-            $like = '%'.$search.'%';
-            $query->where(function ($q) use ($like) {
-                $q->whereLike('name', $like, caseSensitive: false)
-                    ->orWhereLike('username', $like, caseSensitive: false)
-                    ->orWhereLike('email', $like, caseSensitive: false);
-            });
-        }
-
-        $users = $query->paginate(50)->through(fn (User $user) => $user->toAuthArray());
+        /** @var User $actor */
+        $actor = $request->user();
+        $users = $list->handle($request, $actor);
 
         return response()->json($users);
     }
 
-    public function store(StoreUserRequest $request): JsonResponse
+    public function store(StoreUserRequest $request, CreateUser $create): JsonResponse
     {
-        $user = User::query()->create($request->validated());
+        $user = $create->handle($request->validated());
 
         return response()->json(['data' => $user->toAuthArray()], 201);
     }
 
-    public function show(User $user): JsonResponse
+    public function show(Request $request, User $user, AssertUserAccessible $assert): JsonResponse
     {
+        /** @var User $actor */
+        $actor = $request->user();
+        $assert->handle($actor, $user);
+
         return response()->json(['data' => $user->toAuthArray()]);
     }
 
-    public function update(UpdateUserRequest $request, User $user): JsonResponse
+    public function update(UpdateUserRequest $request, User $user, UpdateUser $update): JsonResponse
     {
-        $data = $request->validated();
+        /** @var User $actor */
+        $actor = $request->user();
+        $updated = $update->handle($actor, $user, $request->validated());
 
-        if (
-            isset($data['role'])
-            && $data['role'] !== User::ROLE_ADMIN
-            && $user->role === User::ROLE_ADMIN
-        ) {
-            if ($this->ehUltimoAdmin($user)) {
-                return response()->json([
-                    'message' => 'Não é possível remover o papel de admin do último administrador.',
-                ], 422);
-            }
-        }
-
-        $user->fill($data)->save();
-
-        return response()->json(['data' => $user->fresh()->toAuthArray()]);
+        return response()->json(['data' => $updated->toAuthArray()]);
     }
 
-    public function destroy(Request $request, User $user): JsonResponse
+    public function destroy(Request $request, User $user, DeleteUser $delete): JsonResponse
     {
-        if ($request->user()?->is($user)) {
-            return response()->json([
-                'message' => 'Você não pode excluir a própria conta.',
-            ], 422);
-        }
-
-        if ($user->role === User::ROLE_ADMIN && $this->ehUltimoAdmin($user)) {
-            return response()->json([
-                'message' => 'Não é possível excluir o último administrador.',
-            ], 422);
-        }
-
-        $user->tokens()->delete();
-        $user->delete();
+        /** @var User $actor */
+        $actor = $request->user();
+        $delete->handle($actor, $user);
 
         return response()->json(['message' => 'Usuário removido.']);
-    }
-
-    private function ehUltimoAdmin(User $user): bool
-    {
-        return User::query()
-            ->where('role', User::ROLE_ADMIN)
-            ->whereKeyNot($user->id)
-            ->doesntExist();
     }
 }

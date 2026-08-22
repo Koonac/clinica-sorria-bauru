@@ -25,7 +25,8 @@ class ResolveClinicContext
             return $next($request);
         }
 
-        if ($user->isFuncionario()) {
+        // Admin e funcionário: clínica fixa; só developer usa X-Clinic-Id.
+        if ($user->isClinicScoped()) {
             if (! $user->clinic_id) {
                 return response()->json(['message' => 'Usuário sem clínica vinculada.'], 403);
             }

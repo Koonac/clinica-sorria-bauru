@@ -4,7 +4,7 @@ import { Icon } from '@iconify/vue'
 import { ApiError } from '@/api/client'
 import { listClinics, type Clinic } from '@/api/clinics'
 import { createUser, updateUser } from '@/api/users'
-import type { AuthUser } from '@/stores/auth'
+import { useAuthStore, type AuthUser } from '@/stores/auth'
 import Select from '@/components/Forms/Select.vue'
 
 const open = defineModel<boolean>('open', { default: false })
@@ -17,6 +17,8 @@ const emit = defineEmits<{
   saved: [user: AuthUser]
 }>()
 
+const auth = useAuthStore()
+
 const roleOptions = [
   { value: 'funcionario', label: 'Funcionário' },
   { value: 'admin', label: 'Administrador' },
@@ -27,6 +29,7 @@ const inputClass =
 
 const isEdit = computed(() => Boolean(props.user))
 const isDeveloperUser = computed(() => props.user?.role === 'developer')
+const canPickClinic = computed(() => auth.isDeveloper)
 
 const clinics = ref<Clinic[]>([])
 
@@ -50,10 +53,15 @@ const fieldErrors = reactive({
   clinic_id: '',
 })
 
-const clinicOptions = computed(() => [
-  { value: '', label: 'Sem clínica (somente admin)' },
-  ...clinics.value.map((c) => ({ value: String(c.id), label: c.name })),
-])
+const clinicOptions = computed(() =>
+  clinics.value.map((c) => ({ value: String(c.id), label: c.name })),
+)
+
+const lockedClinicName = computed(() => {
+  const id = auth.user?.clinic_id
+  if (!id) return 'Clínica vinculada'
+  return clinics.value.find((c) => c.id === id)?.name ?? 'Clínica vinculada'
+})
 
 const showPassword = ref(false)
 const showConfirmation = ref(false)
@@ -66,7 +74,7 @@ const canSubmit = computed(() => {
   if (!form.name.trim() || !form.username.trim() || !form.email.trim()) return false
   if (!isEdit.value && !form.password) return false
   if (form.password && !form.passwordConfirmation) return false
-  if (form.role === 'funcionario' && form.clinic_id === '') return false
+  if (form.clinic_id === '') return false
   return true
 })
 
@@ -87,7 +95,11 @@ function resetForm() {
   form.password = ''
   form.passwordConfirmation = ''
   form.role = props.user?.role ?? 'funcionario'
-  form.clinic_id = props.user?.clinic_id ? String(props.user.clinic_id) : ''
+  if (canPickClinic.value) {
+    form.clinic_id = props.user?.clinic_id ? String(props.user.clinic_id) : ''
+  } else {
+    form.clinic_id = auth.user?.clinic_id ? String(auth.user.clinic_id) : ''
+  }
   showPassword.value = false
   showConfirmation.value = false
   loading.value = false
@@ -114,6 +126,9 @@ watch(open, async (isOpen) => {
       clinics.value = await listClinics()
     } catch {
       clinics.value = []
+    }
+    if (!canPickClinic.value && auth.user?.clinic_id) {
+      form.clinic_id = String(auth.user.clinic_id)
     }
     requestAnimationFrame(() => {
       panelRef.value?.querySelector<HTMLInputElement>('input')?.focus()
@@ -158,8 +173,11 @@ async function onSubmit() {
   try {
     let saved: AuthUser
 
-    const clinicId =
-      form.clinic_id === '' ? null : Number(form.clinic_id)
+    const clinicId = Number(
+      canPickClinic.value
+        ? form.clinic_id
+        : (auth.user?.clinic_id ?? form.clinic_id),
+    )
 
     if (isEdit.value && props.user) {
       const payload: {
@@ -167,7 +185,7 @@ async function onSubmit() {
         username: string
         email: string
         role?: AuthUser['role']
-        clinic_id: number | null
+        clinic_id: number
         password?: string
       } = {
         name: form.name.trim(),
@@ -383,10 +401,19 @@ async function onSubmit() {
           <label class="flex flex-col gap-1.5">
             <span class="text-sm font-medium text-brand-ink/80">Clínica</span>
             <Select
+              v-if="canPickClinic"
               v-model="form.clinic_id"
               name="clinic_id"
-              :required="form.role === 'funcionario'"
+              required
               :options="clinicOptions"
+            />
+            <input
+              v-else
+              type="text"
+              name="clinic_id"
+              :value="lockedClinicName"
+              readonly
+              class="w-full cursor-default rounded-xl border border-brand-ink/15 bg-brand-ink/[0.04] px-4 py-3 text-base text-brand-ink outline-none"
             />
             <span v-if="fieldErrors.clinic_id" class="text-sm text-brand-ink/70" role="alert">
               {{ fieldErrors.clinic_id }}

@@ -49,7 +49,7 @@ Route::prefix('v1/users')->middleware(['auth:sanctum', 'role:admin,developer'])-
 
 Route::prefix('v1/clinics')->middleware(['auth:sanctum'])->group(function () {
     Route::get('/', [ClinicController::class, 'index']);
-    Route::post('/', [ClinicController::class, 'store'])->middleware('role:admin,developer');
+    Route::post('/', [ClinicController::class, 'store'])->middleware('role:developer');
     Route::get('{clinic}', [ClinicController::class, 'show']);
     Route::patch('{clinic}', [ClinicController::class, 'update'])->middleware('role:admin,developer');
 });

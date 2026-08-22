@@ -32,7 +32,11 @@ class ClinicController extends Controller
     public function show(Request $request, Clinic $clinic): JsonResponse
     {
         $user = $request->user();
-        if ($user?->isFuncionario() && (int) $user->clinic_id !== (int) $clinic->id) {
+        if (
+            $user
+            && ! $user->isDeveloper()
+            && (int) $user->clinic_id !== (int) $clinic->id
+        ) {
             return response()->json(['message' => 'Acesso não autorizado para esta clínica.'], 403);
         }
 

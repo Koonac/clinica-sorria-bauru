@@ -14,6 +14,14 @@ class StoreUserRequest extends FormRequest
         return $this->user()?->isAdmin() === true;
     }
 
+    protected function prepareForValidation(): void
+    {
+        $actor = $this->user();
+        if ($actor && $actor->isClinicScoped()) {
+            $this->merge(['clinic_id' => $actor->clinic_id]);
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -29,8 +37,7 @@ class StoreUserRequest extends FormRequest
             'password' => ['required', 'string', Password::defaults()],
             'role' => ['required', Rule::in(User::ASSIGNABLE_ROLES)],
             'clinic_id' => [
-                Rule::requiredIf(fn () => $this->input('role') === User::ROLE_FUNCIONARIO),
-                'nullable',
+                'required',
                 'integer',
                 'exists:clinics,id',
             ],
