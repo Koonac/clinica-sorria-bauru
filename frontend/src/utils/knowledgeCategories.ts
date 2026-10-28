@@ -11,14 +11,6 @@ export type KnowledgeCategoryMeta = {
 
 export const KNOWLEDGE_CATEGORIES: KnowledgeCategoryMeta[] = [
   {
-    value: 'horarios',
-    label: 'Horários de funcionamento',
-    icon: 'lucide:clock',
-    hint: 'Dias e horários de atendimento, feriados, intervalo de almoço.',
-    titlePlaceholder: 'Ex.: Segunda a sexta',
-    contentPlaceholder: 'Ex.: Segunda a sexta, das 8h às 18h. Sábados das 8h às 12h.',
-  },
-  {
     value: 'endereco',
     label: 'Endereço e como chegar',
     icon: 'lucide:map-pin',

@@ -1,8 +1,7 @@
 import { api, toApiError } from '@/api/client'
 import type { DataResponse } from '@/api/crm/types'
 
-export type KnowledgeCategory =
-  'horarios' | 'endereco' | 'convenios' | 'pagamento' | 'procedimentos' | 'outros'
+export type KnowledgeCategory = 'endereco' | 'convenios' | 'pagamento' | 'procedimentos' | 'outros'
 
 export type KnowledgeEntry = {
   id: number

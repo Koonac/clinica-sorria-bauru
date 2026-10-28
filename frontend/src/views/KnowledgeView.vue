@@ -23,7 +23,7 @@ const flash = ref('')
 
 const formOpen = ref(false)
 const editingEntry = ref<KnowledgeEntry | null>(null)
-const formCategory = ref<KnowledgeCategory>('horarios')
+const formCategory = ref<KnowledgeCategory>('endereco')
 
 const deleteOpen = ref(false)
 const deletingEntry = ref<KnowledgeEntry | null>(null)
@@ -118,7 +118,8 @@ onMounted(load)
 <template>
   <PageView title="Base de conhecimento">
     <p class="shrink-0 text-sm text-brand-ink/55">
-      Respostas prontas que a IA consulta para responder pacientes no WhatsApp.
+      Respostas prontas que a IA consulta para responder pacientes no WhatsApp. Dias e horários de
+      funcionamento ficam em Configurações › Horário de atendimento.
       <span class="text-brand-ink/40"
         >· {{ filledCategories }}/{{ KNOWLEDGE_CATEGORIES.length }} categorias preenchidas</span
       >

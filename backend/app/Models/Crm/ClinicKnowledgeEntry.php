@@ -7,16 +7,16 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * "Respostas prontas" da clínica: informações oficiais que o agent consulta
- * (horários, endereço, convênios, pagamento, procedimentos...).
+ * (endereço, convênios, pagamento, procedimentos...). Horário de funcionamento fica em
+ * Configurações › Horário de atendimento (clinics.business_hours), não aqui.
  */
 class ClinicKnowledgeEntry extends Model
 {
     use BelongsToClinic;
 
-    public const CATEGORIES = ['horarios', 'endereco', 'convenios', 'pagamento', 'procedimentos', 'outros'];
+    public const CATEGORIES = ['endereco', 'convenios', 'pagamento', 'procedimentos', 'outros'];
 
     public const CATEGORY_LABELS = [
-        'horarios' => 'Horários de funcionamento',
         'endereco' => 'Endereço e como chegar',
         'convenios' => 'Convênios aceitos',
         'pagamento' => 'Formas de pagamento',

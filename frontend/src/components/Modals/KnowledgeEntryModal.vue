@@ -31,7 +31,7 @@ const categoryMeta = computed(
 )
 
 const form = reactive({
-  category: 'horarios' as KnowledgeCategory,
+  category: 'endereco' as KnowledgeCategory,
   title: '',
   content: '',
   active: true,

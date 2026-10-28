@@ -13,7 +13,9 @@ class ListClinicKnowledgeEntries
      */
     public function handle(array $filters = []): Collection
     {
+        // Categorias aposentadas (ex.: "horarios", agora em Horário de atendimento) ficam fora da tela.
         $query = ClinicKnowledgeEntry::query()
+            ->whereIn('category', ClinicKnowledgeEntry::CATEGORIES)
             ->orderBy('category')
             ->orderBy('position')
             ->orderBy('id');

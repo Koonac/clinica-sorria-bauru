@@ -326,7 +326,7 @@ PROMPT;
             return '';
         }
 
-        return "\nInformações da clínica (fonte oficial — use para responder horários, endereço, convênios, pagamento e dúvidas frequentes):\n".$text."\n";
+        return "\nInformações da clínica (fonte oficial — use para responder endereço, convênios, pagamento e dúvidas frequentes; dias e horários de atendimento vêm do calendário acima):\n".$text."\n";
     }
 
     private function priorAttendanceSummariesBlock(AgentContext $context): string
