@@ -10,6 +10,7 @@ use App\Models\Crm\PipelineStage;
 use App\Models\Crm\WhatsappMessage;
 use App\Models\User;
 use App\Services\Crm\Agent\AgentContext;
+use App\Services\Crm\Agent\DetectHandoffSignals;
 use App\Services\Crm\Agent\WhatsappAgentRunner;
 use App\Services\Crm\EnrichWhatsappInboundMedia;
 use App\Services\Crm\TrackWhatsappAttendanceSegment;
@@ -50,6 +51,7 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
         ClinicContext $clinicContext,
         EnrichWhatsappInboundMedia $enrichMedia,
         TrackWhatsappAttendanceSegment $attendance,
+        DetectHandoffSignals $signals,
     ): void {
         $connection = Connection::withoutGlobalScopes()->find($this->connectionId);
         if (! $connection) {
@@ -137,6 +139,7 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
             lead: $lead,
             deal: $latest->deal_id ? $latest->deal()->first() : null,
             leadStages: $stages,
+            handoffSignals: $this->handoffSignals($signals, $history, $connection->id, $lead?->id ?? $leadId, $jid),
         );
 
         try {
@@ -182,6 +185,30 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
         }
 
         $enrichMedia->handleMany($pending, self::MEDIA_ENRICH_LIMIT);
+    }
+
+    /**
+     * Sinais de handoff nas mensagens do paciente desde a última resposta enviada.
+     *
+     * @return list<string>
+     */
+    private function handoffSignals(
+        DetectHandoffSignals $signals,
+        WhatsappChatHistory $history,
+        int $connectionId,
+        ?int $leadId,
+        ?string $jid,
+    ): array {
+        $texts = [];
+        foreach ($history->messages($connectionId, $leadId, $jid, 10)->reverse() as $message) {
+            /** @var WhatsappMessage $message */
+            if ($message->direction !== 'inbound') {
+                break;
+            }
+            $texts[] = $message->textForAgent();
+        }
+
+        return $signals->handle(implode("\n", $texts));
     }
 
     /**

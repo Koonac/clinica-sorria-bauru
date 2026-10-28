@@ -7,7 +7,11 @@ use App\Models\Crm\WhatsappAttendanceSegment;
 
 class PauseWhatsappAgentIndefinitelyForLead
 {
-    public function __construct(private TrackWhatsappAttendanceSegment $attendance) {}
+    public function __construct(
+        private TrackWhatsappAttendanceSegment $attendance,
+        private UpdateLeadAttendanceStatus $status,
+        private ScheduleWhatsappFollowUp $followUp,
+    ) {}
 
     /**
      * Pausa o agent até retomada manual (clique ou escalação). Sem resume_at.
@@ -20,6 +24,15 @@ class PauseWhatsappAgentIndefinitelyForLead
             'whatsapp_agent_paused_at' => $lead->whatsapp_agent_paused_at ?? now(),
             'whatsapp_agent_resume_at' => null,
         ])->save();
+
+        $this->followUp->clear($lead);
+        $this->status->handle(
+            $lead,
+            Lead::ATTENDANCE_HUMAN,
+            'pause:'.$source,
+            [Lead::ATTENDANCE_NEW, Lead::ATTENDANCE_IN_PROGRESS, Lead::ATTENDANCE_NO_REPLY],
+            $actorUserId,
+        );
 
         if (! $wasPaused) {
             $this->attendance->handle(

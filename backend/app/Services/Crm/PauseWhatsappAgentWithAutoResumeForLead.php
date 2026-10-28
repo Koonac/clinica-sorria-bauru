@@ -9,7 +9,11 @@ use Carbon\CarbonInterface;
 
 class PauseWhatsappAgentWithAutoResumeForLead
 {
-    public function __construct(private TrackWhatsappAttendanceSegment $attendance) {}
+    public function __construct(
+        private TrackWhatsappAttendanceSegment $attendance,
+        private UpdateLeadAttendanceStatus $status,
+        private ScheduleWhatsappFollowUp $followUp,
+    ) {}
 
     /**
      * Pausa o agent e agenda retomada automática com base nas horas da conexão.
@@ -31,6 +35,15 @@ class PauseWhatsappAgentWithAutoResumeForLead
             'whatsapp_agent_paused_at' => $lead->whatsapp_agent_paused_at ?? now(),
             'whatsapp_agent_resume_at' => $resumeAt,
         ])->save();
+
+        $this->followUp->clear($lead);
+        $this->status->handle(
+            $lead,
+            Lead::ATTENDANCE_HUMAN,
+            'pause:'.$source,
+            [Lead::ATTENDANCE_NEW, Lead::ATTENDANCE_IN_PROGRESS, Lead::ATTENDANCE_NO_REPLY],
+            $actorUserId,
+        );
 
         if (! $wasPaused) {
             $this->attendance->handle(

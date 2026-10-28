@@ -1,9 +1,15 @@
 import { api, toApiError } from '@/api/client'
-import type { DataResponse, PipelineKind, PipelineStage } from '@/api/crm/types'
+import type {
+  DataResponse,
+  LeadAttendanceStatus,
+  PipelineKind,
+  PipelineStage,
+} from '@/api/crm/types'
 
 export async function getPipeline(params: {
   kind: PipelineKind
   search?: string
+  attendance_status?: LeadAttendanceStatus
 }): Promise<PipelineStage[]> {
   try {
     const { data } = await api.get<DataResponse<PipelineStage[]>>('/v1/crm/pipeline', {

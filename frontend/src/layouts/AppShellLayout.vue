@@ -2,16 +2,19 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
+import NotificationBell from '@/components/Layout/NotificationBell.vue'
 import ClinicFormModal from '@/components/Modals/ClinicFormModal.vue'
 import SettingsModal from '@/components/Modals/SettingsModal.vue'
 import { NAV_ITEMS, type AppRole, type NavItem } from '@/navigation/nav'
 import { useAuthStore } from '@/stores/auth'
 import { useClinicsStore } from '@/stores/clinics'
+import { useNotificationsStore } from '@/stores/notifications'
 
 const SIDEBAR_KEY = 'sorria.sidebar.collapsed'
 
 const auth = useAuthStore()
 const clinics = useClinicsStore()
+const notifications = useNotificationsStore()
 const router = useRouter()
 const route = useRoute()
 
@@ -81,13 +84,24 @@ onMounted(() => {
   document.addEventListener('keydown', onKeydown)
   document.addEventListener('pointerdown', onPointerDown)
   void clinics.bootstrap()
+  notifications.start()
 })
 
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('pointerdown', onPointerDown)
   document.body.classList.remove('menu-mobile-aberto')
+  notifications.stop()
 })
+
+// Avisos são por clínica: recarrega ao trocar de clínica.
+watch(
+  () => clinics.activeClinicId,
+  () => {
+    notifications.stop()
+    notifications.start()
+  },
+)
 
 watch(menuOpen, (open) => {
   document.body.classList.toggle('menu-mobile-aberto', open)
@@ -195,6 +209,9 @@ function isActive(name: string) {
         height="36"
       />
       <strong class="truncate text-base font-semibold tracking-tight">Sorria Bauru</strong>
+      <div class="ml-auto">
+        <NotificationBell />
+      </div>
     </header>
 
     <aside
@@ -341,6 +358,9 @@ function isActive(name: string) {
 
       <div class="rail-rodape shrink-0 border-t border-brand-ink/10 p-3">
         <div class="flex items-center gap-2">
+          <div class="hidden md:contents">
+            <NotificationBell />
+          </div>
           <button
             type="button"
             class="inline-flex cursor-pointer size-10 shrink-0 items-center justify-center rounded-xl border border-brand-ink/10 text-brand-ink/55 transition hover:border-brand-ink/20 hover:bg-[#f4f6f8] hover:text-brand-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue data-[aberto]:border-brand-cyan data-[aberto]:bg-brand-cyan/15 data-[aberto]:text-brand-cyan-ink [&[data-aberto]_svg]:rotate-45"

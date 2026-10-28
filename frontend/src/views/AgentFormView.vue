@@ -10,6 +10,7 @@ import {
 } from '@/api/crm/agents'
 import Button from '@/components/Buttons/Button.vue'
 import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
+import AgentToolsReference from '@/components/crm/AgentToolsReference.vue'
 import PageView from '@/components/Layout/PageView.vue'
 
 const route = useRoute()
@@ -227,6 +228,8 @@ onMounted(() => {
               {{ fieldErrors.system_prompt }}
             </span>
           </label>
+
+          <AgentToolsReference />
         </div>
 
         <aside class="flex flex-col gap-5">

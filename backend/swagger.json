@@ -66,6 +66,18 @@
         },
         {
             "name": "Financeiro Stats"
+        },
+        {
+            "name": "Base de conhecimento",
+            "description": "Respostas prontas que o agent WhatsApp consulta."
+        },
+        {
+            "name": "Avisos da recepção",
+            "description": "Notificações do painel (sino) + alerta opcional por WhatsApp."
+        },
+        {
+            "name": "Consultas",
+            "description": "Pré-agendamentos, consultas marcadas, lembretes e confirmação de presença."
         }
     ],
     "paths": {
@@ -3604,6 +3616,786 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/FinanceOverview"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            }
+        },
+        "/crm/knowledge": {
+            "get": {
+                "tags": [
+                    "Base de conhecimento"
+                ],
+                "summary": "Listar respostas prontas da clínica",
+                "description": "Informações oficiais (horários, endereço, convênios, pagamento, procedimentos) que o agent WhatsApp recebe no system prompt.",
+                "operationId": "listKnowledge",
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "horarios",
+                                "endereco",
+                                "convenios",
+                                "pagamento",
+                                "procedimentos",
+                                "outros"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Lista + meta.categories (rótulos)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Base de conhecimento"
+                ],
+                "summary": "Criar resposta pronta (admin/developer)",
+                "operationId": "createKnowledge",
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "category": {
+                                        "type": "string",
+                                        "enum": [
+                                            "horarios",
+                                            "endereco",
+                                            "convenios",
+                                            "pagamento",
+                                            "procedimentos",
+                                            "outros"
+                                        ]
+                                    },
+                                    "title": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 190
+                                    },
+                                    "content": {
+                                        "type": "string",
+                                        "maxLength": 4000
+                                    },
+                                    "position": {
+                                        "type": "integer",
+                                        "minimum": 0
+                                    },
+                                    "active": {
+                                        "type": "boolean"
+                                    }
+                                },
+                                "required": [
+                                    "category",
+                                    "content"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Resposta criada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            }
+        },
+        "/crm/knowledge/{entry}": {
+            "patch": {
+                "tags": [
+                    "Base de conhecimento"
+                ],
+                "summary": "Atualizar resposta pronta (admin/developer)",
+                "operationId": "updateKnowledge",
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "entry",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "category": {
+                                        "type": "string",
+                                        "enum": [
+                                            "horarios",
+                                            "endereco",
+                                            "convenios",
+                                            "pagamento",
+                                            "procedimentos",
+                                            "outros"
+                                        ]
+                                    },
+                                    "title": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "maxLength": 190
+                                    },
+                                    "content": {
+                                        "type": "string",
+                                        "maxLength": 4000
+                                    },
+                                    "position": {
+                                        "type": "integer",
+                                        "minimum": 0
+                                    },
+                                    "active": {
+                                        "type": "boolean"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Resposta atualizada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Base de conhecimento"
+                ],
+                "summary": "Excluir resposta pronta (admin/developer)",
+                "operationId": "deleteKnowledge",
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "entry",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{ data: { id } }",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/crm/notifications": {
+            "get": {
+                "tags": [
+                    "Avisos da recepção"
+                ],
+                "summary": "Listar avisos (sino do painel)",
+                "description": "Pré-agendamentos, urgências, reclamações, pedidos de humano e respostas a lembretes. Leitura é por usuário.",
+                "operationId": "listNotifications",
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "unread",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 30
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{ data: [...], meta: { unread_count } }",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/crm/notifications/read-all": {
+            "post": {
+                "tags": [
+                    "Avisos da recepção"
+                ],
+                "summary": "Marcar todos os avisos como lidos",
+                "operationId": "readAllNotifications",
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{ data: { marked } }",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/crm/notifications/{notification}/read": {
+            "post": {
+                "tags": [
+                    "Avisos da recepção"
+                ],
+                "summary": "Marcar aviso como lido",
+                "operationId": "readNotification",
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "notification",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{ data: { id } }",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/crm/appointments": {
+            "get": {
+                "tags": [
+                    "Consultas"
+                ],
+                "summary": "Listar consultas e pré-agendamentos",
+                "operationId": "listAppointments",
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "view",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "pre_booking",
+                                "upcoming",
+                                "history"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "pre_agendado",
+                                "agendado",
+                                "confirmado",
+                                "cancelado",
+                                "realizado",
+                                "faltou"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "lead_id",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginator Laravel",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Consultas"
+                ],
+                "summary": "Agendar consulta manualmente (Google Calendar + Task)",
+                "operationId": "createAppointment",
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "lead_id": {
+                                        "type": "integer"
+                                    },
+                                    "title": {
+                                        "type": "string"
+                                    },
+                                    "starts_at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "ends_at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "clinic_service_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "notify_patient": {
+                                        "type": "boolean"
+                                    }
+                                },
+                                "required": [
+                                    "lead_id",
+                                    "title",
+                                    "starts_at",
+                                    "ends_at"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "{ data, meta: { calendar_error, patient_notified, notify_error } }",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            }
+        },
+        "/crm/appointments/available-slots": {
+            "get": {
+                "tags": [
+                    "Consultas"
+                ],
+                "summary": "Horários livres no Google Calendar",
+                "operationId": "appointmentSlots",
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "data",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "dias",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 7
+                        }
+                    },
+                    {
+                        "name": "duracao_minutos",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 15,
+                            "maximum": 180
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "{ data: { horarios: [{ inicio, fim, rotulo }] } }",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            }
+        },
+        "/crm/appointments/{appointment}/confirm": {
+            "post": {
+                "tags": [
+                    "Consultas"
+                ],
+                "summary": "Recepção confirma pré-agendamento",
+                "operationId": "confirmPreBooking",
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "appointment",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "starts_at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "ends_at": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                    },
+                                    "title": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "clinic_service_id": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "notify_patient": {
+                                        "type": "boolean"
+                                    }
+                                },
+                                "required": [
+                                    "starts_at",
+                                    "ends_at"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "{ data, meta: { calendar_error, patient_notified, notify_error } }",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            }
+        },
+        "/crm/appointments/{appointment}/cancel": {
+            "post": {
+                "tags": [
+                    "Consultas"
+                ],
+                "summary": "Cancelar consulta / recusar pré-agendamento",
+                "operationId": "cancelAppointment",
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "appointment",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Consulta cancelada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    }
+                }
+            }
+        },
+        "/crm/appointments/{appointment}/outcome": {
+            "post": {
+                "tags": [
+                    "Consultas"
+                ],
+                "summary": "Registrar presença confirmada, comparecimento ou falta",
+                "operationId": "appointmentOutcome",
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "appointment",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "outcome": {
+                                        "type": "string",
+                                        "enum": [
+                                            "confirmado",
+                                            "realizado",
+                                            "faltou"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "outcome"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Consulta atualizada",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
                                 }
                             }
                         }

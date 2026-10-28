@@ -15,6 +15,28 @@ class Lead extends Model
 
     public const STATUSES = ['new', 'contacted', 'qualified', 'unqualified', 'converted'];
 
+    public const ATTENDANCE_NEW = 'novo';
+
+    public const ATTENDANCE_IN_PROGRESS = 'em_atendimento';
+
+    public const ATTENDANCE_HUMAN = 'humano';
+
+    public const ATTENDANCE_PRE_BOOKED = 'pre_agendado';
+
+    public const ATTENDANCE_SCHEDULED = 'agendado';
+
+    public const ATTENDANCE_NO_REPLY = 'sem_resposta';
+
+    /** Status de atendimento (automático), independente da etapa do pipeline. */
+    public const ATTENDANCE_STATUSES = [
+        self::ATTENDANCE_NEW,
+        self::ATTENDANCE_IN_PROGRESS,
+        self::ATTENDANCE_HUMAN,
+        self::ATTENDANCE_PRE_BOOKED,
+        self::ATTENDANCE_SCHEDULED,
+        self::ATTENDANCE_NO_REPLY,
+    ];
+
     protected $fillable = [
         'clinic_id',
         'title',
@@ -41,6 +63,14 @@ class Lead extends Model
         'whatsapp_auto_close_at',
         'converted_deal_id',
         'converted_at',
+        'attendance_status',
+        'whatsapp_follow_up_step',
+        'whatsapp_follow_up_due_at',
+    ];
+
+    protected $attributes = [
+        'attendance_status' => self::ATTENDANCE_NEW,
+        'whatsapp_follow_up_step' => 0,
     ];
 
     protected function casts(): array
@@ -48,6 +78,8 @@ class Lead extends Model
         return [
             'value' => 'decimal:2',
             'converted_at' => 'datetime',
+            'whatsapp_follow_up_step' => 'integer',
+            'whatsapp_follow_up_due_at' => 'datetime',
             'whatsapp_agent_paused_at' => 'datetime',
             'whatsapp_agent_resume_at' => 'datetime',
             'whatsapp_conversation_closed_at' => 'datetime',
@@ -121,5 +153,22 @@ class Lead extends Model
             ['due_at' => 'min', 'id' => 'min'],
             fn ($query) => $query->whereNull('done_at'),
         );
+    }
+
+    public function appointments(): HasMany
+    {
+        return $this->hasMany(Appointment::class);
+    }
+
+    /**
+     * Consultas em aberto do lead (pré-agendamento pendente ou futura), mais próxima primeiro.
+     */
+    public function upcomingAppointments(): HasMany
+    {
+        return $this->hasMany(Appointment::class)
+            ->upcoming()
+            ->orderByRaw('starts_at IS NULL')
+            ->orderBy('starts_at')
+            ->orderBy('id');
     }
 }

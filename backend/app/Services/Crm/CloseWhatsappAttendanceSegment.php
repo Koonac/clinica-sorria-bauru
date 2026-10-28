@@ -32,8 +32,7 @@ class CloseWhatsappAttendanceSegment
             ];
 
             if ($open->mode === WhatsappAttendanceSegment::MODE_AI && $open->active_started_at !== null) {
-                $elapsed = max(0, (int) $open->active_started_at->diffInSeconds($now));
-                $attrs['active_seconds'] = (int) ($open->active_seconds ?? 0) + $elapsed;
+                $attrs['active_seconds'] = (int) ($open->active_seconds ?? 0) + $open->activeRunSeconds($now);
                 $attrs['active_started_at'] = null;
             }
 

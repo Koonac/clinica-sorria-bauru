@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
+import LeadAttendanceBadge from '@/components/crm/LeadAttendanceBadge.vue'
 import draggable from 'vuedraggable'
-import type { Deal, Lead, PipelineKind, PipelineStage } from '@/api/crm/types'
+import type { Deal, Lead, LeadAttendanceStatus, PipelineKind, PipelineStage } from '@/api/crm/types'
 import { formatMoney } from '@/api/crm/types'
 import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
 import { daysSince, formatDateTime } from '@/utils/crmFormat'
+import { LEAD_ATTENDANCE_OPTIONS } from '@/utils/leadAttendance'
 
 const props = defineProps<{
   kind: PipelineKind
@@ -13,10 +15,13 @@ const props = defineProps<{
   loading: boolean
   error: string
   search: string
+  /** Filtro por status de atendimento (só leads). */
+  attendanceStatus?: LeadAttendanceStatus | ''
 }>()
 
 const emit = defineEmits<{
   'update:search': [value: string]
+  'update:attendanceStatus': [value: LeadAttendanceStatus | '']
   search: []
   refresh: []
   'open-card': [payload: { kind: PipelineKind; id: number }]
@@ -123,6 +128,18 @@ function stageSum(stage: PipelineStage): number {
           @input="emit('update:search', ($event.target as HTMLInputElement).value)"
         />
       </label>
+      <select
+        v-if="kind === 'lead'"
+        :value="attendanceStatus ?? ''"
+        class="cursor-pointer rounded-full border border-brand-ink/15 bg-white px-4 py-2.5 text-sm text-brand-ink/70 outline-none focus:border-brand-cyan"
+        aria-label="Filtrar por status do contato"
+        @change="emit('update:attendanceStatus', ($event.target as HTMLSelectElement).value as LeadAttendanceStatus | '')"
+      >
+        <option value="">Todos os status</option>
+        <option v-for="o in LEAD_ATTENDANCE_OPTIONS" :key="o.value" :value="o.value">
+          {{ o.label }}
+        </option>
+      </select>
       <button
         type="submit"
         class="rounded-full border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink/70 hover:bg-[#f4f6f8]"
@@ -235,6 +252,10 @@ function stageSum(stage: PipelineStage): number {
                   </div>
 
                   <div class="mt-2 flex flex-wrap gap-1.5">
+                    <LeadAttendanceBadge
+                      v-if="isLead(card) && card.attendance_status"
+                      :status="card.attendance_status"
+                    />
                     <span
                       v-if="isLead(card) ? card.whatsapp_jid || card.mobile : (card as Deal).whatsapp_jid"
                       class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700"

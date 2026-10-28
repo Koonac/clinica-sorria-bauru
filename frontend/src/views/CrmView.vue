@@ -7,6 +7,7 @@ import { moveLead } from '@/api/crm/leads'
 import { getPipeline, listStages, reorderStages } from '@/api/crm/pipeline'
 import { listSources } from '@/api/crm/sources'
 import type {
+  LeadAttendanceStatus,
   Deal,
   Lead,
   PipelineKind,
@@ -54,6 +55,7 @@ const errorLeads = ref('')
 const errorDeals = ref('')
 
 const searchLeads = ref('')
+const attendanceFilter = ref<LeadAttendanceStatus | ''>('')
 const searchDeals = ref('')
 
 const leadFormOpen = ref(false)
@@ -92,6 +94,7 @@ async function loadLeadsPipeline(options?: { silent?: boolean }) {
     leadStages.value = await getPipeline({
       kind: 'lead',
       search: searchLeads.value.trim() || undefined,
+      attendance_status: attendanceFilter.value || undefined,
     })
   } catch (error) {
     errorLeads.value =
@@ -311,7 +314,9 @@ function openEditStage(kind: PipelineKind, stage: PipelineStage) {
         :loading="loadingLeads"
         :error="errorLeads"
         :search="searchLeads"
+        :attendance-status="attendanceFilter"
         @update:search="searchLeads = $event"
+        @update:attendance-status="attendanceFilter = $event; loadLeadsPipeline()"
         @search="loadLeadsPipeline"
         @open-card="openDetail($event.kind === 'lead' ? 'lead' : 'deal', $event.id)"
         @move-card="onMoveCard"

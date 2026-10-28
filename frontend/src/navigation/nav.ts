@@ -37,6 +37,12 @@ export const NAV_ITEMS: NavItem[] = [
     to: { name: 'agenda' },
   },
   {
+    name: 'appointments',
+    label: 'Consultas',
+    icon: 'lucide:calendar-check',
+    to: { name: 'appointments' },
+  },
+  {
     name: 'whatsapp',
     label: 'WhatsApp',
     icon: 'lucide:message-circle',
@@ -47,6 +53,13 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Serviços',
     icon: 'lucide:stethoscope',
     to: { name: 'services' },
+    roles: ['admin', 'developer'],
+  },
+  {
+    name: 'knowledge',
+    label: 'Base de conhecimento',
+    icon: 'lucide:book-open',
+    to: { name: 'knowledge' },
     roles: ['admin', 'developer'],
   },
   {

@@ -176,14 +176,9 @@ class GetAttendanceStats
 
         $seconds = (int) ($segment->active_seconds ?? 0);
 
-        if ($segment->active_started_at !== null) {
-            $activeStart = $segment->active_started_at->copy()->timezone($windowStart->timezoneName);
-            if ($activeStart->lt($windowStart)) {
-                $activeStart = $windowStart->copy();
-            }
-            if ($now->gt($activeStart)) {
-                $seconds += (int) $activeStart->diffInSeconds($now);
-            }
+        // Execução em andamento conta no máximo o teto de um job (marca presa não cresce para sempre).
+        if ($segment->active_started_at !== null && $segment->active_started_at->gte($windowStart)) {
+            $seconds += $segment->activeRunSeconds($now);
         }
 
         if ($seconds > 0) {

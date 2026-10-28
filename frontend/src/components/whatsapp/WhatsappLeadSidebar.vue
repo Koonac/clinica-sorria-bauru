@@ -1,12 +1,20 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { Icon } from '@iconify/vue'
-import { ApiError } from '@/api/client'
-import { getLead } from '@/api/crm/leads'
-import type { Lead, WhatsappAttendanceSegment } from '@/api/crm/types'
+import { ApiError, toApiError } from '@/api/client'
+import { listAppointments, type Appointment } from '@/api/crm/appointments'
+import { getLead, updateLead } from '@/api/crm/leads'
+import type { Lead, LeadAttendanceStatus, WhatsappAttendanceSegment } from '@/api/crm/types'
 import Skeleton from '@/components/Feedback/Skeleton.vue'
 import QuickNoteModal from '@/components/Modals/QuickNoteModal.vue'
 import { formatDateTime, formatDurationSeconds } from '@/utils/crmFormat'
+import {
+  APPOINTMENT_STATUS_LABELS,
+  APPOINTMENT_STATUS_TONE,
+  LEAD_ATTENDANCE_OPTIONS,
+  attendanceTone,
+} from '@/utils/leadAttendance'
 
 type SidebarTab = 'detalhes' | 'anotacoes_ia'
 
@@ -88,11 +96,39 @@ function aiNoteMeta(seg: WhatsappAttendanceSegment): string {
   return `${when} · ${mode}`
 }
 
+const appointments = ref<Appointment[]>([])
+const statusSaving = ref(false)
+const statusError = ref('')
+
+const openAppointments = computed(() =>
+  appointments.value.filter((a) => ['pre_agendado', 'agendado', 'confirmado'].includes(a.status)),
+)
+
+async function changeAttendanceStatus(event: Event) {
+  const value = (event.target as HTMLSelectElement).value as LeadAttendanceStatus
+  if (!lead.value || statusSaving.value || value === lead.value.attendance_status) return
+  statusSaving.value = true
+  statusError.value = ''
+  try {
+    const updated = await updateLead(lead.value.id, { attendance_status: value })
+    lead.value = { ...lead.value, attendance_status: updated.attendance_status }
+  } catch (e) {
+    statusError.value = toApiError(e).message || 'Não foi possível alterar o status.'
+  } finally {
+    statusSaving.value = false
+  }
+}
+
 async function load() {
   loading.value = true
   error.value = ''
   try {
-    lead.value = await getLead(props.leadId)
+    const [loaded, page] = await Promise.all([
+      getLead(props.leadId),
+      listAppointments({ lead_id: props.leadId }).catch(() => null),
+    ])
+    lead.value = loaded
+    appointments.value = page?.data ?? []
   } catch (e) {
     lead.value = null
     error.value = e instanceof ApiError ? e.message : 'Não foi possível carregar o lead.'
@@ -232,7 +268,68 @@ watch(
               </dt>
               <dd class="mt-0.5 text-brand-ink">{{ agentLabel }}</dd>
             </div>
+            <div>
+              <dt class="text-[11px] font-medium tracking-wide text-brand-ink/40 uppercase">
+                Status do contato
+              </dt>
+              <dd class="mt-1">
+                <select
+                  :value="lead.attendance_status || 'novo'"
+                  :disabled="statusSaving"
+                  class="w-full cursor-pointer rounded-lg border-0 px-2.5 py-1.5 text-xs font-medium outline-none focus:ring-2 focus:ring-brand-cyan/30 disabled:opacity-60"
+                  :class="attendanceTone(lead.attendance_status)"
+                  aria-label="Status do contato"
+                  @change="changeAttendanceStatus"
+                >
+                  <option v-for="o in LEAD_ATTENDANCE_OPTIONS" :key="o.value" :value="o.value">
+                    {{ o.label }}
+                  </option>
+                </select>
+                <p v-if="statusError" class="mt-1 text-xs text-red-600">{{ statusError }}</p>
+                <p v-if="lead.whatsapp_follow_up_due_at" class="mt-1 text-xs text-brand-ink/50">
+                  Próximo follow-up automático: {{ formatDateTime(lead.whatsapp_follow_up_due_at) }}
+                </p>
+              </dd>
+            </div>
           </dl>
+
+          <section v-if="openAppointments.length" class="mt-5">
+            <h4 class="text-[11px] font-medium tracking-wide text-brand-ink/40 uppercase">
+              Consultas
+            </h4>
+            <ul class="mt-2 space-y-2">
+              <li
+                v-for="a in openAppointments"
+                :key="a.id"
+                class="rounded-xl border border-brand-ink/10 bg-[#f8fafb] px-3 py-2.5 text-sm"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <span class="truncate font-medium text-brand-ink">
+                    {{ a.starts_at ? formatDateTime(a.starts_at) : a.preferred_text }}
+                  </span>
+                  <span
+                    class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    :class="APPOINTMENT_STATUS_TONE[a.status]"
+                  >
+                    {{ APPOINTMENT_STATUS_LABELS[a.status] }}
+                  </span>
+                </div>
+                <p v-if="a.title || a.service" class="mt-0.5 truncate text-xs text-brand-ink/55">
+                  {{ a.title || a.service?.name }}
+                </p>
+                <p v-if="a.status === 'agendado' && a.reminder_sent_at" class="mt-0.5 text-xs text-brand-ink/45">
+                  Lembrete enviado · aguardando confirmação
+                </p>
+              </li>
+            </ul>
+            <RouterLink
+              :to="{ name: 'appointments' }"
+              class="mt-2 inline-flex items-center gap-1 text-xs font-medium text-brand-cyan-ink hover:underline"
+            >
+              Ver em Consultas
+              <Icon icon="lucide:arrow-right" class="size-3.5" aria-hidden="true" />
+            </RouterLink>
+          </section>
 
           <section class="mt-5">
             <h4 class="text-[11px] font-medium tracking-wide text-brand-ink/40 uppercase">

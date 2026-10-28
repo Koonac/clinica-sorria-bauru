@@ -219,7 +219,7 @@ class WhatsappController extends Controller
         $connection = $this->upsertConnection->handle([], $user->id);
         $search = trim((string) $request->query('search', ''));
         $filter = strtolower(trim((string) $request->query('filter', 'all')));
-        if (! in_array($filter, ['all', 'mine', 'unassigned', 'unread', 'human', 'agent'], true)) {
+        if (! in_array($filter, ['all', 'mine', 'unassigned', 'unread', 'human', 'agent', 'no_reply', 'pre_booked'], true)) {
             $filter = 'all';
         }
 
@@ -365,7 +365,7 @@ class WhatsappController extends Controller
                     }
                 })
                 ->orderByDesc('id')
-                ->get(['id', 'owner_id', 'whatsapp_agent_paused_at', 'whatsapp_agent_resume_at', 'whatsapp_conversation_closed_at', 'name', 'contact_id', 'whatsapp_jid', 'email', 'mobile', 'instagram', 'organization_id', 'clinic_id', 'status']);
+                ->get(['id', 'owner_id', 'whatsapp_agent_paused_at', 'whatsapp_agent_resume_at', 'whatsapp_conversation_closed_at', 'attendance_status', 'name', 'contact_id', 'whatsapp_jid', 'email', 'mobile', 'instagram', 'organization_id', 'clinic_id', 'status']);
 
             foreach ($openLeads as $openLead) {
                 if (filled($openLead->whatsapp_jid) && ! $openLeadsByJid->has($openLead->whatsapp_jid)) {
@@ -388,7 +388,7 @@ class WhatsappController extends Controller
             $leadsById = Lead::query()
                 ->with('owner:id,name')
                 ->whereIn('id', $leadIds)
-                ->get(['id', 'owner_id', 'whatsapp_agent_paused_at', 'whatsapp_agent_resume_at', 'whatsapp_conversation_closed_at', 'name', 'contact_id', 'whatsapp_jid', 'email', 'mobile', 'instagram', 'organization_id', 'clinic_id'])
+                ->get(['id', 'owner_id', 'whatsapp_agent_paused_at', 'whatsapp_agent_resume_at', 'whatsapp_conversation_closed_at', 'attendance_status', 'name', 'contact_id', 'whatsapp_jid', 'email', 'mobile', 'instagram', 'organization_id', 'clinic_id'])
                 ->keyBy('id');
 
             foreach ($leadsById as $lead) {
@@ -538,6 +538,7 @@ class WhatsappController extends Controller
                 'whatsapp_agent_paused_at' => $lead?->whatsapp_agent_paused_at?->toIso8601String(),
                 'whatsapp_agent_resume_at' => $lead?->whatsapp_agent_resume_at?->toIso8601String(),
                 'whatsapp_conversation_closed_at' => $lead?->whatsapp_conversation_closed_at?->toIso8601String(),
+                'attendance_status' => $lead?->attendance_status,
                 'unread_count' => $unread,
                 'last_message' => [
                     'id' => (int) $row->id,
@@ -931,6 +932,8 @@ class WhatsappController extends Controller
             'agent' => ($item['lead_id'] ?? null) !== null
                 && ! filled($item['whatsapp_agent_paused_at'] ?? null)
                 && ! filled($item['whatsapp_conversation_closed_at'] ?? null),
+            'no_reply' => ($item['attendance_status'] ?? null) === Lead::ATTENDANCE_NO_REPLY,
+            'pre_booked' => ($item['attendance_status'] ?? null) === Lead::ATTENDANCE_PRE_BOOKED,
             default => true,
         };
     }

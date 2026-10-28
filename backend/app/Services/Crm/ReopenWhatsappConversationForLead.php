@@ -7,7 +7,10 @@ use App\Models\Crm\WhatsappAttendanceSegment;
 
 class ReopenWhatsappConversationForLead
 {
-    public function __construct(private TrackWhatsappAttendanceSegment $attendance) {}
+    public function __construct(
+        private TrackWhatsappAttendanceSegment $attendance,
+        private UpdateLeadAttendanceStatus $status,
+    ) {}
 
     /**
      * Reabre conversa fechada: limpa closed_* e inicia segmento AI.
@@ -26,6 +29,8 @@ class ReopenWhatsappConversationForLead
             'whatsapp_agent_paused_at' => null,
             'whatsapp_agent_resume_at' => null,
         ])->save();
+
+        $this->status->handle($lead, Lead::ATTENDANCE_IN_PROGRESS, 'reopen', [Lead::ATTENDANCE_HUMAN]);
 
         $fresh = $lead->fresh(['contact', 'source', 'owner', 'stage']) ?? $lead;
 

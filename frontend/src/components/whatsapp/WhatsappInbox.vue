@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ApiError } from '@/api/client'
 import { listAttendants } from '@/api/crm/attendants'
-import { pauseLeadAgent, resumeLeadAgent, finalizeLeadWhatsapp, updateLead } from '@/api/crm/leads'
+import { getLead, pauseLeadAgent, resumeLeadAgent, finalizeLeadWhatsapp, updateLead } from '@/api/crm/leads'
 import { listWhatsappChats, markWhatsappChatRead, ensureWhatsappChatLead } from '@/api/crm/whatsapp'
 import type { CrmAttendant, WhatsappChat, WhatsappChatFilter } from '@/api/crm/types'
 import WhatsappChatList from '@/components/whatsapp/WhatsappChatList.vue'
@@ -15,6 +16,11 @@ import { playTransferSound, unlockTransferSound } from '@/utils/playTransferSoun
 
 const auth = useAuthStore()
 const clinics = useClinicsStore()
+const route = useRoute()
+const router = useRouter()
+
+/** Lead vindo de um aviso/consulta (?lead=ID): abre a conversa dele. */
+const queryLeadId = Number(route.query.lead) || null
 
 const INITIAL_LIMIT = 20
 const MORE_LIMIT = 10
@@ -24,7 +30,7 @@ const attendants = ref<CrmAttendant[]>([])
 const selected = ref<WhatsappChat | null>(null)
 const leadSidebarOpen = ref(false)
 const search = ref('')
-const filter = ref<WhatsappChatFilter>('mine')
+const filter = ref<WhatsappChatFilter>(queryLeadId ? 'all' : 'mine')
 const loading = ref(true)
 const loadingMore = ref(false)
 const hasMore = ref(false)
@@ -395,8 +401,27 @@ watch(
   },
 )
 
+async function openQueryLead(leadId: number) {
+  let chat = chats.value.find((c) => c.lead_id === leadId)
+  if (!chat) {
+    try {
+      const lead = await getLead(leadId)
+      const term = lead.mobile || lead.whatsapp_jid?.split('@')[0] || lead.name
+      const page = await listWhatsappChats({ search: term, filter: 'all', limit: 10, offset: 0 })
+      chat = page.data.find((c) => c.lead_id === leadId) ?? page.data[0]
+    } catch {
+      chat = undefined
+    }
+  }
+  if (chat) await selectChat(chat)
+  const { lead: _lead, ...rest } = route.query
+  void router.replace({ query: rest })
+}
+
 onMounted(() => {
-  void loadChats()
+  void loadChats().then(() => {
+    if (queryLeadId) void openQueryLead(queryLeadId)
+  })
   void loadAttendants()
   startListPoll()
   window.addEventListener('pointerdown', onPointerUnlock, { once: true })

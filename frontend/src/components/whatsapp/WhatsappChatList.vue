@@ -14,6 +14,7 @@ import {
 import type { WhatsappChat, WhatsappChatFilter } from '@/api/crm/types'
 import Skeleton from '@/components/Feedback/Skeleton.vue'
 import WhatsappAvatar from '@/components/whatsapp/WhatsappAvatar.vue'
+import LeadAttendanceBadge from '@/components/crm/LeadAttendanceBadge.vue'
 import { formatDateTime } from '@/utils/crmFormat'
 
 const props = defineProps<{
@@ -39,12 +40,14 @@ const primaryFilters: { id: WhatsappChatFilter; label: string }[] = [
   { id: 'all', label: 'Todas' },
 ]
 
-const moreFilterIds: WhatsappChatFilter[] = ['unassigned', 'unread', 'human']
+const moreFilterIds: WhatsappChatFilter[] = ['unassigned', 'unread', 'human', 'no_reply', 'pre_booked']
 
 const moreOptions: { value: WhatsappChatFilter; label: string }[] = [
   { value: 'unassigned', label: 'Finalizados' },
   { value: 'unread', label: 'Não lidas' },
   { value: 'human', label: 'Humano' },
+  { value: 'no_reply', label: 'Sem resposta' },
+  { value: 'pre_booked', label: 'Pré-agendados' },
 ]
 
 const moreValue = computed({
@@ -235,6 +238,10 @@ function onListScroll(event: Event) {
                 {{ ownershipBadge(chat)?.label }}
               </span>
               <span v-else-if="chat.owner_name">· {{ chat.owner_name }}</span>
+              <LeadAttendanceBadge
+                v-if="chat.lead_id && chat.attendance_status && chat.attendance_status !== 'em_atendimento'"
+                :status="chat.attendance_status"
+              />
             </div>
           </div>
         </button>

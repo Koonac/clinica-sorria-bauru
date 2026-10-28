@@ -4,6 +4,7 @@ namespace App\Services\Crm;
 
 use App\Models\Clinic;
 use App\Models\Crm\Connection;
+use App\Models\Crm\Lead;
 use App\Models\Crm\WhatsappMessage;
 use App\Support\ClinicContext;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -17,6 +18,8 @@ class ProcessInboundWhatsappMessage
         private ReopenWhatsappConversationForLead $reopener,
         private ScheduleWhatsappAttendanceAutoClose $autoClose,
         private WhatsappMediaStore $mediaStore,
+        private UpdateLeadAttendanceStatus $attendanceStatus,
+        private ScheduleWhatsappFollowUp $followUp,
     ) {}
 
     /**
@@ -37,6 +40,11 @@ class ProcessInboundWhatsappMessage
 
         $jid = trim((string) ($payload['jid'] ?? ''));
         if ($jid === '') {
+            return null;
+        }
+
+        // Alertas para o WhatsApp da recepção não são conversa com paciente (nem o eco from_me deles).
+        if ($this->isReceptionAlertChat($connection, $jid, $payload)) {
             return null;
         }
 
@@ -87,6 +95,14 @@ class ProcessInboundWhatsappMessage
             } else {
                 $lead = $this->autoClose->clear($lead);
             }
+            // Paciente respondeu: encerra a sequência de follow-up e volta a "em atendimento".
+            $this->followUp->clear($lead);
+            $this->attendanceStatus->handle(
+                $lead,
+                Lead::ATTENDANCE_IN_PROGRESS,
+                'inbound',
+                [Lead::ATTENDANCE_NEW, Lead::ATTENDANCE_NO_REPLY],
+            );
             $resolved['lead'] = $lead;
         }
 
@@ -133,6 +149,27 @@ class ProcessInboundWhatsappMessage
         }
 
         return $message;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function isReceptionAlertChat(Connection $connection, string $jid, array $payload): bool
+    {
+        $alertJid = trim((string) ($connection->reception_alert_jid ?? ''));
+        if ($alertJid === '') {
+            return false;
+        }
+
+        $digits = fn (string $value) => preg_replace('/\D+/', '', explode('@', $value)[0]) ?: '';
+        $alertDigits = $digits($alertJid);
+        if ($jid === $alertJid || ($alertDigits !== '' && $digits($jid) === $alertDigits)) {
+            return true;
+        }
+
+        $phone = (string) ($payload['phone_number'] ?? '');
+
+        return $alertDigits !== '' && $phone !== '' && $digits($phone) === $alertDigits;
     }
 
     /**

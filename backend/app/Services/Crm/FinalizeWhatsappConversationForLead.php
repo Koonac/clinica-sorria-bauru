@@ -19,7 +19,11 @@ class FinalizeWhatsappConversationForLead
 
     public const DEFAULT_FINALIZE_NOTICE = '_finalizando chamado_';
 
-    public function __construct(private CloseWhatsappAttendanceSegment $closeSegment) {}
+    public function __construct(
+        private CloseWhatsappAttendanceSegment $closeSegment,
+        private UpdateLeadAttendanceStatus $status,
+        private ScheduleWhatsappFollowUp $followUp,
+    ) {}
 
     /**
      * Finaliza o atendimento: remove dono, limpa pausa, fecha segmento e marca conversa fechada.
@@ -46,6 +50,12 @@ class FinalizeWhatsappConversationForLead
                 'whatsapp_conversation_closed_by' => $user?->id,
                 'whatsapp_auto_close_at' => null,
             ])->save();
+
+            $this->status->handle($lead, Lead::ATTENDANCE_IN_PROGRESS, 'finalize:'.$source, [Lead::ATTENDANCE_HUMAN]);
+            // Auto-close só fecha por inatividade: o follow-up continua valendo para reengajar.
+            if ($source !== self::SOURCE_AUTO_CLOSE) {
+                $this->followUp->clear($lead);
+            }
 
             $closedSegment = $this->closeSegment->handle($lead);
             $closedSegmentId = $closedSegment?->id;

@@ -7,7 +7,10 @@ use App\Models\Crm\WhatsappAttendanceSegment;
 
 class ResumeWhatsappAgentForLead
 {
-    public function __construct(private TrackWhatsappAttendanceSegment $attendance) {}
+    public function __construct(
+        private TrackWhatsappAttendanceSegment $attendance,
+        private UpdateLeadAttendanceStatus $status,
+    ) {}
 
     /**
      * Retoma o agent no lead (manual ou automática). Zera pausa e prazo de retomada.
@@ -18,6 +21,8 @@ class ResumeWhatsappAgentForLead
             'whatsapp_agent_paused_at' => null,
             'whatsapp_agent_resume_at' => null,
         ])->save();
+
+        $this->status->handle($lead, Lead::ATTENDANCE_IN_PROGRESS, 'resume', [Lead::ATTENDANCE_HUMAN]);
 
         $fresh = $lead->fresh(['contact', 'source', 'owner', 'stage']) ?? $lead;
 

@@ -1,6 +1,14 @@
 export type PipelineKind = 'lead' | 'deal'
 export type StageStatus = 'open' | 'in_progress' | 'won' | 'lost'
 export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'unqualified' | 'converted'
+/** Status de atendimento automático (independe da etapa do pipeline). */
+export type LeadAttendanceStatus =
+  | 'novo'
+  | 'em_atendimento'
+  | 'humano'
+  | 'pre_agendado'
+  | 'agendado'
+  | 'sem_resposta'
 export type ActivityType = 'note' | 'call' | 'whatsapp' | 'email' | 'task' | 'stage_change'
 
 export type CrmUserRef = {
@@ -112,6 +120,9 @@ export type Lead = {
   whatsapp_conversation_closed_at?: string | null
   whatsapp_conversation_closed_by?: number | null
   whatsapp_auto_close_at?: string | null
+  attendance_status?: LeadAttendanceStatus
+  whatsapp_follow_up_step?: number
+  whatsapp_follow_up_due_at?: string | null
   converted_deal_id?: number | null
   converted_at?: string | null
   created_at?: string
@@ -188,7 +199,15 @@ export type WhatsappMessage = {
   user_id?: number | null
 }
 
-export type WhatsappChatFilter = 'all' | 'mine' | 'unassigned' | 'unread' | 'human' | 'agent'
+export type WhatsappChatFilter =
+  | 'all'
+  | 'mine'
+  | 'unassigned'
+  | 'unread'
+  | 'human'
+  | 'agent'
+  | 'no_reply'
+  | 'pre_booked'
 
 
 export type WhatsappChat = {
@@ -206,6 +225,7 @@ export type WhatsappChat = {
   whatsapp_agent_paused_at?: string | null
   whatsapp_agent_resume_at?: string | null
   whatsapp_conversation_closed_at?: string | null
+  attendance_status?: LeadAttendanceStatus | null
   unread_count: number
   last_message: {
     id: number
@@ -243,6 +263,7 @@ export type UpdateLeadPayload = Partial<
     status?: Exclude<LeadStatus, 'converted'>
     lost_reason?: string | null
     owner_id?: number | null
+    attendance_status?: LeadAttendanceStatus
   }
 >
 

@@ -28,6 +28,7 @@ class UpdateLeadRequest extends FormRequest
             'currency' => ['sometimes', 'nullable', 'string', 'size:3'],
             'external_id' => ['sometimes', 'nullable', 'string', 'max:120'],
             'lost_reason' => ['sometimes', 'nullable', 'string', 'max:190'],
+            'attendance_status' => ['sometimes', Rule::in(Lead::ATTENDANCE_STATUSES)],
         ];
     }
 }

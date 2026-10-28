@@ -146,6 +146,57 @@ class AttendanceStatsApiTest extends TestCase
             ->assertJsonPath('data.by_user.0.total_seconds', 95);
     }
 
+    public function test_marca_de_ia_presa_nao_faz_tempo_crescer_para_sempre(): void
+    {
+        $admin = User::factory()->admin()->create();
+        Sanctum::actingAs($admin);
+
+        $lead = Lead::create(['title' => 'L', 'name' => 'Ana']);
+
+        // Job que morreu no meio há 3 dias: active_started_at nunca foi zerado.
+        WhatsappAttendanceSegment::create([
+            'clinic_id' => $lead->clinic_id,
+            'lead_id' => $lead->id,
+            'mode' => WhatsappAttendanceSegment::MODE_AI,
+            'user_id' => null,
+            'started_at' => now()->subDays(3)->subMinute(),
+            'active_seconds' => 40,
+            'active_started_at' => now()->subDays(3),
+            'source' => 'lead_created',
+        ]);
+
+        $first = $this->getJson('/api/v1/crm/stats/attendance?dias=30')->assertOk()->json('data.total_ai_seconds');
+        $this->travel(2)->hours();
+        $second = $this->getJson('/api/v1/crm/stats/attendance?dias=30')->assertOk()->json('data.total_ai_seconds');
+
+        $this->assertSame(40 + WhatsappAttendanceSegment::MAX_ACTIVE_RUN_SECONDS, $first);
+        $this->assertSame($first, $second);
+    }
+
+    public function test_novo_job_libera_marca_de_ia_presa_com_teto(): void
+    {
+        $lead = Lead::create(['title' => 'L', 'name' => 'Ana']);
+        $segment = WhatsappAttendanceSegment::create([
+            'clinic_id' => $lead->clinic_id,
+            'lead_id' => $lead->id,
+            'mode' => WhatsappAttendanceSegment::MODE_AI,
+            'user_id' => null,
+            'started_at' => now()->subDays(2),
+            'active_seconds' => 10,
+            'active_started_at' => now()->subDays(2),
+            'source' => 'lead_created',
+        ]);
+
+        $tracker = app(\App\Services\Crm\TrackWhatsappAttendanceSegment::class);
+        $tracker->startActiveAiTime($lead);
+        $this->travel(30)->seconds();
+        $tracker->stopActiveAiTime($lead);
+
+        $segment->refresh();
+        $this->assertNull($segment->active_started_at);
+        $this->assertSame(10 + WhatsappAttendanceSegment::MAX_ACTIVE_RUN_SECONDS + 30, (int) $segment->active_seconds);
+    }
+
     public function test_funcionario_nao_acessa_metricas_de_atendimento(): void
     {
         Sanctum::actingAs(User::factory()->funcionario()->create([

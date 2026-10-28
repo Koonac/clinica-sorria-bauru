@@ -3,10 +3,12 @@
 namespace App\Services\Crm\Agent\Tools;
 
 use App\Models\Crm\Activity;
+use App\Models\Crm\CrmNotification;
 use App\Models\Crm\WhatsappMessage;
 use App\Models\User;
 use App\Services\Crm\Agent\AgentContext;
 use App\Services\Crm\Agent\AgentTool;
+use App\Services\Crm\NotifyReception;
 use App\Services\Crm\PauseWhatsappAgentWithAutoResumeForLead;
 use App\Services\Crm\WhatsappApiClient;
 use RuntimeException;
@@ -15,7 +17,21 @@ class EscalarHumanoTool implements AgentTool
 {
     public const TRANSFER_NOTICE = '_[transferindo chamado]_';
 
-    public function __construct(private PauseWhatsappAgentWithAutoResumeForLead $pauseWithResume) {}
+    public const CATEGORIES = ['urgencia_dor', 'reclamacao', 'pedido_humano', 'fora_escopo', 'outro'];
+
+    /** categoria => [tipo da notificação, prioridade, título] */
+    private const NOTIFICATIONS = [
+        'urgencia_dor' => [CrmNotification::TYPE_URGENCY, CrmNotification::PRIORITY_URGENT, 'Urgência: paciente com dor/sintoma'],
+        'reclamacao' => [CrmNotification::TYPE_COMPLAINT, CrmNotification::PRIORITY_NORMAL, 'Reclamação de paciente'],
+        'pedido_humano' => [CrmNotification::TYPE_HUMAN_REQUEST, CrmNotification::PRIORITY_NORMAL, 'Paciente pediu atendimento humano'],
+        'fora_escopo' => [CrmNotification::TYPE_HANDOFF, CrmNotification::PRIORITY_NORMAL, 'IA transferiu atendimento'],
+        'outro' => [CrmNotification::TYPE_HANDOFF, CrmNotification::PRIORITY_NORMAL, 'IA transferiu atendimento'],
+    ];
+
+    public function __construct(
+        private PauseWhatsappAgentWithAutoResumeForLead $pauseWithResume,
+        private NotifyReception $notifyReception,
+    ) {}
 
     public function name(): string
     {
@@ -26,13 +42,18 @@ class EscalarHumanoTool implements AgentTool
     {
         return [
             'name' => $this->name(),
-            'description' => 'Pausa o atendimento automático deste lead, avisa o cliente com "transferindo chamado", transfere para um atendente humano aleatório e registra o handoff. Use quando o lead pedir atendente, o caso estiver fora do escopo ou houver risco/reclamação. A IA retoma automaticamente após o prazo configurado na conexão.',
+            'description' => 'Pausa o atendimento automático deste lead, avisa o cliente com "transferindo chamado", transfere para um atendente humano, avisa a recepção e registra o handoff. Use em dor/urgência, reclamação, pedido explícito de atendente/pessoa ou caso fora do escopo. A IA retoma automaticamente após o prazo configurado na conexão.',
             'parameters' => [
                 'type' => 'object',
                 'properties' => [
                     'motivo' => [
                         'type' => 'string',
                         'description' => 'Motivo do handoff',
+                    ],
+                    'categoria' => [
+                        'type' => 'string',
+                        'enum' => self::CATEGORIES,
+                        'description' => 'urgencia_dor (dor, sangramento, inchaço, trauma), reclamacao, pedido_humano (pediu atendente/pessoa), fora_escopo ou outro.',
                     ],
                 ],
                 'required' => ['motivo'],
@@ -49,6 +70,11 @@ class EscalarHumanoTool implements AgentTool
 
         if (! $context->lead) {
             throw new RuntimeException('Não há lead associado a esta conversa para pausar o agent.');
+        }
+
+        $categoria = (string) ($arguments['categoria'] ?? 'outro');
+        if (! in_array($categoria, self::CATEGORIES, true)) {
+            $categoria = 'outro';
         }
 
         $this->sendTransferNotice($context);
@@ -81,6 +107,7 @@ class EscalarHumanoTool implements AgentTool
                 'agent_id' => $context->agent->id,
                 'agent_name' => $context->agent->name,
                 'handoff' => true,
+                'categoria' => $categoria,
                 'previous_owner_id' => $previousOwnerId,
                 'assigned_user_id' => $attendant->id,
                 'assigned_user_name' => $attendant->name,
@@ -89,6 +116,18 @@ class EscalarHumanoTool implements AgentTool
             ],
         ]);
 
+        [$type, $priority, $title] = self::NOTIFICATIONS[$categoria];
+        $this->notifyReception->handle(
+            (int) $lead->clinic_id,
+            $type,
+            $title.' → '.$attendant->name,
+            $motivo,
+            $lead,
+            null,
+            $priority,
+            ['categoria' => $categoria, 'assigned_user_id' => $attendant->id],
+        );
+
         return [
             'ok' => true,
             'paused' => true,
@@ -96,6 +135,7 @@ class EscalarHumanoTool implements AgentTool
             'owner_id' => $attendant->id,
             'owner_name' => $attendant->name,
             'motivo' => $motivo,
+            'categoria' => $categoria,
             'notice' => self::TRANSFER_NOTICE,
             'resume_at' => $result['resume_at']->toIso8601String(),
             'auto_resume_hours' => $result['hours'],

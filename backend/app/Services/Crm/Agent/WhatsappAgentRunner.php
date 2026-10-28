@@ -2,12 +2,14 @@
 
 namespace App\Services\Crm\Agent;
 
+use App\Models\Crm\Appointment;
 use App\Models\Crm\Connection;
 use App\Models\Crm\PipelineStage;
 use App\Models\Crm\WhatsappAttendanceSegment;
 use App\Models\Crm\WhatsappMessage;
 use App\Services\Crm\Agent\Tools\EscalarHumanoTool;
 use App\Services\Crm\FinalizeWhatsappConversationForLead;
+use App\Services\Crm\Knowledge\BuildClinicKnowledgePrompt;
 use App\Models\LlmTokenUsage;
 use App\Services\Crm\OpenRouterAgentClient;
 use App\Services\Crm\WhatsappChatHistory;
@@ -25,6 +27,7 @@ class WhatsappAgentRunner
         private OpenRouterAgentClient $openRouter,
         private WhatsappAgentToolRegistry $tools,
         private WhatsappChatHistory $history,
+        private BuildClinicKnowledgePrompt $knowledge,
     ) {}
 
     public function run(AgentContext $context): void
@@ -40,7 +43,7 @@ class WhatsappAgentRunner
             return;
         }
 
-        $openAiTools = $this->tools->openAiTools();
+        $openAiTools = $this->tools->openAiTools($context);
         $model = $context->agent->resolvedModel();
         $enviouResposta = false;
 
@@ -212,6 +215,13 @@ class WhatsappAgentRunner
 
         $priorSummaries = $this->priorAttendanceSummariesBlock($context);
         $rules = trim((string) $context->agent->system_prompt);
+        $schedulingRules = $this->schedulingRules($context);
+        $appointmentsBlock = $this->appointmentsBlock($context);
+        $knowledgeBlock = $this->knowledgeBlock();
+        $signalsBlock = $context->handoffSignals !== []
+            ? "\nAtenção: a mensagem atual do paciente tem sinais de ".implode(', ', $context->handoffSignals)
+                .'. Avalie com cuidado se é caso de escalar_humano (com a categoria certa) antes de responder.'."\n"
+            : '';
 
         return <<<PROMPT
 Você é o agent de atendimento WhatsApp "{$context->agent->name}".
@@ -225,12 +235,16 @@ Regras de operação (obrigatórias):
 - Antes de oferecer horários ao lead, chame listar_horarios_disponiveis e ofereça só o que ela retornar (sem inventar).
 - Nunca cite nome, título ou descrição de outros compromissos da agenda — só horários livres.
 - Antes de confirmar procedimentos, preços ou cobertura por convênio, chame consultar_servicos e use apenas o retorno. A clínica já é a deste atendimento.
-- Para marcar ou remarcar horário, use criar_agendamento (por padrão cancela o agendamento anterior deste lead).
-- Só use manter_anteriores=true se o lead quiser DOIS horários ao mesmo tempo.
-- Se o lead pedir humano ou o caso sair do escopo, use escalar_humano.
+{$schedulingRules}
+- Se o lead responder a um lembrete de consulta (confirmar presença ou desmarcar), use atualizar_consulta com o id do bloco "Consultas do lead".
+- Use escalar_humano (sempre com categoria) quando:
+  • urgencia_dor: dor forte, sangramento, inchaço, dente quebrado/trauma, febre ou complicação após procedimento. Antes, mande uma mensagem curta e acolhedora dizendo que a equipe vai falar com ele agora; se houver inchaço que dificulte respirar/engolir ou sangramento intenso, oriente procurar um pronto-atendimento imediatamente.
+  • reclamacao: insatisfação, cobrança indevida, problema com tratamento ou atendimento.
+  • pedido_humano: o lead pede para falar com atendente, pessoa, recepção ou dentista.
+  • fora_escopo / outro: o caso sai do que você pode resolver.
 - Quando o pedido estiver resolvido (confirmação do cliente, informação entregue, agendamento feito sem pendência), chame finalizar_atendimento após a última enviar_resposta.
 - Responda em português brasileiro, de forma objetiva.
-- Não invente preços, prazos ou políticas que não estejam nas regras do agent.
+- Não invente preços, prazos, endereço, horários, convênios ou políticas que não estejam nas Informações da clínica, no retorno das tools ou nas regras do agent. Se não souber, diga que vai verificar e use escalar_humano(categoria=outro).
 - Aja com base nas mensagens do atendimento ATUAL. Resumos de atendimentos anteriores são só contexto — não escale nem finalize só porque o histórico antigo menciona handoff ou encerramento.
 
 Contexto CRM:
@@ -238,10 +252,65 @@ Contexto CRM:
 - Estágios de lead disponíveis: {$stagesJson}
 - Fuso horário: America/Sao_Paulo
 - Agora: {$this->nowIso()}
-{$priorSummaries}
+{$appointmentsBlock}{$priorSummaries}{$signalsBlock}{$knowledgeBlock}
 Regras do agent (system prompt do cliente):
 {$rules}
 PROMPT;
+    }
+
+    private function schedulingRules(AgentContext $context): string
+    {
+        if ($context->connection->isPreBookingMode()) {
+            return implode("\n", [
+                '- Agendamento nesta clínica é por PRÉ-AGENDAMENTO: você não marca na agenda. Colete o dia/horário preferido (e o procedimento, se souber) e chame registrar_pre_agendamento.',
+                '- Depois diga ao paciente que a recepção vai confirmar o horário em breve. Nunca diga que o horário está marcado.',
+                '- Pode usar listar_horarios_disponiveis para sugerir horários livres, mas a confirmação final é da recepção.',
+            ]);
+        }
+
+        return implode("\n", [
+            '- Para marcar ou remarcar horário, use criar_agendamento (por padrão cancela o agendamento anterior deste lead).',
+            '- Só use manter_anteriores=true se o lead quiser DOIS horários ao mesmo tempo.',
+        ]);
+    }
+
+    private function appointmentsBlock(AgentContext $context): string
+    {
+        if (! $context->lead) {
+            return '';
+        }
+
+        $appointments = $context->lead->upcomingAppointments()
+            ->with('service:id,name')
+            ->limit(5)
+            ->get();
+
+        if ($appointments->isEmpty()) {
+            return '';
+        }
+
+        $tz = config('app.timezone');
+        $items = $appointments->map(fn (Appointment $a) => array_filter([
+            'id' => $a->id,
+            'status' => $a->status,
+            'inicio' => $a->starts_at?->timezone($tz)->toIso8601String(),
+            'preferencia' => $a->status === Appointment::STATUS_PRE_BOOKED ? $a->preferred_text : null,
+            'titulo' => $a->title,
+            'servico' => $a->service?->name,
+            'lembrete_enviado' => $a->reminder_sent_at !== null ? true : null,
+        ], fn ($v) => $v !== null))->values()->all();
+
+        return '- Consultas do lead: '.json_encode($items, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n";
+    }
+
+    private function knowledgeBlock(): string
+    {
+        $text = $this->knowledge->handle();
+        if ($text === '') {
+            return '';
+        }
+
+        return "\nInformações da clínica (fonte oficial — use para responder horários, endereço, convênios, pagamento e dúvidas frequentes):\n".$text."\n";
     }
 
     private function priorAttendanceSummariesBlock(AgentContext $context): string

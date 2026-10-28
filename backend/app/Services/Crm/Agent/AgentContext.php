@@ -12,6 +12,7 @@ class AgentContext
 {
     /**
      * @param  list<array{id: int, name: string, is_lost: bool}>  $leadStages
+     * @param  list<string>  $handoffSignals  sinais de urgência/reclamação/pedido de humano nas inbounds do turno
      */
     public function __construct(
         public User $user,
@@ -23,5 +24,6 @@ class AgentContext
         public ?Lead $lead,
         public ?Deal $deal,
         public array $leadStages,
+        public array $handoffSignals = [],
     ) {}
 }

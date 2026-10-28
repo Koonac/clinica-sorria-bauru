@@ -15,6 +15,8 @@ class LlmTokenUsage extends Model
 
     public const PURPOSE_CAMPAIGN = 'campaign';
 
+    public const PURPOSE_FOLLOW_UP = 'follow_up';
+
     public const PURPOSE_MEDIA_TRANSCRIPTION = 'media_transcription';
 
     public const PURPOSE_MEDIA_VISION = 'media_vision';

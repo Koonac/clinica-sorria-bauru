@@ -3,6 +3,9 @@ import type { DataResponse } from '@/api/crm/types'
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
 
+/** direct = IA marca na agenda; pre_booking = IA registra preferência e a recepção confirma. */
+export type SchedulingMode = 'direct' | 'pre_booking'
+
 export type ClinicConnection = {
   id: number
   clinic_id: number
@@ -18,6 +21,15 @@ export type ClinicConnection = {
   whatsapp_attendance_auto_close_minutes: number
   whatsapp_finalize_notice: string
   whatsapp_agent_history_limit: number
+  reception_alert_jid: string | null
+  scheduling_mode: SchedulingMode
+  appointment_reminder_enabled: boolean
+  appointment_reminder_hours: number
+  appointment_reminder_template: string
+  whatsapp_follow_up_enabled: boolean
+  whatsapp_follow_up_delays: number[]
+  whatsapp_send_window_start: number
+  whatsapp_send_window_end: number
   api_username?: string | null
   has_qr?: boolean
 }
@@ -60,6 +72,15 @@ export async function updateConnectionSettings(payload: {
   whatsapp_attendance_auto_close_minutes?: number
   whatsapp_finalize_notice?: string | null
   whatsapp_agent_history_limit?: number
+  reception_alert_jid?: string | null
+  scheduling_mode?: SchedulingMode
+  appointment_reminder_enabled?: boolean
+  appointment_reminder_hours?: number
+  appointment_reminder_template?: string | null
+  whatsapp_follow_up_enabled?: boolean
+  whatsapp_follow_up_delays?: number[]
+  whatsapp_send_window_start?: number
+  whatsapp_send_window_end?: number
 }): Promise<ClinicConnection> {
   try {
     const { data } = await api.put<DataResponse<ClinicConnection>>(

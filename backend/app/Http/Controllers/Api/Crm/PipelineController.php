@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Crm;
 
 use App\Http\Controllers\Controller;
+use App\Models\Crm\Lead;
 use App\Models\Crm\PipelineStage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,10 +17,12 @@ class PipelineController extends Controller
         $dados = $request->validate([
             'kind' => ['required', Rule::in(PipelineStage::KINDS)],
             'search' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'attendance_status' => ['sometimes', 'nullable', Rule::in(Lead::ATTENDANCE_STATUSES)],
         ]);
 
         $kind = $dados['kind'];
         $search = trim((string) ($dados['search'] ?? ''));
+        $attendanceStatus = $dados['attendance_status'] ?? null;
 
         $query = PipelineStage::ofKind($kind)
             ->where('active', true)
@@ -27,8 +30,9 @@ class PipelineController extends Controller
 
         if ($kind === 'lead') {
             $query->with([
-                'leads' => function ($q) use ($search) {
+                'leads' => function ($q) use ($search, $attendanceStatus) {
                     $q->where('status', '!=', 'converted')
+                        ->when($attendanceStatus, fn ($inner) => $inner->where('attendance_status', $attendanceStatus))
                         ->latest('updated_at')
                         ->with([
                             'source',

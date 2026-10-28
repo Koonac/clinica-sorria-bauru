@@ -70,6 +70,17 @@ const router = createRouter({
           },
         },
         {
+          path: 'consultas',
+          name: 'appointments',
+          component: () => import('@/views/AppointmentsView.vue'),
+          meta: {
+            requiresAuth: true,
+            roles: bothRoles,
+            title: 'Consultas',
+            icon: 'lucide:calendar-check',
+          },
+        },
+        {
           path: 'whatsapp',
           name: 'whatsapp',
           component: () => import('@/views/WhatsappView.vue'),
@@ -89,6 +100,17 @@ const router = createRouter({
             roles: elevatedRoles,
             title: 'Serviços',
             icon: 'lucide:stethoscope',
+          },
+        },
+        {
+          path: 'base-conhecimento',
+          name: 'knowledge',
+          component: () => import('@/views/KnowledgeView.vue'),
+          meta: {
+            requiresAuth: true,
+            roles: elevatedRoles,
+            title: 'Base de conhecimento',
+            icon: 'lucide:book-open',
           },
         },
         {

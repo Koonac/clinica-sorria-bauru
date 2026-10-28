@@ -7,6 +7,7 @@ import {
   getConnectionStatus,
   updateConnectionSettings,
   type ClinicConnection,
+  type SchedulingMode,
 } from '@/api/crm/connection'
 import { listStages } from '@/api/crm/pipeline'
 import type { PipelineStage } from '@/api/crm/types'
@@ -34,7 +35,24 @@ const settings = ref({
   whatsapp_attendance_auto_close_minutes: 10,
   whatsapp_finalize_notice: '_finalizando chamado_',
   whatsapp_agent_history_limit: 40,
+  scheduling_mode: 'direct' as SchedulingMode,
+  reception_alert_jid: '',
+  appointment_reminder_enabled: true,
+  appointment_reminder_hours: 24,
+  appointment_reminder_template: '',
+  whatsapp_follow_up_enabled: false,
+  /** Em horas na tela; a API guarda minutos. */
+  follow_up_hours: [2, 24, 72] as number[],
+  whatsapp_send_window_start: 8,
+  whatsapp_send_window_end: 20,
 })
+
+const schedulingOptions = [
+  { value: 'direct', label: 'IA marca direto na agenda' },
+  { value: 'pre_booking', label: 'IA faz pré-agendamento (recepção confirma)' },
+]
+
+const REMINDER_VARIABLES = ['{nome}', '{quando}', '{data}', '{hora}', '{clinica}', '{servico}']
 
 const inputClass =
   'w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-base text-brand-ink outline-none transition placeholder:text-brand-ink/35 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25'
@@ -86,6 +104,25 @@ function applyConnection(next: ClinicConnection) {
   settings.value.whatsapp_finalize_notice =
     next.whatsapp_finalize_notice ?? '_finalizando chamado_'
   settings.value.whatsapp_agent_history_limit = next.whatsapp_agent_history_limit ?? 40
+  settings.value.scheduling_mode = next.scheduling_mode ?? 'direct'
+  settings.value.reception_alert_jid = next.reception_alert_jid ?? ''
+  settings.value.appointment_reminder_enabled = next.appointment_reminder_enabled ?? true
+  settings.value.appointment_reminder_hours = next.appointment_reminder_hours ?? 24
+  settings.value.appointment_reminder_template = next.appointment_reminder_template ?? ''
+  settings.value.whatsapp_follow_up_enabled = next.whatsapp_follow_up_enabled ?? false
+  settings.value.follow_up_hours = (next.whatsapp_follow_up_delays ?? [120, 1440, 4320]).map(
+    (minutes) => Math.round((minutes / 60) * 10) / 10,
+  )
+  settings.value.whatsapp_send_window_start = next.whatsapp_send_window_start ?? 8
+  settings.value.whatsapp_send_window_end = next.whatsapp_send_window_end ?? 20
+}
+
+function formatHours(hours: number): string {
+  if (hours >= 24 && hours % 24 === 0) {
+    const days = hours / 24
+    return days === 1 ? '1 dia' : `${days} dias`
+  }
+  return `${hours}h`
 }
 
 async function load() {
@@ -158,6 +195,17 @@ async function saveSettings() {
       ),
       whatsapp_finalize_notice: settings.value.whatsapp_finalize_notice.trim(),
       whatsapp_agent_history_limit: Number(settings.value.whatsapp_agent_history_limit),
+      scheduling_mode: settings.value.scheduling_mode,
+      reception_alert_jid: settings.value.reception_alert_jid.trim() || null,
+      appointment_reminder_enabled: settings.value.appointment_reminder_enabled,
+      appointment_reminder_hours: Number(settings.value.appointment_reminder_hours),
+      appointment_reminder_template: settings.value.appointment_reminder_template.trim() || null,
+      whatsapp_follow_up_enabled: settings.value.whatsapp_follow_up_enabled,
+      whatsapp_follow_up_delays: settings.value.follow_up_hours
+        .map((hours) => Math.round(Number(hours) * 60))
+        .filter((minutes) => Number.isFinite(minutes) && minutes >= 1),
+      whatsapp_send_window_start: Number(settings.value.whatsapp_send_window_start),
+      whatsapp_send_window_end: Number(settings.value.whatsapp_send_window_end),
     })
     applyConnection(next)
     flash.value = 'Configurações salvas.'
@@ -349,6 +397,131 @@ onMounted(() => {
             </span>
           </label>
         </div>
+
+        <h4 class="mt-3 text-base font-semibold tracking-tight text-brand-ink">Agendamento e avisos</h4>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label class="flex flex-col gap-1.5 sm:col-span-2">
+            <span class="text-sm font-medium text-brand-ink/80">Como a IA agenda</span>
+            <Select v-model="settings.scheduling_mode" :options="schedulingOptions" />
+            <span class="text-xs text-brand-ink/45">
+              No pré-agendamento a IA anota o dia/horário preferido e avisa a recepção, que confirma
+              em <strong class="font-medium">Consultas</strong>.
+            </span>
+          </label>
+          <label class="flex flex-col gap-1.5 sm:col-span-2">
+            <span class="text-sm font-medium text-brand-ink/80">WhatsApp da recepção para alertas</span>
+            <input
+              v-model="settings.reception_alert_jid"
+              type="text"
+              maxlength="120"
+              placeholder="(14) 99999-0000 ou id do grupo …@g.us"
+              :class="inputClass"
+            />
+            <span class="text-xs text-brand-ink/45">
+              Opcional. Pré-agendamentos, urgências, reclamações e pedidos de atendente também chegam
+              por WhatsApp neste número/grupo (além do sino do painel). Use um número diferente do
+              conectado acima.
+            </span>
+          </label>
+          <label class="flex flex-col gap-1.5">
+            <span class="text-sm font-medium text-brand-ink/80">Mensagens automáticas a partir de</span>
+            <input
+              v-model.number="settings.whatsapp_send_window_start"
+              type="number"
+              min="0"
+              max="23"
+              :class="inputClass"
+            />
+          </label>
+          <label class="flex flex-col gap-1.5">
+            <span class="text-sm font-medium text-brand-ink/80">Até (hora)</span>
+            <input
+              v-model.number="settings.whatsapp_send_window_end"
+              type="number"
+              min="1"
+              max="24"
+              :class="inputClass"
+            />
+          </label>
+          <span class="-mt-1 text-xs text-brand-ink/45 sm:col-span-2">
+            Lembretes e follow-ups só saem nesse horário; fora dele ficam para a próxima abertura.
+          </span>
+        </div>
+
+        <h4 class="mt-3 text-base font-semibold tracking-tight text-brand-ink">Lembrete de consulta</h4>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label class="flex cursor-pointer items-center gap-2.5 text-sm text-brand-ink/80 sm:col-span-2">
+            <input
+              v-model="settings.appointment_reminder_enabled"
+              type="checkbox"
+              class="size-4 rounded accent-brand-cyan"
+            />
+            Enviar lembrete pedindo confirmação de presença
+          </label>
+          <label class="flex flex-col gap-1.5">
+            <span class="text-sm font-medium text-brand-ink/80">Horas antes da consulta</span>
+            <input
+              v-model.number="settings.appointment_reminder_hours"
+              type="number"
+              min="2"
+              max="72"
+              :disabled="!settings.appointment_reminder_enabled"
+              :class="inputClass"
+            />
+          </label>
+          <label class="flex flex-col gap-1.5 sm:col-span-2">
+            <span class="text-sm font-medium text-brand-ink/80">Texto do lembrete</span>
+            <textarea
+              v-model="settings.appointment_reminder_template"
+              rows="3"
+              maxlength="1000"
+              :disabled="!settings.appointment_reminder_enabled"
+              :class="inputClass"
+            />
+            <span class="text-xs text-brand-ink/45">
+              Variáveis: {{ REMINDER_VARIABLES.join(' ') }}. A resposta do paciente (confirmar ou
+              desmarcar) é tratada pela IA e atualiza a consulta.
+            </span>
+          </label>
+        </div>
+
+        <h4 class="mt-3 text-base font-semibold tracking-tight text-brand-ink">Follow-up automático</h4>
+        <div class="grid gap-3 sm:grid-cols-3">
+          <label class="flex cursor-pointer items-center gap-2.5 text-sm text-brand-ink/80 sm:col-span-3">
+            <input
+              v-model="settings.whatsapp_follow_up_enabled"
+              type="checkbox"
+              class="size-4 rounded accent-brand-cyan"
+            />
+            Reengajar quem parou de responder à IA
+          </label>
+          <label
+            v-for="(_, index) in settings.follow_up_hours"
+            :key="index"
+            class="flex flex-col gap-1.5"
+          >
+            <span class="text-sm font-medium text-brand-ink/80">
+              {{ index + 1 }}ª tentativa após
+              <span class="font-normal text-brand-ink/50">({{ formatHours(settings.follow_up_hours[index] ?? 0) }})</span>
+            </span>
+            <input
+              v-model.number="settings.follow_up_hours[index]"
+              type="number"
+              min="0.5"
+              max="720"
+              step="0.5"
+              :disabled="!settings.whatsapp_follow_up_enabled"
+              :class="inputClass"
+              :aria-label="`Horas até a ${index + 1}ª tentativa`"
+            />
+          </label>
+          <span class="-mt-1 text-xs text-brand-ink/45 sm:col-span-3">
+            Horas contadas a partir da mensagem anterior. A IA escreve cada mensagem com base na
+            conversa e para assim que o paciente responder, quando um atendente assume ou quando a
+            consulta é marcada. Depois da última tentativa o contato fica como “Sem resposta”.
+          </span>
+        </div>
+
         <div>
           <Button
             type="submit"

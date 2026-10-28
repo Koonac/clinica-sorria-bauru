@@ -34,6 +34,10 @@ class LeadController extends Controller
             $query->where('status', $status);
         }
 
+        if ($attendanceStatus = $request->query('attendance_status')) {
+            $query->where('attendance_status', $attendanceStatus);
+        }
+
         if ($search = trim((string) $request->query('search'))) {
             $like = '%'.$search.'%';
             $query->where(function ($q) use ($like) {

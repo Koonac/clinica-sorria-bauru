@@ -4,11 +4,14 @@ use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\UserController;
 use App\Http\Controllers\Api\Crm\ActivityController;
 use App\Http\Controllers\Api\Crm\AgentController;
+use App\Http\Controllers\Api\Crm\AppointmentController;
 use App\Http\Controllers\Api\Crm\AttendantController;
 use App\Http\Controllers\Api\Crm\ClinicController;
+use App\Http\Controllers\Api\Crm\ClinicKnowledgeController;
 use App\Http\Controllers\Api\Crm\ClinicServiceController;
 use App\Http\Controllers\Api\Crm\ConnectionController;
 use App\Http\Controllers\Api\Crm\ContactController;
+use App\Http\Controllers\Api\Crm\CrmNotificationController;
 use App\Http\Controllers\Api\Crm\DealController;
 use App\Http\Controllers\Api\Crm\LeadController;
 use App\Http\Controllers\Api\Crm\OrganizationController;
@@ -98,6 +101,22 @@ Route::prefix('v1/crm')->middleware(['auth:sanctum', 'clinic'])->group(function 
     Route::get('services/{service}', [ClinicServiceController::class, 'show']);
     Route::patch('services/{service}', [ClinicServiceController::class, 'update']);
     Route::delete('services/{service}', [ClinicServiceController::class, 'destroy']);
+
+    Route::get('knowledge', [ClinicKnowledgeController::class, 'index']);
+    Route::post('knowledge', [ClinicKnowledgeController::class, 'store'])->middleware('role:admin,developer');
+    Route::patch('knowledge/{entry}', [ClinicKnowledgeController::class, 'update'])->middleware('role:admin,developer');
+    Route::delete('knowledge/{entry}', [ClinicKnowledgeController::class, 'destroy'])->middleware('role:admin,developer');
+
+    Route::get('notifications', [CrmNotificationController::class, 'index']);
+    Route::post('notifications/read-all', [CrmNotificationController::class, 'readAll']);
+    Route::post('notifications/{notification}/read', [CrmNotificationController::class, 'read']);
+
+    Route::get('appointments', [AppointmentController::class, 'index']);
+    Route::post('appointments', [AppointmentController::class, 'store']);
+    Route::get('appointments/available-slots', [AppointmentController::class, 'availableSlots']);
+    Route::post('appointments/{appointment}/confirm', [AppointmentController::class, 'confirm']);
+    Route::post('appointments/{appointment}/cancel', [AppointmentController::class, 'cancel']);
+    Route::post('appointments/{appointment}/outcome', [AppointmentController::class, 'outcome']);
 
     Route::get('stats/leads-por-dia', [StatsController::class, 'leadsPorDia'])->middleware('role:admin,developer');
     Route::get('stats/attendance', [StatsController::class, 'attendance'])->middleware('role:admin,developer');

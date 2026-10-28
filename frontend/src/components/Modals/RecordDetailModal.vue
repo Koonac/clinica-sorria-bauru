@@ -7,6 +7,7 @@ import { convertLead, deleteLead, getLead, updateLead } from '@/api/crm/leads'
 import { deleteDeal, getDeal, updateDeal } from '@/api/crm/deals'
 import { createTask, deleteTask, updateTask } from '@/api/crm/tasks'
 import type {
+  LeadAttendanceStatus,
   Activity,
   CrmTask,
   Deal,
@@ -20,6 +21,7 @@ import Select from '@/components/Forms/Select.vue'
 import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
 import WhatsappThread from '@/components/whatsapp/WhatsappThread.vue'
 import { useAuthStore } from '@/stores/auth'
+import { LEAD_ATTENDANCE_OPTIONS } from '@/utils/leadAttendance'
 import {
   formatDateTime,
   fromLocalInputValue,
@@ -73,7 +75,10 @@ const leadForm = reactive({
   source_id: '' as string | number,
   value: '',
   lost_reason: '',
+  attendance_status: 'novo' as LeadAttendanceStatus,
 })
+
+const attendanceOptions = LEAD_ATTENDANCE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))
 
 const dealForm = reactive({
   title: '',
@@ -172,6 +177,7 @@ async function load() {
       leadForm.source_id = lead.value.source_id ?? ''
       leadForm.value = lead.value.value != null ? String(lead.value.value) : ''
       leadForm.lost_reason = lead.value.lost_reason || ''
+      leadForm.attendance_status = lead.value.attendance_status || 'novo'
     } else {
       deal.value = await getDeal(props.recordId)
       lead.value = null
@@ -228,6 +234,7 @@ async function saveDados() {
         source_id: leadForm.source_id === '' ? null : Number(leadForm.source_id),
         value: leadForm.value === '' ? null : Number(leadForm.value),
         lost_reason: leadForm.lost_reason.trim() || null,
+        attendance_status: leadForm.attendance_status,
       })
     } else {
       deal.value = await updateDeal(props.recordId, {
@@ -445,6 +452,10 @@ function activityLabel(a: Activity): string {
                   <div>
                     <label :class="labelClass">Valor</label>
                     <input v-model="leadForm.value" type="number" min="0" step="0.01" :class="inputClass" />
+                  </div>
+                  <div>
+                    <label :class="labelClass">Status do contato</label>
+                    <Select v-model="leadForm.attendance_status" :options="attendanceOptions" />
                   </div>
                 </div>
               </template>

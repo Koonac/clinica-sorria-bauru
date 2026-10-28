@@ -2,10 +2,14 @@
 
 namespace App\Services\Crm\Agent\Tools;
 
+use App\Models\Crm\Connection;
+use App\Models\Crm\Lead;
 use App\Models\Crm\WhatsappMessage;
 use App\Services\Crm\Agent\AgentContext;
 use App\Services\Crm\Agent\AgentTool;
 use App\Services\Crm\ScheduleWhatsappAttendanceAutoClose;
+use App\Services\Crm\ScheduleWhatsappFollowUp;
+use App\Services\Crm\UpdateLeadAttendanceStatus;
 use App\Services\Crm\WhatsappApiClient;
 use App\Services\Crm\WhatsappLeadResolver;
 use RuntimeException;
@@ -15,6 +19,8 @@ class EnviarRespostaTool implements AgentTool
     public function __construct(
         private WhatsappLeadResolver $leadResolver,
         private ScheduleWhatsappAttendanceAutoClose $autoClose,
+        private ScheduleWhatsappFollowUp $followUp,
+        private UpdateLeadAttendanceStatus $attendanceStatus,
     ) {}
 
     public function name(): string
@@ -102,6 +108,7 @@ class EnviarRespostaTool implements AgentTool
             $lead = $context->lead ?? $resolved['lead'];
             if ($lead) {
                 $this->autoClose->handle($lead, $connection);
+                $this->afterAiReply($lead, $connection);
             }
 
             return [
@@ -135,6 +142,7 @@ class EnviarRespostaTool implements AgentTool
         $lead = $context->lead ?? $resolved['lead'];
         if ($lead) {
             $this->autoClose->handle($lead, $connection);
+            $this->afterAiReply($lead, $connection);
         }
 
         return [
@@ -142,5 +150,23 @@ class EnviarRespostaTool implements AgentTool
             'whatsapp_message_id' => $record->id,
             'texto' => $texto,
         ];
+    }
+
+    /**
+     * IA falou por último: começa a contar o follow-up e tira o lead de "novo".
+     */
+    private function afterAiReply(Lead $lead, Connection $connection): void
+    {
+        $this->attendanceStatus->handle($lead, Lead::ATTENDANCE_IN_PROGRESS, 'ai_reply', [Lead::ATTENDANCE_NEW]);
+
+        // Sem sequência para quem já tem consulta marcada ou está com humano.
+        if ($lead->isWhatsappAgentPaused()
+            || in_array($lead->attendance_status, [Lead::ATTENDANCE_PRE_BOOKED, Lead::ATTENDANCE_SCHEDULED], true)) {
+            $this->followUp->clear($lead);
+
+            return;
+        }
+
+        $this->followUp->arm($lead, $connection);
     }
 }

@@ -83,11 +83,20 @@ class TrackWhatsappAttendanceSegment
                 ->latest('id')
                 ->first();
 
-            if (! $segment || $segment->active_started_at !== null) {
+            if (! $segment) {
                 return;
             }
 
-            $segment->forceFill(['active_started_at' => now()])->save();
+            $now = now();
+            if ($segment->active_started_at !== null) {
+                // Outro job ainda rodando: não reinicia. Marca velha = job morto; fecha e recomeça.
+                if (! $segment->hasStaleActiveRun($now)) {
+                    return;
+                }
+                $this->flushActiveTime($segment, $now);
+            }
+
+            $segment->forceFill(['active_started_at' => $now])->save();
         });
     }
 
@@ -119,9 +128,8 @@ class TrackWhatsappAttendanceSegment
             return;
         }
 
-        $elapsed = max(0, (int) $segment->active_started_at->diffInSeconds($now));
         $segment->forceFill([
-            'active_seconds' => (int) ($segment->active_seconds ?? 0) + $elapsed,
+            'active_seconds' => (int) ($segment->active_seconds ?? 0) + $segment->activeRunSeconds($now),
             'active_started_at' => null,
         ])->save();
     }

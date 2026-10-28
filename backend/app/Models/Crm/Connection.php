@@ -4,6 +4,7 @@ namespace App\Models\Crm;
 
 use App\Models\Concerns\BelongsToClinic;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,6 +21,17 @@ class Connection extends Model
         'connected',
         'error',
     ];
+
+    public const SCHEDULING_DIRECT = 'direct';
+
+    public const SCHEDULING_PRE_BOOKING = 'pre_booking';
+
+    public const SCHEDULING_MODES = [self::SCHEDULING_DIRECT, self::SCHEDULING_PRE_BOOKING];
+
+    /** 2h, 24h e 3 dias sem resposta. */
+    public const DEFAULT_FOLLOW_UP_DELAYS = [120, 1440, 4320];
+
+    public const DEFAULT_REMINDER_TEMPLATE = 'Olá, {nome}! Passando para lembrar da sua consulta {quando}, às {hora}, na {clinica}. Você confirma sua presença? Se precisar remarcar, é só responder aqui.';
 
     protected $fillable = [
         'clinic_id',
@@ -38,6 +50,15 @@ class Connection extends Model
         'whatsapp_attendance_auto_close_minutes',
         'whatsapp_finalize_notice',
         'whatsapp_agent_history_limit',
+        'reception_alert_jid',
+        'scheduling_mode',
+        'appointment_reminder_enabled',
+        'appointment_reminder_hours',
+        'appointment_reminder_template',
+        'whatsapp_follow_up_enabled',
+        'whatsapp_follow_up_delays',
+        'whatsapp_send_window_start',
+        'whatsapp_send_window_end',
         'created_by',
     ];
 
@@ -51,6 +72,12 @@ class Connection extends Model
     {
         return [
             'is_business' => 'boolean',
+            'appointment_reminder_enabled' => 'boolean',
+            'appointment_reminder_hours' => 'integer',
+            'whatsapp_follow_up_enabled' => 'boolean',
+            'whatsapp_follow_up_delays' => 'array',
+            'whatsapp_send_window_start' => 'integer',
+            'whatsapp_send_window_end' => 'integer',
         ];
     }
 
@@ -159,7 +186,97 @@ class Connection extends Model
             'whatsapp_attendance_auto_close_minutes' => (int) ($this->whatsapp_attendance_auto_close_minutes ?? 10),
             'whatsapp_finalize_notice' => (string) ($this->whatsapp_finalize_notice ?? '_finalizando chamado_'),
             'whatsapp_agent_history_limit' => $this->resolvedAgentHistoryLimit(),
+            'reception_alert_jid' => $this->reception_alert_jid,
+            'scheduling_mode' => $this->resolvedSchedulingMode(),
+            'appointment_reminder_enabled' => (bool) ($this->appointment_reminder_enabled ?? true),
+            'appointment_reminder_hours' => $this->resolvedReminderHours(),
+            'appointment_reminder_template' => $this->resolvedReminderTemplate(),
+            'whatsapp_follow_up_enabled' => (bool) ($this->whatsapp_follow_up_enabled ?? false),
+            'whatsapp_follow_up_delays' => $this->resolvedFollowUpDelays(),
+            'whatsapp_send_window_start' => $this->resolvedSendWindow()[0],
+            'whatsapp_send_window_end' => $this->resolvedSendWindow()[1],
         ];
+    }
+
+    public function resolvedSchedulingMode(): string
+    {
+        return in_array($this->scheduling_mode, self::SCHEDULING_MODES, true)
+            ? (string) $this->scheduling_mode
+            : self::SCHEDULING_DIRECT;
+    }
+
+    public function isPreBookingMode(): bool
+    {
+        return $this->resolvedSchedulingMode() === self::SCHEDULING_PRE_BOOKING;
+    }
+
+    public function resolvedReminderHours(): int
+    {
+        $hours = (int) ($this->appointment_reminder_hours ?? 24);
+
+        return max(2, min(72, $hours > 0 ? $hours : 24));
+    }
+
+    public function resolvedReminderTemplate(): string
+    {
+        $template = trim((string) ($this->appointment_reminder_template ?? ''));
+
+        return $template !== '' ? $template : self::DEFAULT_REMINDER_TEMPLATE;
+    }
+
+    /**
+     * Atrasos (minutos) de cada tentativa de follow-up, contados a partir da mensagem anterior.
+     *
+     * @return list<int>
+     */
+    public function resolvedFollowUpDelays(): array
+    {
+        $delays = is_array($this->whatsapp_follow_up_delays) ? $this->whatsapp_follow_up_delays : [];
+        $delays = array_values(array_filter(
+            array_map(fn ($d) => (int) $d, $delays),
+            fn (int $d) => $d >= 1,
+        ));
+
+        $delays = array_map(fn (int $d) => min($d, 60 * 24 * 30), array_slice($delays, 0, 5));
+
+        return $delays !== [] ? $delays : self::DEFAULT_FOLLOW_UP_DELAYS;
+    }
+
+    /**
+     * Janela [início, fim) em horas locais para mensagens automáticas (follow-up, lembrete).
+     *
+     * @return array{0: int, 1: int}
+     */
+    public function resolvedSendWindow(): array
+    {
+        $start = max(0, min(23, (int) ($this->whatsapp_send_window_start ?? 8)));
+        $end = max(1, min(24, (int) ($this->whatsapp_send_window_end ?? 20)));
+
+        return $end > $start ? [$start, $end] : [8, 20];
+    }
+
+    public function isWithinSendWindow(?CarbonInterface $at = null): bool
+    {
+        $at = ($at ?? now())->copy()->timezone(config('app.timezone'));
+        [$start, $end] = $this->resolvedSendWindow();
+
+        return $at->hour >= $start && $at->hour < $end;
+    }
+
+    /**
+     * Próximo instante dentro da janela de envio (o próprio $at se já estiver nela).
+     */
+    public function nextSendWindowOpening(?CarbonInterface $at = null): CarbonInterface
+    {
+        $at = ($at ?? now())->copy()->timezone(config('app.timezone'));
+        if ($this->isWithinSendWindow($at)) {
+            return $at;
+        }
+
+        [$start] = $this->resolvedSendWindow();
+        $opening = $at->copy()->setTime($start, 0);
+
+        return $opening->lessThanOrEqualTo($at) ? $opening->addDay() : $opening;
     }
 
     public function resolvedAgentHistoryLimit(): int
