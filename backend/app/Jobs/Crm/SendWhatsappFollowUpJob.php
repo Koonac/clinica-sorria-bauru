@@ -79,15 +79,16 @@ class SendWhatsappFollowUpJob implements ShouldQueue, ShouldBeUnique
         }
 
         try {
-            $text = $generator->handle($agent, $connection, $lead, $attempt, count($delays));
+            $generated = $generator->handle($agent, $connection, $lead, $attempt, count($delays));
         } catch (Throwable $e) {
             $this->retryLater($lead, 'gerar', $e);
 
             return;
         }
 
+        $text = $generated['text'];
         if ($text === null) {
-            $this->cancel($lead, $followUp, 'Follow-up automático encerrado pela IA', 'a conversa não pedia novo contato');
+            $this->cancel($lead, $followUp, 'Follow-up automático encerrado pela IA', (string) $generated['skip_reason']);
 
             return;
         }

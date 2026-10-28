@@ -604,7 +604,7 @@ class AttendanceAutomationTest extends TestCase
     {
         $this->travelTo(now()->setTime(10, 0));
         Http::fake([
-            'openrouter.ai/*' => Http::response(['choices' => [['message' => ['role' => 'assistant', 'content' => 'PULAR']]]]),
+            'openrouter.ai/*' => Http::response(['choices' => [['message' => ['role' => 'assistant', 'content' => 'PULAR: paciente disse que não tem interesse']]]]),
             'whatsapp.test/*' => Http::response(['success' => true]),
         ]);
 
@@ -616,6 +616,11 @@ class AttendanceAutomationTest extends TestCase
         $this->app->call([new SendWhatsappFollowUpJob($lead->id), 'handle']);
         $this->assertNull($lead->fresh()->whatsapp_follow_up_due_at);
         Http::assertNotSent(fn (HttpRequest $r) => str_contains($r->url(), 'whatsapp.test'));
+        $this->assertDatabaseHas('activities', [
+            'lead_id' => $lead->id,
+            'subject' => 'Follow-up automático encerrado pela IA',
+            'body' => 'Motivo: paciente disse que não tem interesse.',
+        ]);
 
         $pausado = $this->lead($user, [
             'name' => 'Bia',
