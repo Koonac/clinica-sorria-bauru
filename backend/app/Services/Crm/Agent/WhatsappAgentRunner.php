@@ -258,6 +258,7 @@ Contexto CRM:
 - Estágios de lead disponíveis: {$stagesJson}
 - Fuso horário: America/Sao_Paulo
 - Agora: {$this->nowIso()}
+{$this->calendarBlock()}
 {$appointmentsBlock}{$priorSummaries}{$signalsBlock}{$knowledgeBlock}
 Regras do agent (system prompt do cliente):
 {$rules}
@@ -399,6 +400,31 @@ PROMPT;
     private function nowIso(): string
     {
         return now(config('app.timezone'))->toIso8601String();
+    }
+
+    /**
+     * Calendário pronto dos próximos dias: o modelo erra dia da semana quando calcula sozinho.
+     */
+    private function calendarBlock(): string
+    {
+        $today = now(config('app.timezone'))->locale('pt_BR');
+
+        $lines = [
+            '- HOJE é '.$today->translatedFormat('l, d/m/Y').', '.$today->format('H:i').' (horário de Brasília).',
+            '- Calendário dos próximos dias (use SEMPRE esta lista para saber o dia da semana de uma data; nunca calcule de cabeça):',
+        ];
+        for ($i = 0; $i < 14; $i++) {
+            $day = $today->copy()->addDays($i);
+            $prefix = match ($i) {
+                0 => 'hoje: ',
+                1 => 'amanhã: ',
+                default => '',
+            };
+            $lines[] = '  • '.$prefix.$day->translatedFormat('l, d/m/Y').' ('.$day->toDateString().')';
+        }
+        $lines[] = '- Ao chamar listar_horarios_disponiveis, passe sempre o parâmetro data (YYYY-MM-DD) do dia que o paciente pediu.';
+
+        return implode("\n", $lines);
     }
 
     /**

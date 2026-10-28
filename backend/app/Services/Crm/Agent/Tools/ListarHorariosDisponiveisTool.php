@@ -26,7 +26,7 @@ class ListarHorariosDisponiveisTool implements AgentTool
                 'properties' => [
                     'data' => [
                         'type' => 'string',
-                        'description' => 'Dia no formato YYYY-MM-DD (fuso America/Sao_Paulo). Se omitido, usa o próximo dia útil.',
+                        'description' => 'Dia no formato YYYY-MM-DD (fuso America/Sao_Paulo), tirado do calendário do contexto. Se omitido, começa hoje.',
                     ],
                     'dias' => [
                         'type' => 'integer',

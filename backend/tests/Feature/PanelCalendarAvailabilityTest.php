@@ -94,6 +94,19 @@ class PanelCalendarAvailabilityTest extends TestCase
         $this->assertSame(['11:00'], $inicios);
     }
 
+    public function test_rotulos_dizem_hoje_e_amanha_e_sem_data_comeca_hoje(): void
+    {
+        Http::fake();
+        // Quarta-feira 28/10/2026, 8h: todos os slots de hoje (9h–12h) ainda estão no futuro.
+        $this->travelTo(Carbon::parse('2026-10-28 08:00:00', config('app.timezone')));
+
+        $result = app(ListAvailableCalendarSlots::class)->handle(['dias' => 2]);
+
+        $this->assertSame('quarta-feira, 28/10/2026', $result['hoje']);
+        $this->assertSame('hoje (quarta-feira 28/10) às 09:00', $result['horarios'][0]['rotulo']);
+        $this->assertSame('amanhã (quinta-feira 29/10) às 09:00', $result['horarios'][3]['rotulo']);
+    }
+
     public function test_google_fora_do_ar_nao_trava_e_usa_painel(): void
     {
         $this->defaultClinic()->forceFill(['google_calendar_refresh_token' => 'rtoken'])->save();

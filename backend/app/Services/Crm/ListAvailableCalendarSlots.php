@@ -41,7 +41,7 @@ class ListAvailableCalendarSlots
         try {
             $inicioDia = $dataRaw !== ''
                 ? Carbon::parse($dataRaw, $tz)->startOfDay()
-                : $this->proximoDiaUtil(now($tz))->startOfDay();
+                : now($tz)->startOfDay(); // sem data = a partir de hoje (horários já passados são descartados)
         } catch (Throwable) {
             throw new RuntimeException('data inválida. Use YYYY-MM-DD.');
         }
@@ -97,7 +97,7 @@ class ListAvailableCalendarSlots
                     $slots[] = [
                         'inicio' => $slotStart->toIso8601String(),
                         'fim' => $slotEnd->toIso8601String(),
-                        'rotulo' => $slotStart->translatedFormat('l d/m').' às '.$slotStart->format('H:i'),
+                        'rotulo' => $this->dayLabel($slotStart, $tz).' às '.$slotStart->format('H:i'),
                     ];
                 }
 
@@ -108,6 +108,7 @@ class ListAvailableCalendarSlots
         return [
             'ok' => true,
             'timezone' => $tz,
+            'hoje' => now($tz)->locale('pt_BR')->translatedFormat('l, d/m/Y'),
             'expediente' => sprintf('%02d:00–%02d:00', $horaInicio, $horaFim),
             'duracao_minutos' => $slotMinutes,
             'fonte' => $fonte,
@@ -133,13 +134,23 @@ class ListAvailableCalendarSlots
         return false;
     }
 
-    private function proximoDiaUtil(Carbon $from): Carbon
+    /**
+     * "hoje (quarta-feira 28/10)", "amanhã (quinta-feira 29/10)" ou "sexta-feira 30/10".
+     * Deixa explícito de que dia é o horário — o modelo confundia "amanhã" com "hoje".
+     */
+    private function dayLabel(Carbon $day, string $tz): string
     {
-        $dia = $from->copy()->startOfDay()->addDay();
-        while ($dia->isWeekend()) {
-            $dia->addDay();
+        $label = $day->copy()->locale('pt_BR')->translatedFormat('l d/m');
+        $today = now($tz)->startOfDay();
+        $date = $day->copy()->startOfDay();
+
+        if ($date->equalTo($today)) {
+            return "hoje ({$label})";
+        }
+        if ($date->equalTo($today->copy()->addDay())) {
+            return "amanhã ({$label})";
         }
 
-        return $dia;
+        return $label;
     }
 }

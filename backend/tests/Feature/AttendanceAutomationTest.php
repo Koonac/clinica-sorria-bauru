@@ -167,6 +167,9 @@ class AttendanceAutomationTest extends TestCase
 
         $system = $this->openRouterRequests()[0]['messages'][0]['content'];
         $this->assertStringContainsString('da clínica "'.$this->defaultClinic()->name.'"', $system);
+        $today = now(config('app.timezone'))->locale('pt_BR');
+        $this->assertStringContainsString('HOJE é '.$today->translatedFormat('l, d/m/Y'), $system);
+        $this->assertStringContainsString('amanhã: '.$today->copy()->addDay()->translatedFormat('l, d/m/Y'), $system);
         $this->assertStringContainsString('Informações da clínica', $system);
         $this->assertStringContainsString('Rua das Flores, 100 - Centro', $system);
         $this->assertStringContainsString('Odontoprev e Amil Dental', $system);
