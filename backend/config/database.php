@@ -97,6 +97,9 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Sessão no mesmo fuso do app: o Laravel grava datas sem offset, e colunas timestamptz
+            // as interpretariam no fuso padrão do servidor (UTC no postgres do Docker) → 3h de erro.
+            'timezone' => env('DB_TIMEZONE', env('APP_TIMEZONE', 'America/Sao_Paulo')),
         ],
 
         'sqlsrv' => [

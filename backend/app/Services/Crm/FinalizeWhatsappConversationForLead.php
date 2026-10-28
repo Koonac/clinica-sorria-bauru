@@ -52,8 +52,10 @@ class FinalizeWhatsappConversationForLead
             ])->save();
 
             $this->status->handle($lead, Lead::ATTENDANCE_IN_PROGRESS, 'finalize:'.$source, [Lead::ATTENDANCE_HUMAN]);
-            // Auto-close só fecha por inatividade: o follow-up continua valendo para reengajar.
-            if ($source !== self::SOURCE_AUTO_CLOSE) {
+            // Só o atendente encerra a sequência. A IA costuma finalizar logo após responder e o
+            // auto-close fecha por inatividade — em ambos o paciente pode ter sumido; o gerador de
+            // follow-up decide (PULAR) se a conversa já terminou de verdade.
+            if ($source === self::SOURCE_MANUAL) {
                 $this->followUp->clear($lead);
             }
 

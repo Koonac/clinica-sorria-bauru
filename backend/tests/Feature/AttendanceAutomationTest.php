@@ -166,6 +166,7 @@ class AttendanceAutomationTest extends TestCase
         $this->runAiJob($connection, $lead);
 
         $system = $this->openRouterRequests()[0]['messages'][0]['content'];
+        $this->assertStringContainsString('da clínica "'.$this->defaultClinic()->name.'"', $system);
         $this->assertStringContainsString('Informações da clínica', $system);
         $this->assertStringContainsString('Rua das Flores, 100 - Centro', $system);
         $this->assertStringContainsString('Odontoprev e Amil Dental', $system);
@@ -577,6 +578,26 @@ class AttendanceAutomationTest extends TestCase
         $prompts = $this->openRouterRequests();
         $this->assertStringContainsString('tentativa 1 de 3', $prompts[0]['messages'][0]['content']);
         $this->assertStringContainsString('ÚLTIMA tentativa', $prompts[2]['messages'][0]['content']);
+    }
+
+    public function test_finalizacao_pela_ia_mantem_follow_up_e_manual_cancela(): void
+    {
+        Http::fake();
+        [$user, $connection] = $this->userWithWhatsappConnection(['whatsapp_follow_up_enabled' => true]);
+        $finalizer = app(\App\Services\Crm\FinalizeWhatsappConversationForLead::class);
+
+        $porIa = $this->lead($user, ['whatsapp_follow_up_due_at' => now()->addMinutes(5)]);
+        $finalizer->handle($porIa, null, \App\Services\Crm\FinalizeWhatsappConversationForLead::SOURCE_AI);
+        $this->assertNotNull($porIa->fresh()->whatsapp_follow_up_due_at);
+
+        $manual = $this->lead($user, [
+            'name' => 'Bia',
+            'mobile' => '5511777770000',
+            'whatsapp_jid' => '5511777770000@c.us',
+            'whatsapp_follow_up_due_at' => now()->addMinutes(5),
+        ]);
+        $finalizer->handle($manual, $user, \App\Services\Crm\FinalizeWhatsappConversationForLead::SOURCE_MANUAL);
+        $this->assertNull($manual->fresh()->whatsapp_follow_up_due_at);
     }
 
     public function test_follow_up_pular_encerra_e_pausa_humana_bloqueia(): void

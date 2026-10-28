@@ -65,7 +65,8 @@ class SendWhatsappFinalizeNotice
         WhatsappMessage::create([
             'clinic_id' => $connection->clinic_id,
             'connection_id' => $connection->id,
-            'user_id' => $user?->id,
+            // Finalização pela IA não tem usuário; user_id é obrigatório → dono da conexão.
+            'user_id' => $user?->id ?? $connection->created_by,
             'session_id' => $connection->session_id,
             'whatsapp_jid' => $resultTo ?: $jid,
             'phone_number' => $lead->mobile,

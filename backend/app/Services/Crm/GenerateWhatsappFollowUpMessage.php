@@ -2,6 +2,7 @@
 
 namespace App\Services\Crm;
 
+use App\Models\Clinic;
 use App\Models\Crm\Agent;
 use App\Models\Crm\Connection;
 use App\Models\Crm\Lead;
@@ -72,9 +73,11 @@ class GenerateWhatsappFollowUpMessage
         $knowledge = $this->knowledge->handle();
         $knowledgeBlock = $knowledge !== '' ? "\nInformações da clínica (fonte oficial):\n{$knowledge}\n" : '';
         $rules = trim((string) $agent->system_prompt);
+        $clinicName = trim((string) Clinic::query()->whereKey($agent->clinic_id)->value('name'));
+        $clinicLabel = $clinicName !== '' ? "da clínica odontológica \"{$clinicName}\"" : 'de uma clínica odontológica';
 
         return <<<PROMPT
-Você é "{$agent->name}", atendente virtual de uma clínica odontológica no WhatsApp.
+Você é "{$agent->name}", atendente virtual {$clinicLabel} no WhatsApp.
 O paciente parou de responder. Escreva UMA mensagem de follow-up (tentativa {$attempt} de {$total}).
 
 Regras:

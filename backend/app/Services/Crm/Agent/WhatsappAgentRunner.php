@@ -2,6 +2,7 @@
 
 namespace App\Services\Crm\Agent;
 
+use App\Models\Clinic;
 use App\Models\Crm\Appointment;
 use App\Models\Crm\Connection;
 use App\Models\Crm\PipelineStage;
@@ -223,8 +224,13 @@ class WhatsappAgentRunner
                 .'. Avalie com cuidado se é caso de escalar_humano (com a categoria certa) antes de responder.'."\n"
             : '';
 
+        $clinicName = $this->clinicName($context->connection->clinic_id);
+        $clinicIntro = $clinicName !== ''
+            ? " da clínica \"{$clinicName}\". Você trabalha exclusivamente para essa clínica e fala em nome dela"
+            : '';
+
         return <<<PROMPT
-Você é o agent de atendimento WhatsApp "{$context->agent->name}".
+Você é o agent de atendimento WhatsApp "{$context->agent->name}"{$clinicIntro}.
 
 Regras de operação (obrigatórias):
 - Fale com o lead SOMENTE pela tool enviar_resposta. Texto livre / comentários NÃO são enviados ao WhatsApp.
@@ -256,6 +262,15 @@ Contexto CRM:
 Regras do agent (system prompt do cliente):
 {$rules}
 PROMPT;
+    }
+
+    private function clinicName(?int $clinicId): string
+    {
+        if (! $clinicId) {
+            return '';
+        }
+
+        return trim((string) Clinic::query()->whereKey($clinicId)->value('name'));
     }
 
     private function schedulingRules(AgentContext $context): string
