@@ -5,14 +5,13 @@ namespace App\Jobs\Crm;
 use App\Models\Clinic;
 use App\Models\Crm\Activity;
 use App\Models\Crm\Agent;
-use App\Models\Crm\Appointment;
 use App\Models\Crm\Connection;
 use App\Models\Crm\Lead;
+use App\Services\Crm\CheckWhatsappFollowUpEligibility;
 use App\Services\Crm\GenerateWhatsappFollowUpMessage;
 use App\Services\Crm\ScheduleWhatsappFollowUp;
 use App\Services\Crm\SendWhatsappSystemMessage;
 use App\Services\Crm\UpdateLeadAttendanceStatus;
-use App\Services\Crm\WhatsappChatHistory;
 use App\Support\ClinicContext;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -28,6 +27,9 @@ class SendWhatsappFollowUpJob implements ShouldQueue, ShouldBeUnique
 
     public int $uniqueFor = 600;
 
+    /** Nova tentativa após falha de geração/envio. */
+    private const RETRY_MINUTES = 15;
+
     public function __construct(public int $leadId) {}
 
     public function uniqueId(): string
@@ -37,7 +39,7 @@ class SendWhatsappFollowUpJob implements ShouldQueue, ShouldBeUnique
 
     public function handle(
         ClinicContext $clinicContext,
-        WhatsappChatHistory $history,
+        CheckWhatsappFollowUpEligibility $eligibility,
         GenerateWhatsappFollowUpMessage $generator,
         SendWhatsappSystemMessage $sender,
         ScheduleWhatsappFollowUp $followUp,
@@ -55,23 +57,15 @@ class SendWhatsappFollowUpJob implements ShouldQueue, ShouldBeUnique
         $clinicContext->set($clinic);
 
         $connection = Connection::query()->where('clinic_id', $clinic->id)->first();
-        if (! $connection || ! $connection->whatsapp_follow_up_enabled) {
-            $followUp->clear($lead);
-
-            return;
-        }
-        if ($connection->status !== 'connected' || ! filled($connection->session_id)) {
-            return;
-        }
-        if (! $connection->allowsAutomationFor($lead->mobile, $lead->whatsapp_jid)) {
-            $followUp->clear($lead);
-
+        if ($connection && ($connection->status !== 'connected' || ! filled($connection->session_id))) {
+            // WhatsApp fora do ar: mantém a sequência e tenta no próximo ciclo.
             return;
         }
 
         $agent = Agent::activeForClinic((int) $clinic->id);
-        if (! $agent || ! $agent->canActivate() || ! $this->stillWaitingForPatient($lead, $connection, $history)) {
-            $followUp->clear($lead);
+        $reason = $eligibility->handle($lead, $connection, $agent);
+        if ($reason !== null) {
+            $this->cancel($lead, $followUp, 'Follow-up automático cancelado', $reason);
 
             return;
         }
@@ -87,22 +81,13 @@ class SendWhatsappFollowUpJob implements ShouldQueue, ShouldBeUnique
         try {
             $text = $generator->handle($agent, $connection, $lead, $attempt, count($delays));
         } catch (Throwable $e) {
-            // Tenta de novo no próximo ciclo do scheduler, sem perder a sequência.
-            $lead->forceFill(['whatsapp_follow_up_due_at' => now()->addMinutes(15)])->save();
-            Log::warning('Falha ao gerar follow-up do WhatsApp.', ['lead_id' => $lead->id, 'error' => $e->getMessage()]);
+            $this->retryLater($lead, 'gerar', $e);
 
             return;
         }
 
         if ($text === null) {
-            $followUp->clear($lead);
-            Activity::create([
-                'type' => 'note',
-                'subject' => 'Follow-up automático encerrado pela IA',
-                'body' => 'A conversa não pedia novo contato.',
-                'lead_id' => $lead->id,
-                'meta' => ['follow_up' => true, 'attempt' => $attempt, 'skipped' => true],
-            ]);
+            $this->cancel($lead, $followUp, 'Follow-up automático encerrado pela IA', 'a conversa não pedia novo contato');
 
             return;
         }
@@ -110,8 +95,7 @@ class SendWhatsappFollowUpJob implements ShouldQueue, ShouldBeUnique
         try {
             $sender->handle($connection, $lead, $connection->applyAiDisplayNamePrefix($text), 'follow_up', $agent->user_id);
         } catch (Throwable $e) {
-            $lead->forceFill(['whatsapp_follow_up_due_at' => now()->addMinutes(15)])->save();
-            Log::warning('Falha ao enviar follow-up do WhatsApp.', ['lead_id' => $lead->id, 'error' => $e->getMessage()]);
+            $this->retryLater($lead, 'enviar', $e);
 
             return;
         }
@@ -129,20 +113,36 @@ class SendWhatsappFollowUpJob implements ShouldQueue, ShouldBeUnique
         }
     }
 
-    private function stillWaitingForPatient(Lead $lead, Connection $connection, WhatsappChatHistory $history): bool
+    /**
+     * Encerra a sequência deixando o motivo no histórico do lead (antes sumia em silêncio).
+     */
+    private function cancel(Lead $lead, ScheduleWhatsappFollowUp $followUp, string $subject, string $reason): void
     {
-        if ($lead->isWhatsappAgentPaused()
-            || in_array($lead->attendance_status, [Lead::ATTENDANCE_PRE_BOOKED, Lead::ATTENDANCE_SCHEDULED, Lead::ATTENDANCE_HUMAN], true)) {
-            return false;
-        }
+        $followUp->clear($lead);
 
-        if ($lead->appointments()->whereIn('status', Appointment::ACTIVE_STATUSES)->exists()) {
-            return false;
-        }
+        Activity::create([
+            'type' => 'note',
+            'subject' => $subject,
+            'body' => 'Motivo: '.$reason.'.',
+            'lead_id' => $lead->id,
+            'meta' => ['follow_up' => true, 'skipped' => true, 'reason' => $reason],
+        ]);
 
-        $last = $history->messages($connection->id, $lead->id, $lead->whatsapp_jid, 1)->last();
+        Log::info('Follow-up do WhatsApp cancelado.', ['lead_id' => $lead->id, 'reason' => $reason]);
+    }
 
-        // Só insiste se a clínica falou por último (o paciente não respondeu).
-        return $last !== null && $last->direction === 'outbound';
+    private function retryLater(Lead $lead, string $step, Throwable $e): void
+    {
+        $lead->forceFill(['whatsapp_follow_up_due_at' => now()->addMinutes(self::RETRY_MINUTES)])->save();
+
+        Activity::create([
+            'type' => 'note',
+            'subject' => 'Follow-up automático adiado',
+            'body' => "Falha ao {$step} a mensagem; nova tentativa em ".self::RETRY_MINUTES.' min. Erro: '.mb_substr($e->getMessage(), 0, 300),
+            'lead_id' => $lead->id,
+            'meta' => ['follow_up' => true, 'error' => $e->getMessage()],
+        ]);
+
+        Log::warning("Falha ao {$step} follow-up do WhatsApp.", ['lead_id' => $lead->id, 'error' => $e->getMessage()]);
     }
 }

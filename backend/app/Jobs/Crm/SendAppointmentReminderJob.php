@@ -56,7 +56,14 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
             return;
         }
         // Modo de teste: não manda lembrete para pacientes reais (fica pendente até sair do teste).
-        if (! $connection->allowsAutomationFor($lead->mobile, $lead->whatsapp_jid)) {
+        $latestInbound = app(\App\Services\Crm\WhatsappChatHistory::class)
+            ->latestInbound($connection->id, $lead->id, $lead->whatsapp_jid);
+        if (! $connection->allowsAutomationFor(
+            $lead->mobile,
+            $lead->whatsapp_jid,
+            $latestInbound?->phone_number,
+            $latestInbound?->whatsapp_jid,
+        )) {
             return;
         }
 

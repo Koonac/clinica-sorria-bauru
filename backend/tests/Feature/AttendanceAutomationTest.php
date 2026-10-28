@@ -626,6 +626,11 @@ class AttendanceAutomationTest extends TestCase
         ]);
         $this->app->call([new SendWhatsappFollowUpJob($pausado->id), 'handle']);
         $this->assertNull($pausado->fresh()->whatsapp_follow_up_due_at);
+        $this->assertDatabaseHas('activities', [
+            'lead_id' => $pausado->id,
+            'subject' => 'Follow-up automático cancelado',
+            'body' => 'Motivo: IA pausada neste lead (atendimento humano).',
+        ]);
         Http::assertNotSent(fn (HttpRequest $r) => str_contains($r->url(), 'whatsapp.test'));
     }
 
