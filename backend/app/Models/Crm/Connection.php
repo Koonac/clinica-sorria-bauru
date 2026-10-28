@@ -59,6 +59,7 @@ class Connection extends Model
         'whatsapp_follow_up_delays',
         'whatsapp_send_window_start',
         'whatsapp_send_window_end',
+        'agent_test_phone',
         'created_by',
     ];
 
@@ -195,7 +196,62 @@ class Connection extends Model
             'whatsapp_follow_up_delays' => $this->resolvedFollowUpDelays(),
             'whatsapp_send_window_start' => $this->resolvedSendWindow()[0],
             'whatsapp_send_window_end' => $this->resolvedSendWindow()[1],
+            'agent_test_phone' => $this->agent_test_phone,
         ];
+    }
+
+    public function isAgentTestMode(): bool
+    {
+        return filled($this->agent_test_phone);
+    }
+
+    /**
+     * Modo de teste: só o número configurado recebe a IA e as mensagens automáticas.
+     * Sem modo de teste, libera todos. Aceita JID, telefone ou ambos (qualquer um que bata).
+     */
+    public function allowsAutomationFor(?string ...$identifiers): bool
+    {
+        if (! $this->isAgentTestMode()) {
+            return true;
+        }
+
+        $allowed = self::phoneVariants((string) $this->agent_test_phone);
+        if ($allowed === []) {
+            return true;
+        }
+
+        foreach ($identifiers as $identifier) {
+            if (array_intersect(self::phoneVariants((string) $identifier), $allowed) !== []) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Formas equivalentes de um número BR: com/sem DDI 55 e com/sem o nono dígito
+     * (o WhatsApp às vezes entrega o JID sem o 9).
+     *
+     * @return list<string>
+     */
+    public static function phoneVariants(string $value): array
+    {
+        $local = explode('@', trim($value))[0];
+        $digits = preg_replace('/\D+/', '', $local) ?: '';
+        if (strlen($digits) < 8) {
+            return [];
+        }
+
+        $national = str_starts_with($digits, '55') && strlen($digits) >= 12 ? substr($digits, 2) : $digits;
+        $variants = [$national];
+        if (strlen($national) === 11 && $national[2] === '9') {
+            $variants[] = substr($national, 0, 2).substr($national, 3);
+        } elseif (strlen($national) === 10) {
+            $variants[] = substr($national, 0, 2).'9'.substr($national, 2);
+        }
+
+        return array_values(array_unique($variants));
     }
 
     public function resolvedSchedulingMode(): string

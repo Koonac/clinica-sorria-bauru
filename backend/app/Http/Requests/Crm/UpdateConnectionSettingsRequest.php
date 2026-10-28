@@ -34,6 +34,7 @@ class UpdateConnectionSettingsRequest extends FormRequest
             'whatsapp_follow_up_delays.*' => ['integer', 'min:1', 'max:43200'],
             'whatsapp_send_window_start' => ['sometimes', 'integer', 'min:0', 'max:23'],
             'whatsapp_send_window_end' => ['sometimes', 'integer', 'min:1', 'max:24'],
+            'agent_test_phone' => ['sometimes', 'nullable', 'string', 'max:30', 'regex:/^\+?[\d\s().-]{10,25}$/'],
         ];
     }
 
@@ -44,6 +45,7 @@ class UpdateConnectionSettingsRequest extends FormRequest
     {
         return [
             'reception_alert_jid.regex' => 'Informe um número de WhatsApp (com DDD) ou o id de um grupo (…@g.us).',
+            'agent_test_phone.regex' => 'Informe o número de teste com DDD, ex.: (14) 99999-0000.',
         ];
     }
 }

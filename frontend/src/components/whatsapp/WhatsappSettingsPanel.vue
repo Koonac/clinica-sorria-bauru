@@ -45,6 +45,7 @@ const settings = ref({
   follow_up_hours: [2, 24, 72] as number[],
   whatsapp_send_window_start: 8,
   whatsapp_send_window_end: 20,
+  agent_test_phone: '',
 })
 
 const schedulingOptions = [
@@ -115,6 +116,7 @@ function applyConnection(next: ClinicConnection) {
   )
   settings.value.whatsapp_send_window_start = next.whatsapp_send_window_start ?? 8
   settings.value.whatsapp_send_window_end = next.whatsapp_send_window_end ?? 20
+  settings.value.agent_test_phone = next.agent_test_phone ?? ''
 }
 
 function formatHours(hours: number): string {
@@ -206,6 +208,7 @@ async function saveSettings() {
         .filter((minutes) => Number.isFinite(minutes) && minutes >= 1),
       whatsapp_send_window_start: Number(settings.value.whatsapp_send_window_start),
       whatsapp_send_window_end: Number(settings.value.whatsapp_send_window_end),
+      agent_test_phone: settings.value.agent_test_phone.trim() || null,
     })
     applyConnection(next)
     flash.value = 'Configurações salvas.'
@@ -394,6 +397,44 @@ onMounted(() => {
             <span class="text-xs text-brand-ink/45">
               Enviada automaticamente ao cliente quando o atendimento é finalizado (IA ou
               atendente). Deixe vazio para não enviar aviso.
+            </span>
+          </label>
+        </div>
+
+        <h4 class="mt-3 text-base font-semibold tracking-tight text-brand-ink">Modo de teste</h4>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label class="flex flex-col gap-1.5 sm:col-span-2">
+            <span class="text-sm font-medium text-brand-ink/80">
+              Responder somente este número
+            </span>
+            <div class="flex gap-2">
+              <input
+                v-model="settings.agent_test_phone"
+                type="tel"
+                maxlength="30"
+                placeholder="(14) 99999-0000 — vazio = responde todos"
+                :class="inputClass"
+              />
+              <Button
+                v-if="settings.agent_test_phone"
+                variant="secondary"
+                size="sm"
+                icon="lucide:x"
+                @click="settings.agent_test_phone = ''"
+              >
+                Limpar
+              </Button>
+            </div>
+            <span class="text-xs text-brand-ink/45">
+              Para testar o agent sem atingir pacientes: com um número aqui, a IA só responde a
+              ele, e follow-ups e lembretes automáticos também só vão para ele. Deixe vazio e salve
+              para voltar a atender todos.
+            </span>
+            <span
+              v-if="connection?.agent_test_phone"
+              class="rounded-lg bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-900"
+            >
+              Modo de teste ativo: os demais contatos estão sem resposta da IA.
             </span>
           </label>
         </div>

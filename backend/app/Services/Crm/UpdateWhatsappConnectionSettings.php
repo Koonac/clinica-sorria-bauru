@@ -37,6 +37,13 @@ class UpdateWhatsappConnectionSettings
         if (array_key_exists('whatsapp_agent_history_limit', $attrs)) {
             $connection->whatsapp_agent_history_limit = max(5, min(100, (int) $attrs['whatsapp_agent_history_limit']));
         }
+        if (array_key_exists('agent_test_phone', $attrs)) {
+            $digits = preg_replace('/\D+/', '', (string) ($attrs['agent_test_phone'] ?? '')) ?: '';
+            if ($digits !== '' && strlen($digits) <= 11) {
+                $digits = '55'.$digits;
+            }
+            $connection->agent_test_phone = $digits !== '' ? $digits : null;
+        }
         if (array_key_exists('reception_alert_jid', $attrs)) {
             $connection->reception_alert_jid = $this->normalizeAlertJid($attrs['reception_alert_jid']);
         }

@@ -55,6 +55,10 @@ class SendAppointmentReminderJob implements ShouldQueue, ShouldBeUnique
         if (! $connection || ! $lead || ! $connection->appointment_reminder_enabled) {
             return;
         }
+        // Modo de teste: não manda lembrete para pacientes reais (fica pendente até sair do teste).
+        if (! $connection->allowsAutomationFor($lead->mobile, $lead->whatsapp_jid)) {
+            return;
+        }
 
         $text = $this->render($connection->resolvedReminderTemplate(), $appointment, (string) ($lead->name ?? ''), $clinic->name);
 

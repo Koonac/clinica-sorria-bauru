@@ -6,6 +6,7 @@ use App\Events\Crm\WhatsappMessageStored;
 use App\Jobs\Crm\ProcessWhatsappAiReplyJob;
 use App\Models\Clinic;
 use App\Models\Crm\Agent;
+use App\Models\Crm\Connection;
 use App\Models\Crm\Lead;
 use App\Support\ClinicContext;
 
@@ -36,14 +37,22 @@ class DispatchWhatsappAiReplyJob
             return;
         }
 
-        if ($message->lead_id) {
-            $paused = Lead::query()
-                ->whereKey($message->lead_id)
-                ->whereNotNull('whatsapp_agent_paused_at')
-                ->exists();
-            if ($paused) {
-                return;
-            }
+        $lead = $message->lead_id
+            ? Lead::query()->find($message->lead_id, ['id', 'mobile', 'whatsapp_jid', 'whatsapp_agent_paused_at'])
+            : null;
+        if ($lead?->whatsapp_agent_paused_at !== null) {
+            return;
+        }
+
+        // Modo de teste: a IA só responde ao número configurado.
+        $connection = Connection::withoutGlobalScopes()->find($connectionId);
+        if ($connection && ! $connection->allowsAutomationFor(
+            $message->whatsapp_jid,
+            $message->phone_number,
+            $lead?->mobile,
+            $lead?->whatsapp_jid,
+        )) {
+            return;
         }
 
         $chatKey = $message->lead_id

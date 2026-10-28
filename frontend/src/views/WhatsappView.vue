@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { Icon } from '@iconify/vue'
 import { ApiError } from '@/api/client'
 import { getConnection, type ConnectionStatus } from '@/api/crm/connection'
 import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
@@ -13,6 +14,7 @@ const clinics = useClinicsStore()
 const loading = ref(true)
 const errorMessage = ref('')
 const status = ref<ConnectionStatus | null>(null)
+const testPhone = ref<string | null>(null)
 
 const isConnected = computed(() => status.value === 'connected')
 
@@ -22,6 +24,7 @@ async function checkConnection() {
   try {
     const conn = await getConnection()
     status.value = conn.status
+    testPhone.value = conn.agent_test_phone
   } catch (error) {
     status.value = null
     errorMessage.value =
@@ -57,6 +60,19 @@ onMounted(() => {
       role="alert"
     >
       {{ errorMessage }}
+    </p>
+
+    <p
+      v-if="testPhone && !loading"
+      class="flex shrink-0 items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-sm leading-snug text-amber-900"
+      role="status"
+    >
+      <Icon icon="lucide:flask-conical" class="size-4 shrink-0" aria-hidden="true" />
+      <span>
+        <strong class="font-semibold">Modo de teste ativo:</strong> a IA só responde ao número
+        {{ testPhone }}. Os demais pacientes ficam sem resposta automática. Desative em
+        Configurações › WhatsApp.
+      </span>
     </p>
 
     <ContentSkeleton v-if="loading" variant="cards" />

@@ -91,6 +91,17 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
             return;
         }
 
+        // Modo de teste: revalida aqui também (a config pode ter mudado durante o debounce).
+        $leadForCheck = $lead ?? ($latest->lead_id ? Lead::query()->find($latest->lead_id) : null);
+        if (! $connection->allowsAutomationFor(
+            $latest->whatsapp_jid,
+            $latest->phone_number,
+            $leadForCheck?->mobile,
+            $leadForCheck?->whatsapp_jid,
+        )) {
+            return;
+        }
+
         $idempotencyKey = 'wa-ai:replied:'.$latest->id;
         if (! Cache::add($idempotencyKey, 1, now()->addDay())) {
             return;

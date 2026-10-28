@@ -63,6 +63,11 @@ class SendWhatsappFollowUpJob implements ShouldQueue, ShouldBeUnique
         if ($connection->status !== 'connected' || ! filled($connection->session_id)) {
             return;
         }
+        if (! $connection->allowsAutomationFor($lead->mobile, $lead->whatsapp_jid)) {
+            $followUp->clear($lead);
+
+            return;
+        }
 
         $agent = Agent::activeForClinic((int) $clinic->id);
         if (! $agent || ! $agent->canActivate() || ! $this->stillWaitingForPatient($lead, $connection, $history)) {

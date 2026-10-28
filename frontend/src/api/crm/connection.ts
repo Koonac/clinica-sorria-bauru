@@ -30,6 +30,8 @@ export type ClinicConnection = {
   whatsapp_follow_up_delays: number[]
   whatsapp_send_window_start: number
   whatsapp_send_window_end: number
+  /** Modo de teste: a IA só responde a este número (só dígitos, com 55). */
+  agent_test_phone: string | null
   api_username?: string | null
   has_qr?: boolean
 }
@@ -81,6 +83,7 @@ export async function updateConnectionSettings(payload: {
   whatsapp_follow_up_delays?: number[]
   whatsapp_send_window_start?: number
   whatsapp_send_window_end?: number
+  agent_test_phone?: string | null
 }): Promise<ClinicConnection> {
   try {
     const { data } = await api.put<DataResponse<ClinicConnection>>(
