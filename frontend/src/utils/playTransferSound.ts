@@ -1,5 +1,6 @@
 /**
- * Alerta sonoro quando um chat é transferido para o atendente atual.
+ * Alerta sonoro (chat transferido / aviso novo). Chime suave de duas notas, estilo notificação
+ * de mensageiro: senoides com decaimento natural, sem ruído nem onda quadrada.
  * Web Audio (sem asset binário). Chamar unlockTransferSound() após gesto do usuário.
  */
 
@@ -27,6 +28,41 @@ export async function unlockTransferSound(): Promise<void> {
   }
 }
 
+/**
+ * Uma nota tipo "sino": fundamental + parcial suave uma oitava acima, ataque rápido e
+ * decaimento exponencial (sem corte seco no fim).
+ */
+function chimeNote(
+  ctx: AudioContext,
+  destination: AudioNode,
+  frequency: number,
+  start: number,
+  duration: number,
+  peak: number,
+) {
+  const partials: { ratio: number; gain: number }[] = [
+    { ratio: 1, gain: 1 },
+    { ratio: 2, gain: 0.18 },
+  ]
+
+  for (const partial of partials) {
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(frequency * partial.ratio, start)
+
+    const level = peak * partial.gain
+    gain.gain.setValueAtTime(0.0001, start)
+    gain.gain.exponentialRampToValueAtTime(level, start + 0.012)
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration)
+
+    osc.connect(gain)
+    gain.connect(destination)
+    osc.start(start)
+    osc.stop(start + duration + 0.05)
+  }
+}
+
 export function playTransferSound(): void {
   const ctx = audioContext()
   if (!ctx) return
@@ -39,64 +75,18 @@ export function playTransferSound(): void {
     }
 
     const now = ctx.currentTime
+
+    // Filtro passa-baixa tira o "brilho" agudo que cansa; volume moderado.
+    const tone = ctx.createBiquadFilter()
+    tone.type = 'lowpass'
+    tone.frequency.value = 3200
     const master = ctx.createGain()
-    master.gain.setValueAtTime(0.0001, now)
-    master.gain.exponentialRampToValueAtTime(0.95, now + 0.008)
-    master.gain.setValueAtTime(0.95, now + 0.55)
-    master.gain.exponentialRampToValueAtTime(0.0001, now + 0.72)
+    master.gain.value = 0.35
+    tone.connect(master)
     master.connect(ctx.destination)
 
-    // Impacto percussivo forte
-    const noiseDur = 0.12
-    const noiseBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * noiseDur), ctx.sampleRate)
-    const data = noiseBuf.getChannelData(0)
-    for (let i = 0; i < data.length; i++) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / data.length)
-    }
-    const noise = ctx.createBufferSource()
-    noise.buffer = noiseBuf
-    const noiseGain = ctx.createGain()
-    noiseGain.gain.setValueAtTime(1, now)
-    noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + noiseDur)
-    const noiseFilter = ctx.createBiquadFilter()
-    noiseFilter.type = 'bandpass'
-    noiseFilter.frequency.value = 1400
-    noiseFilter.Q.value = 0.55
-    noise.connect(noiseFilter)
-    noiseFilter.connect(noiseGain)
-    noiseGain.connect(master)
-    noise.start(now)
-    noise.stop(now + noiseDur + 0.02)
-
-    // Sirene curta: sobe e desce em frequência aguda (square = mais cortante)
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.type = 'square'
-    osc.frequency.setValueAtTime(880, now)
-    osc.frequency.exponentialRampToValueAtTime(1760, now + 0.18)
-    osc.frequency.exponentialRampToValueAtTime(1174, now + 0.38)
-    osc.frequency.exponentialRampToValueAtTime(2093, now + 0.55)
-    gain.gain.setValueAtTime(0.0001, now)
-    gain.gain.exponentialRampToValueAtTime(0.9, now + 0.02)
-    gain.gain.setValueAtTime(0.9, now + 0.5)
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.68)
-    osc.connect(gain)
-    gain.connect(master)
-    osc.start(now)
-    osc.stop(now + 0.7)
-
-    // Harmônico agudo por cima, para “furar” o ambiente
-    const ping = ctx.createOscillator()
-    const pingGain = ctx.createGain()
-    ping.type = 'sawtooth'
-    ping.frequency.setValueAtTime(2637, now + 0.02)
-    ping.frequency.exponentialRampToValueAtTime(1975, now + 0.45)
-    pingGain.gain.setValueAtTime(0.0001, now + 0.02)
-    pingGain.gain.exponentialRampToValueAtTime(0.45, now + 0.04)
-    pingGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5)
-    ping.connect(pingGain)
-    pingGain.connect(master)
-    ping.start(now + 0.02)
-    ping.stop(now + 0.52)
+    // Intervalo de quinta ascendente (Mi5 → Si5): consonante e reconhecível sem ser estridente.
+    chimeNote(ctx, tone, 659.25, now, 0.45, 0.6)
+    chimeNote(ctx, tone, 987.77, now + 0.12, 0.7, 0.5)
   })()
 }

@@ -107,6 +107,51 @@ class PanelCalendarAvailabilityTest extends TestCase
         $this->assertSame('amanhã (quinta-feira 29/10) às 09:00', $result['horarios'][3]['rotulo']);
     }
 
+    public function test_horario_por_dia_da_semana_define_os_slots(): void
+    {
+        Http::fake();
+        // Segunda fechada; sábado 08:00–10:00 (slots de 1h).
+        $this->defaultClinic()->forceFill([
+            'business_hours' => ['3' => ['start' => '14:00', 'end' => '16:00'], '6' => ['start' => '08:00', 'end' => '10:00']],
+        ])->save();
+        $this->travelTo(Carbon::parse('2026-11-02 07:00:00', config('app.timezone'))); // segunda
+
+        $result = app(ListAvailableCalendarSlots::class)->handle(['dias' => 7]);
+
+        $this->assertSame(
+            ['quarta-feira 04/11 às 14:00', 'quarta-feira 04/11 às 15:00', 'sábado 07/11 às 08:00', 'sábado 07/11 às 09:00'],
+            array_column($result['horarios'], 'rotulo'),
+        );
+        $this->assertSame('qua 14:00–16:00; sáb 08:00–10:00; fechado: seg, ter, qui, sex, dom', $result['expediente']);
+    }
+
+    public function test_admin_salva_horario_de_atendimento_e_valida(): void
+    {
+        $admin = \App\Models\User::factory()->admin()->create(['clinic_id' => $this->defaultClinic()->id]);
+        \Laravel\Sanctum\Sanctum::actingAs($admin);
+        $clinicId = $this->defaultClinic()->id;
+
+        $this->patchJson("/api/v1/clinics/{$clinicId}", [
+            'business_hours' => [
+                '1' => ['start' => '08:00', 'end' => '18:00'],
+                '2' => ['start' => '08:00', 'end' => '18:00'],
+                '6' => ['start' => '08:00', 'end' => '12:00'],
+            ],
+        ])->assertOk()
+            ->assertJsonPath('data.business_hours.6.end', '12:00')
+            ->assertJsonMissingPath('data.business_hours.3');
+
+        $this->assertSame('seg e ter 08:00–18:00; sáb 08:00–12:00; fechado: qua, qui, sex, dom', $this->defaultClinic()->fresh()->businessHoursSummary());
+
+        $this->patchJson("/api/v1/clinics/{$clinicId}", [
+            'business_hours' => ['1' => ['start' => '18:00', 'end' => '08:00']],
+        ])->assertUnprocessable()->assertJsonValidationErrors('business_hours.1.end');
+
+        $this->patchJson("/api/v1/clinics/{$clinicId}", [
+            'business_hours' => ['9' => ['start' => '08:00', 'end' => '12:00']],
+        ])->assertUnprocessable();
+    }
+
     public function test_google_fora_do_ar_nao_trava_e_usa_painel(): void
     {
         $this->defaultClinic()->forceFill(['google_calendar_refresh_token' => 'rtoken'])->save();

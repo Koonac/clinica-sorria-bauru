@@ -2,7 +2,9 @@
 
 namespace App\Services\Crm;
 
+use App\Models\Clinic;
 use App\Services\Crm\Appointments\ListPanelBusyIntervals;
+use App\Support\ClinicContext;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -13,6 +15,7 @@ class ListAvailableCalendarSlots
     public function __construct(
         private GoogleCalendarClient $calendar,
         private ListPanelBusyIntervals $panelBusy,
+        private ClinicContext $clinicContext,
     ) {}
 
     /**
@@ -30,12 +33,10 @@ class ListAvailableCalendarSlots
         $slotMinutes = (int) ($arguments['duracao_minutos'] ?? $this->calendar->slotMinutes());
         $slotMinutes = max(15, min(180, $slotMinutes));
 
-        $horaInicio = $this->calendar->businessHoursStart();
-        $horaFim = $this->calendar->businessHoursEnd();
-        if ($horaFim <= $horaInicio) {
-            $horaInicio = 9;
-            $horaFim = 18;
-        }
+        $clinic = $this->clinicContext->clinic()
+            ?? Clinic::query()->find($this->clinicContext->id());
+        // Horário por dia da semana (configurações › horário de atendimento); dias ausentes = fechado.
+        $businessHours = $clinic?->resolvedBusinessHours() ?? (new Clinic)->resolvedBusinessHours();
 
         $dataRaw = trim((string) ($arguments['data'] ?? ''));
         try {
@@ -76,18 +77,21 @@ class ListAvailableCalendarSlots
         $slots = [];
         for ($d = 0; $d < $dias; $d++) {
             $dia = $inicioDia->copy()->addDays($d);
-            if ($dia->isWeekend()) {
+            $horario = $businessHours[$dia->dayOfWeekIso] ?? null;
+            if ($horario === null) {
                 continue;
             }
 
-            $cursor = $dia->copy()->setTime($horaInicio, 0, 0);
-            $fimExpediente = $dia->copy()->setTime($horaFim, 0, 0);
+            [$hIni, $mIni] = array_map('intval', explode(':', $horario['start']));
+            [$hFim, $mFim] = array_map('intval', explode(':', $horario['end']));
+            $cursor = $dia->copy()->setTime($hIni, $mIni, 0);
+            $fimExpediente = $dia->copy()->setTime($hFim, $mFim, 0);
 
             while ($cursor->copy()->addMinutes($slotMinutes)->lessThanOrEqualTo($fimExpediente)) {
                 $slotStart = $cursor->copy();
                 $slotEnd = $cursor->copy()->addMinutes($slotMinutes);
 
-                if ($slotEnd->lessThanOrEqualTo(now($tz))) {
+                if ($slotStart->lessThanOrEqualTo(now($tz))) {
                     $cursor->addMinutes($slotMinutes);
 
                     continue;
@@ -109,7 +113,7 @@ class ListAvailableCalendarSlots
             'ok' => true,
             'timezone' => $tz,
             'hoje' => now($tz)->locale('pt_BR')->translatedFormat('l, d/m/Y'),
-            'expediente' => sprintf('%02d:00–%02d:00', $horaInicio, $horaFim),
+            'expediente' => $clinic?->businessHoursSummary() ?? (new Clinic)->businessHoursSummary(),
             'duracao_minutos' => $slotMinutes,
             'fonte' => $fonte,
             'total' => count($slots),

@@ -68,8 +68,35 @@ class UpdateClinic
             }
         }
 
+        if (array_key_exists('business_hours', $attrs)) {
+            $clinic->business_hours = $this->normalizeBusinessHours($attrs['business_hours']);
+        }
+
         $clinic->save();
 
         return $clinic->fresh();
+    }
+
+    /**
+     * Guarda só os dias abertos, chave = dia ISO em texto ("1" … "7"). Lista vazia = fechado todos os dias.
+     *
+     * @return array<string, array{start: string, end: string}>|null
+     */
+    private function normalizeBusinessHours(mixed $hours): ?array
+    {
+        if ($hours === null) {
+            return null;
+        }
+
+        $out = [];
+        foreach ((array) $hours as $day => $range) {
+            $out[(string) (int) $day] = [
+                'start' => (string) $range['start'],
+                'end' => (string) $range['end'],
+            ];
+        }
+        ksort($out);
+
+        return $out;
     }
 }

@@ -258,7 +258,7 @@ Contexto CRM:
 - Estágios de lead disponíveis: {$stagesJson}
 - Fuso horário: America/Sao_Paulo
 - Agora: {$this->nowIso()}
-{$this->calendarBlock()}
+{$this->calendarBlock($context->connection->clinic_id)}
 {$appointmentsBlock}{$priorSummaries}{$signalsBlock}{$knowledgeBlock}
 Regras do agent (system prompt do cliente):
 {$rules}
@@ -405,14 +405,19 @@ PROMPT;
     /**
      * Calendário pronto dos próximos dias: o modelo erra dia da semana quando calcula sozinho.
      */
-    private function calendarBlock(): string
+    private function calendarBlock(?int $clinicId): string
     {
         $today = now(config('app.timezone'))->locale('pt_BR');
+        $clinic = $clinicId ? Clinic::query()->find($clinicId) : null;
+        $hours = $clinic?->resolvedBusinessHours() ?? [];
 
         $lines = [
             '- HOJE é '.$today->translatedFormat('l, d/m/Y').', '.$today->format('H:i').' (horário de Brasília).',
-            '- Calendário dos próximos dias (use SEMPRE esta lista para saber o dia da semana de uma data; nunca calcule de cabeça):',
         ];
+        if ($clinic) {
+            $lines[] = '- Horário de atendimento da clínica: '.$clinic->businessHoursSummary().'. Nunca ofereça horário fora disso.';
+        }
+        $lines[] = '- Calendário dos próximos dias (use SEMPRE esta lista para saber o dia da semana de uma data; nunca calcule de cabeça):';
         for ($i = 0; $i < 14; $i++) {
             $day = $today->copy()->addDays($i);
             $prefix = match ($i) {
@@ -420,7 +425,9 @@ PROMPT;
                 1 => 'amanhã: ',
                 default => '',
             };
-            $lines[] = '  • '.$prefix.$day->translatedFormat('l, d/m/Y').' ('.$day->toDateString().')';
+            $range = $hours[$day->dayOfWeekIso] ?? null;
+            $status = ! $clinic ? '' : ($range ? " — aberto {$range['start']}–{$range['end']}" : ' — FECHADO');
+            $lines[] = '  • '.$prefix.$day->translatedFormat('l, d/m/Y').' ('.$day->toDateString().')'.$status;
         }
         $lines[] = '- Ao chamar listar_horarios_disponiveis, passe sempre o parâmetro data (YYYY-MM-DD) do dia que o paciente pediu.';
 

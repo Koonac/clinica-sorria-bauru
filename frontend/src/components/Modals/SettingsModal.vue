@@ -4,8 +4,9 @@ import { Icon } from '@iconify/vue'
 import { ApiError } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import WhatsappSettingsPanel from '@/components/whatsapp/WhatsappSettingsPanel.vue'
+import ClinicHoursSettingsPanel from '@/components/crm/ClinicHoursSettingsPanel.vue'
 
-type SettingsSection = 'geral' | 'whatsapp' | 'senha'
+type SettingsSection = 'geral' | 'horarios' | 'whatsapp' | 'senha'
 
 const open = defineModel<boolean>('open', { default: false })
 
@@ -28,6 +29,7 @@ const sections = computed(() => {
     { id: 'geral', label: 'Geral', icon: 'lucide:sliders-horizontal' },
   ]
   if (auth.isAdmin) {
+    items.push({ id: 'horarios', label: 'Horário de atendimento', icon: 'lucide:clock' })
     items.push({ id: 'whatsapp', label: 'WhatsApp', icon: 'lucide:message-circle' })
   }
   items.push({ id: 'senha', label: 'Alteração de senha', icon: 'lucide:key-round' })
@@ -193,6 +195,8 @@ async function onSubmit() {
                 Configurações gerais em breve.
               </p>
             </div>
+
+            <ClinicHoursSettingsPanel v-else-if="section === 'horarios' && auth.isAdmin" />
 
             <WhatsappSettingsPanel v-else-if="section === 'whatsapp' && auth.isAdmin" />
 
