@@ -35,9 +35,18 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
     /** Teto de chamadas de transcrição/visão por execução. */
     private const MEDIA_ENRICH_LIMIT = 5;
 
+    /** Espera máxima desde a 1ª mensagem: no mínimo 60s ou 3× o debounce do agent. */
+    private const MIN_MAX_WAIT_SECONDS = 60;
+
+    private const MAX_WAIT_DEBOUNCE_MULTIPLIER = 3;
+
+    /**
+     * @param  int|null  $firstQueuedAt  unix ts da 1ª mensagem da rajada; null = sem debounce deslizante
+     */
     public function __construct(
         public int $connectionId,
         public string $chatKey,
+        public ?int $firstQueuedAt = null,
     ) {}
 
     public function uniqueId(): string
@@ -99,6 +108,10 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
             $leadForCheck?->mobile,
             $leadForCheck?->whatsapp_jid,
         )) {
+            return;
+        }
+
+        if ($this->rescheduleIfStillTyping($agent, $latest)) {
             return;
         }
 
@@ -196,6 +209,44 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
         }
 
         $enrichMedia->handleMany($pending, self::MEDIA_ENRICH_LIMIT);
+    }
+
+    /**
+     * Debounce deslizante: se o paciente mandou mensagem há menos de debounce_seconds, espera de novo
+     * (até o teto contado da 1ª mensagem). Mensagens que chegam enquanto este job aguarda batem na
+     * trava de unicidade, então quem "reinicia" o relógio é o próprio job ao acordar.
+     */
+    private function rescheduleIfStillTyping(Agent $agent, WhatsappMessage $latest): bool
+    {
+        // Sem marca (chamada direta) ou fila síncrona (não há como atrasar): responde já.
+        if ($this->firstQueuedAt === null || $this->runsOnSyncQueue()) {
+            return false;
+        }
+
+        $debounce = max(3, min(60, (int) $agent->debounce_seconds));
+        $maxWait = max(self::MIN_MAX_WAIT_SECONDS, $debounce * self::MAX_WAIT_DEBOUNCE_MULTIPLIER);
+        $now = now()->timestamp;
+
+        $lastAt = $latest->created_at?->timestamp ?? $now;
+        $quietFor = max(0, $now - $lastAt);
+        $waitedFor = max(0, $now - $this->firstQueuedAt);
+
+        if ($quietFor >= $debounce || $waitedFor >= $maxWait) {
+            return false;
+        }
+
+        $delay = max(1, min($debounce - $quietFor, $maxWait - $waitedFor));
+        self::dispatch($this->connectionId, $this->chatKey, $this->firstQueuedAt)
+            ->delay(now()->addSeconds($delay));
+
+        return true;
+    }
+
+    private function runsOnSyncQueue(): bool
+    {
+        $connection = $this->connection ?? config('queue.default');
+
+        return config("queue.connections.{$connection}.driver") === 'sync';
     }
 
     /**

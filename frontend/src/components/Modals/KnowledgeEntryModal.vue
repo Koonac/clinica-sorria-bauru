@@ -124,7 +124,7 @@ async function onSubmit() {
       v-if="open"
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-3 backdrop-blur-sm sm:p-6"
       role="presentation"
-      @click.self="close"
+      v-backdrop-close="close"
     >
       <div
         ref="panelRef"

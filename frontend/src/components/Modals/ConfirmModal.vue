@@ -63,7 +63,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
     <div
       v-if="open"
       class="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4"
-      @click.self="onCancel"
+      v-backdrop-close="onCancel"
     >
       <div
         role="dialog"

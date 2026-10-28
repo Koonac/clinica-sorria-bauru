@@ -54,7 +54,7 @@ function submit() {
     <div
       v-if="open"
       class="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4"
-      @click.self="close"
+      v-backdrop-close="close"
     >
       <div role="dialog" aria-modal="true" class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
         <div class="flex items-start justify-between gap-3">

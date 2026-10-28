@@ -96,7 +96,7 @@ onUnmounted(() => {
       v-if="open"
       class="fixed inset-0 z-[60] flex justify-end bg-black/40 backdrop-blur-[1px]"
       role="presentation"
-      @click.self="open = false"
+      v-backdrop-close="() => (open = false)"
     >
       <aside
         role="dialog"

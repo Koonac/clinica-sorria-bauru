@@ -65,7 +65,7 @@ class DispatchWhatsappAiReplyJob
 
         $debounce = max(3, min(60, (int) $agent->debounce_seconds));
 
-        ProcessWhatsappAiReplyJob::dispatch((int) $connectionId, $chatKey)
+        ProcessWhatsappAiReplyJob::dispatch((int) $connectionId, $chatKey, now()->timestamp)
             ->delay(now()->addSeconds($debounce));
     }
 }

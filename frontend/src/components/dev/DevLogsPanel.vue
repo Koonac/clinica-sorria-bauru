@@ -224,7 +224,7 @@ onMounted(() => {
       <div
         v-if="detailOpen"
         class="fixed inset-0 z-50 flex items-end justify-center bg-brand-ink/40 p-4 sm:items-center"
-        @click.self="closeDetail"
+        v-backdrop-close="closeDetail"
       >
         <div
           class="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-brand-ink/10 bg-white shadow-xl"

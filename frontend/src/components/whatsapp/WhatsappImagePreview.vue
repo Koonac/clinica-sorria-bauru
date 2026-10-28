@@ -62,7 +62,7 @@ onUnmounted(() => {
       role="dialog"
       aria-modal="true"
       :aria-label="alt"
-      @click.self="closeLightbox"
+      v-backdrop-close="closeLightbox"
     >
       <button
         type="button"

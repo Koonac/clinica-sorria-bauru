@@ -275,7 +275,7 @@ onUnmounted(() => {
         v-if="deletingUser"
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm"
         role="presentation"
-        @click.self="closeDelete"
+        v-backdrop-close="closeDelete"
       >
         <div
           role="dialog"

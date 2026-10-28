@@ -244,7 +244,11 @@ onMounted(() => {
               required
               :class="inputClass"
             />
-            <span class="text-xs text-brand-ink/45">Entre 3 e 60. Padrão: 10.</span>
+            <span class="text-xs text-brand-ink/45">
+              Entre 3 e 60. Padrão: 10. A IA espera esse tempo sem novas mensagens do paciente
+              antes de responder; cada mensagem nova reinicia a contagem (espera máxima: 60s ou 3×
+              o debounce).
+            </span>
             <span
               v-if="fieldErrors.debounce_seconds"
               class="text-sm text-brand-ink/70"
