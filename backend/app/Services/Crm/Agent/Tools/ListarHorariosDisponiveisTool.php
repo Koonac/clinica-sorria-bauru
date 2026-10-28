@@ -20,7 +20,7 @@ class ListarHorariosDisponiveisTool implements AgentTool
     {
         return [
             'name' => $this->name(),
-            'description' => 'Lista horários livres na agenda (FreeBusy). Não revela nome/descrição de outros compromissos — só slots disponíveis. Use antes de oferecer opções ao lead.',
+            'description' => 'Lista horários livres dentro do expediente, considerando a agenda do painel (consultas e tarefas) e, se conectado, o Google Agenda. Não revela nome/descrição de outros compromissos — só slots disponíveis. Use antes de oferecer opções ao lead.',
             'parameters' => [
                 'type' => 'object',
                 'properties' => [

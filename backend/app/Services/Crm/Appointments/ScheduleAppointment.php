@@ -24,6 +24,7 @@ class ScheduleAppointment
         private CancelAppointment $cancelAppointment,
         private UpdateLeadAttendanceStatus $attendanceStatus,
         private ScheduleWhatsappFollowUp $followUp,
+        private ListPanelBusyIntervals $panelBusy,
     ) {}
 
     /**
@@ -61,6 +62,11 @@ class ScheduleAppointment
 
         $notes = trim((string) ($data['notes'] ?? ''));
 
+        // A IA não pode marcar em cima de outro compromisso do painel (a recepção pode encaixar).
+        if ($source === Appointment::SOURCE_AI) {
+            $this->assertPanelSlotFree($lead, $startsAt, $endsAt, $from);
+        }
+
         $cancelados = $replacePrevious ? $this->cancelPrevious($lead, $from, $userId, $source) : [];
 
         // Só lead_id: o CHECK de tasks exige lead XOR deal.
@@ -74,28 +80,31 @@ class ScheduleAppointment
 
         $calendarResult = null;
         $calendarError = null;
-        try {
-            $calendarResult = $this->calendar->createEvent([
-                'summary' => $title,
-                'description' => $this->calendarDescription($lead, $notes, $data['origin_label'] ?? null),
-                'start' => $startsAt->toIso8601String(),
-                'end' => $endsAt->toIso8601String(),
-            ]);
+        // Sem Google conectado a consulta vive só na agenda do painel (não é erro).
+        if ($this->calendar->configured()) {
+            try {
+                $calendarResult = $this->calendar->createEvent([
+                    'summary' => $title,
+                    'description' => $this->calendarDescription($lead, $notes, $data['origin_label'] ?? null),
+                    'start' => $startsAt->toIso8601String(),
+                    'end' => $endsAt->toIso8601String(),
+                ]);
 
-            $extra = [];
-            if (! empty($calendarResult['htmlLink'])) {
-                $extra[] = 'Google Calendar: '.$calendarResult['htmlLink'];
+                $extra = [];
+                if (! empty($calendarResult['htmlLink'])) {
+                    $extra[] = 'Google Calendar: '.$calendarResult['htmlLink'];
+                }
+                if (! empty($calendarResult['id'])) {
+                    $extra[] = 'event_id: '.$calendarResult['id'];
+                }
+                if ($extra !== []) {
+                    $task->forceFill([
+                        'description' => trim(($task->description ? $task->description."\n\n" : '').implode("\n", $extra)),
+                    ])->save();
+                }
+            } catch (Throwable $e) {
+                $calendarError = $e->getMessage();
             }
-            if (! empty($calendarResult['id'])) {
-                $extra[] = 'event_id: '.$calendarResult['id'];
-            }
-            if ($extra !== []) {
-                $task->forceFill([
-                    'description' => trim(($task->description ? $task->description."\n\n" : '').implode("\n", $extra)),
-                ])->save();
-            }
-        } catch (Throwable $e) {
-            $calendarError = $e->getMessage();
         }
 
         $attrs = [
@@ -156,6 +165,25 @@ class ScheduleAppointment
             'calendar_error' => $calendarError,
             'cancelados' => $cancelados,
         ];
+    }
+
+    private function assertPanelSlotFree(Lead $lead, Carbon $startsAt, Carbon $endsAt, ?Appointment $from): void
+    {
+        // Compromissos do próprio lead não contam: numa remarcação eles serão substituídos.
+        $busy = $this->panelBusy->handle(
+            $startsAt,
+            $endsAt,
+            max(15, (int) $startsAt->diffInMinutes($endsAt)),
+            (string) config('app.timezone'),
+            $from?->id,
+            $lead->id,
+        );
+
+        foreach ($busy as $block) {
+            if ($startsAt->lt($block['end']) && $endsAt->gt($block['start'])) {
+                throw new RuntimeException('Esse horário não está mais disponível na agenda. Chame listar_horarios_disponiveis de novo e ofereça outro horário.');
+            }
+        }
     }
 
     /**

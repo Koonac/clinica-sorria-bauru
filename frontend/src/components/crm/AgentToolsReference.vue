@@ -17,7 +17,8 @@ const TOOLS: { name: string; description: string; mode: ToolMode }[] = [
   },
   {
     name: 'listar_horarios_disponiveis',
-    description: 'Consulta os horários livres no Google Agenda dentro do expediente.',
+    description:
+      'Consulta os horários livres no expediente: agenda do painel e, se conectado, Google Agenda.',
     mode: 'sempre',
   },
   {

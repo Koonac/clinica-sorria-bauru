@@ -2,26 +2,28 @@
 
 namespace App\Services\Crm;
 
+use App\Services\Crm\Appointments\ListPanelBusyIntervals;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
 class ListAvailableCalendarSlots
 {
-    public function __construct(private GoogleCalendarClient $calendar) {}
+    public function __construct(
+        private GoogleCalendarClient $calendar,
+        private ListPanelBusyIntervals $panelBusy,
+    ) {}
 
     /**
-     * Horários livres no Google Calendar dentro do expediente (sem títulos de eventos).
+     * Horários livres dentro do expediente (sem títulos de eventos).
+     * Sempre respeita a agenda do painel; com Google conectado, soma também o FreeBusy de lá.
      *
      * @param  array{data?: string|null, dias?: int|null, duracao_minutos?: int|null}  $arguments
      * @return array<string, mixed>
      */
     public function handle(array $arguments): array
     {
-        if (! $this->calendar->configured()) {
-            throw new RuntimeException('Google Calendar não configurado.');
-        }
-
         $tz = $this->calendar->timezone();
         Carbon::setLocale('pt_BR');
         $dias = max(1, min(7, (int) ($arguments['dias'] ?? 1)));
@@ -49,20 +51,25 @@ class ListAvailableCalendarSlots
             throw new RuntimeException('Intervalo de dias inválido.');
         }
 
-        $busy = $this->calendar->freeBusy(
-            $inicioDia->toIso8601String(),
-            $fimJanela->toIso8601String(),
-        );
+        $busyIntervals = $this->panelBusy->handle($inicioDia, $fimJanela, $slotMinutes, $tz);
+        $fonte = 'agenda do painel';
 
-        $busyIntervals = [];
-        foreach ($busy as $block) {
+        if ($this->calendar->configured()) {
             try {
-                $busyIntervals[] = [
-                    'start' => Carbon::parse($block['start'])->timezone($tz),
-                    'end' => Carbon::parse($block['end'])->timezone($tz),
-                ];
-            } catch (Throwable) {
-                continue;
+                foreach ($this->calendar->freeBusy($inicioDia->toIso8601String(), $fimJanela->toIso8601String()) as $block) {
+                    try {
+                        $busyIntervals[] = [
+                            'start' => Carbon::parse($block['start'])->timezone($tz),
+                            'end' => Carbon::parse($block['end'])->timezone($tz),
+                        ];
+                    } catch (Throwable) {
+                        continue;
+                    }
+                }
+                $fonte = 'Google Agenda + agenda do painel';
+            } catch (Throwable $e) {
+                // Google fora do ar não pode impedir o atendimento: segue só com o painel.
+                Log::warning('FreeBusy do Google falhou; usando só a agenda do painel.', ['error' => $e->getMessage()]);
             }
         }
 
@@ -103,6 +110,7 @@ class ListAvailableCalendarSlots
             'timezone' => $tz,
             'expediente' => sprintf('%02d:00–%02d:00', $horaInicio, $horaFim),
             'duracao_minutos' => $slotMinutes,
+            'fonte' => $fonte,
             'total' => count($slots),
             'horarios' => $slots,
             // Nunca incluir títulos de eventos — FreeBusy só tem busy blocks.
