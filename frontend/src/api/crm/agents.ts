@@ -1,4 +1,5 @@
 import { api, toApiError } from '@/api/client'
+import type { BusinessHours } from '@/api/clinics'
 import type { DataResponse } from '@/api/crm/types'
 
 export type Agent = {
@@ -9,6 +10,8 @@ export type Agent = {
   system_prompt: string | null
   debounce_seconds: number
   is_active: boolean
+  /** Null = atende 24 horas. */
+  working_hours: BusinessHours | null
   created_at: string
   updated_at: string
 }
@@ -18,6 +21,7 @@ export type CreateAgentPayload = {
   system_prompt?: string | null
   debounce_seconds?: number
   is_active?: boolean
+  working_hours?: BusinessHours | null
 }
 
 export type UpdateAgentPayload = {
@@ -25,6 +29,7 @@ export type UpdateAgentPayload = {
   system_prompt?: string | null
   debounce_seconds?: number
   is_active?: boolean
+  working_hours?: BusinessHours | null
 }
 
 type AgentsListResponse = {

@@ -75,7 +75,7 @@ class ProcessWhatsappAiReplyJob implements ShouldQueue, ShouldBeUniqueUntilProce
         $clinicContext->set($clinic);
 
         $agent = Agent::activeForClinic((int) $connection->clinic_id);
-        if (! $agent || ! $agent->canActivate()) {
+        if (! $agent || ! $agent->canActivate() || ! $agent->isWorkingAt()) {
             return;
         }
 

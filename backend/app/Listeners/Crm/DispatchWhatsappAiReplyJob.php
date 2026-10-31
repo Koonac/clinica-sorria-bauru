@@ -33,7 +33,7 @@ class DispatchWhatsappAiReplyJob
         app(ClinicContext::class)->set($clinic);
 
         $agent = Agent::activeForClinic((int) $clinicId);
-        if (! $agent || ! $agent->canActivate()) {
+        if (! $agent || ! $agent->canActivate() || ! $agent->isWorkingAt()) {
             return;
         }
 

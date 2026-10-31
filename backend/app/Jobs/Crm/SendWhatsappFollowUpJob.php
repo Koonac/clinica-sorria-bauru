@@ -70,6 +70,13 @@ class SendWhatsappFollowUpJob implements ShouldQueue, ShouldBeUnique
             return;
         }
 
+        // Follow-up é o bot falando: fora do horário dele, espera a próxima abertura.
+        if (! $agent->isWorkingAt()) {
+            $lead->forceFill(['whatsapp_follow_up_due_at' => $agent->nextWorkingOpening() ?? now()->addDay()])->save();
+
+            return;
+        }
+
         $delays = $connection->resolvedFollowUpDelays();
         $attempt = (int) $lead->whatsapp_follow_up_step + 1;
         if ($attempt > count($delays)) {

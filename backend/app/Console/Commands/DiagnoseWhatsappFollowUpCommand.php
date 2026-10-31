@@ -61,7 +61,9 @@ class DiagnoseWhatsappFollowUpCommand extends Command
                 ." · janela {$start}h–{$end}h (".($connection->isWithinSendWindow($now) ? 'dentro' : 'FORA').')'
                 .' · modo de teste='.($connection->agent_test_phone ?: 'não'));
         }
-        $this->line('Agent ativo: '.($agent ? $agent->name : 'NENHUM'));
+        $this->line('Agent ativo: '.($agent
+            ? $agent->name.' · atende agora: '.($agent->isWorkingAt($now) ? 'sim' : 'NÃO (fora do horário do bot)')
+            : 'NENHUM'));
 
         $reason = $eligibility->handle($lead, $connection, $agent);
         $this->newLine();

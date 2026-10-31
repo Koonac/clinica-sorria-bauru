@@ -8,10 +8,13 @@ import {
   updateAgent,
   type Agent,
 } from '@/api/crm/agents'
+import type { BusinessHours } from '@/api/clinics'
 import Button from '@/components/Buttons/Button.vue'
 import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
+import WeeklyHoursEditor from '@/components/Forms/WeeklyHoursEditor.vue'
 import AgentToolsReference from '@/components/crm/AgentToolsReference.vue'
 import PageView from '@/components/Layout/PageView.vue'
+import { WEEK_DAYS, isValidWeek, type WeekDayKey } from '@/utils/weeklyHours'
 
 const route = useRoute()
 const router = useRouter()
@@ -30,11 +33,22 @@ const isEdit = computed(() => route.name === 'agents-edit')
 
 const pageTitle = computed(() => (isEdit.value ? 'Editar agent' : 'Novo agent'))
 
+const WORKDAY = { start: '08:00', end: '18:00' }
+const WEEKDAYS_DEFAULT: BusinessHours = {
+  '1': WORKDAY,
+  '2': WORKDAY,
+  '3': WORKDAY,
+  '4': WORKDAY,
+  '5': WORKDAY,
+}
+
 const form = reactive({
   name: '',
   system_prompt: '',
   debounce_seconds: 10,
   is_active: false,
+  limit_hours: false,
+  working_hours: { ...WEEKDAYS_DEFAULT } as BusinessHours,
 })
 
 const fieldErrors = reactive({
@@ -42,7 +56,9 @@ const fieldErrors = reactive({
   system_prompt: '',
   debounce_seconds: '',
   is_active: '',
+  working_hours: '',
 })
+const workingDayErrors = ref<Partial<Record<WeekDayKey, string>>>({})
 
 const loading = ref(false)
 const pageLoading = ref(isEdit.value)
@@ -56,6 +72,10 @@ const canSubmit = computed(() => {
   if (form.is_active && !form.system_prompt.trim()) return false
   const debounce = Number(form.debounce_seconds)
   if (!Number.isFinite(debounce) || debounce < 3 || debounce > 60) return false
+  if (form.limit_hours) {
+    if (Object.keys(form.working_hours).length === 0) return false
+    if (!isValidWeek(form.working_hours, true)) return false
+  }
   return true
 })
 
@@ -64,6 +84,8 @@ function clearFieldErrors() {
   fieldErrors.system_prompt = ''
   fieldErrors.debounce_seconds = ''
   fieldErrors.is_active = ''
+  fieldErrors.working_hours = ''
+  workingDayErrors.value = {}
 }
 
 function fillForm(source: Agent | null) {
@@ -71,6 +93,8 @@ function fillForm(source: Agent | null) {
   form.system_prompt = source?.system_prompt ?? ''
   form.debounce_seconds = source?.debounce_seconds ?? 10
   form.is_active = source?.is_active ?? false
+  form.limit_hours = Boolean(source?.working_hours)
+  form.working_hours = source?.working_hours ?? { ...WEEKDAYS_DEFAULT }
   clearFieldErrors()
   formError.value = ''
 }
@@ -81,6 +105,11 @@ function applyApiFieldErrors(details?: Record<string, string[]>) {
   fieldErrors.system_prompt = details.system_prompt?.[0] || ''
   fieldErrors.debounce_seconds = details.debounce_seconds?.[0] || ''
   fieldErrors.is_active = details.is_active?.[0] || ''
+  fieldErrors.working_hours = details.working_hours?.[0] || ''
+  for (const day of WEEK_DAYS) {
+    const message = details[`working_hours.${day.key}.end`]?.[0]
+    if (message) workingDayErrors.value[day.key] = message
+  }
 }
 
 function goBack() {
@@ -134,6 +163,7 @@ async function onSubmit() {
       system_prompt: form.system_prompt.trim() || null,
       debounce_seconds: Number(form.debounce_seconds),
       is_active: form.is_active,
+      working_hours: form.limit_hours ? form.working_hours : null,
     }
 
     const saved =
@@ -148,7 +178,9 @@ async function onSubmit() {
   } catch (error) {
     if (error instanceof ApiError) {
       applyApiFieldErrors(error.details)
-      const hasFieldError = Object.values(fieldErrors).some(Boolean)
+      const hasFieldError =
+        Object.values(fieldErrors).some(Boolean) ||
+        Object.keys(workingDayErrors.value).length > 0
       if (!hasFieldError) {
         formError.value =
           error.message ||
@@ -279,6 +311,43 @@ onMounted(() => {
           </span>
         </aside>
       </div>
+
+      <section class="flex flex-col gap-4 rounded-xl border border-brand-ink/10 p-4">
+        <label class="flex cursor-pointer items-start gap-3">
+          <input
+            v-model="form.limit_hours"
+            type="checkbox"
+            name="limit_hours"
+            class="mt-0.5 size-4 cursor-pointer rounded border-brand-ink/25 text-brand-blue focus:ring-brand-cyan/30"
+          />
+          <span class="min-w-0">
+            <span class="block text-sm font-medium text-brand-ink">
+              Definir horário de funcionamento do agent
+            </span>
+            <span class="mt-0.5 block text-xs leading-snug text-brand-ink/55">
+              Desmarcado, o agent responde 24 horas. Fora do horário definido ele não responde e as
+              mensagens ficam na caixa do WhatsApp para a equipe.
+            </span>
+          </span>
+        </label>
+
+        <template v-if="form.limit_hours">
+          <WeeklyHoursEditor
+            v-model="form.working_hours"
+            legend="Dias em que o agent responde"
+            allow-overnight
+            :day-errors="workingDayErrors"
+            empty-message="Marque pelo menos um dia."
+          />
+          <p class="text-xs text-brand-ink/45">
+            Para virar a madrugada, coloque o fim antes do início: sexta das 18:00 até 08:00 vale até
+            sábado às 08:00.
+          </p>
+          <p v-if="fieldErrors.working_hours" class="text-sm text-brand-ink/70" role="alert">
+            {{ fieldErrors.working_hours }}
+          </p>
+        </template>
+      </section>
 
       <p
         v-if="formError"
