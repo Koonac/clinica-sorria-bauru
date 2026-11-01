@@ -23,6 +23,43 @@ class WhatsAppService {
     // (evita duplicar no CRM e pausar o agent indevidamente).
     this.apiOutboundIds = new Map();
     this.apiOutboundPending = new Map();
+    // URLs de webhook por sessão (objeto mutável — os handlers leem daqui).
+    this.webhookData = new Map();
+  }
+
+  setWebhookData(sessionId, data = {}) {
+    let current = this.webhookData.get(sessionId);
+    if (!current) {
+      current = { notifications_url: null, messages_url: null };
+      this.webhookData.set(sessionId, current);
+    }
+    if (data.notifications_url) {
+      current.notifications_url = data.notifications_url;
+    }
+    if (data.messages_url) {
+      current.messages_url = data.messages_url;
+    } else if (current.notifications_url && !current.messages_url) {
+      current.messages_url = String(current.notifications_url).replace(
+        "/webhooks/notifications",
+        "/webhooks/messages",
+      );
+    }
+    return current;
+  }
+
+  async persistWebhookData(sessionId, data) {
+    try {
+      const SessionMetadata = getSessionMetadataModel();
+      await SessionMetadata.findOneAndUpdate(
+        { sessionId },
+        { $set: { data, updatedAt: new Date() } },
+        { upsert: true },
+      );
+    } catch (error) {
+      console.error(
+        `❌ Erro ao persistir webhooks da sessão ${sessionId}: ${error.message}`,
+      );
+    }
   }
 
   apiOutboundPendingKey(sessionId, chatId, body) {
@@ -1134,6 +1171,19 @@ class WhatsAppService {
     try {
       console.log(`🔗 Criando conexão WhatsApp para sessão: ${sessionId}`);
 
+      const liveData = this.setWebhookData(sessionId, data);
+      if (this.clients.has(sessionId)) {
+        await this.persistWebhookData(sessionId, liveData);
+        console.log(
+          `🔗 Sessão ${sessionId} já ativa; webhooks da clínica atualizados`,
+        );
+        return {
+          success: true,
+          sessionId,
+          message: "Webhooks atualizados na sessão existente",
+        };
+      }
+
       // Verificar se a sessão já existe usando MongoStore
       const sessionExists = await this.checkSessionExists(sessionId);
 
@@ -1178,7 +1228,7 @@ class WhatsAppService {
       });
 
       // Configurar todos os event handlers
-      this.setupClientEventHandlers(client, sessionId, data);
+      this.setupClientEventHandlers(client, sessionId, liveData);
 
       // Adicionar timeout mais longo para inicialização
       const initPromise = client.initialize();
@@ -1194,9 +1244,9 @@ class WhatsAppService {
       // Salvar cliente na lista
       this.clients.set(sessionId, client);
 
-      // Salvar sessão no MongoDB usando MongoStore
+      await this.persistWebhookData(sessionId, liveData);
       if (!sessionExists.exists) {
-        await this.saveSessionToDB(sessionId, "connecting", data);
+        await this.saveSessionToDB(sessionId, "connecting", liveData);
       }
 
       return {
@@ -1591,19 +1641,32 @@ class WhatsAppService {
 
   resolveSessionData(session) {
     const sessionData = session.data;
+    let notifications = null;
+    let messages = null;
 
     if (
       sessionData &&
       typeof sessionData === "object" &&
-      !(sessionData instanceof Date) &&
-      (sessionData.notifications_url || sessionData.messages_url)
+      !(sessionData instanceof Date)
     ) {
-      return sessionData;
+      notifications = sessionData.notifications_url || null;
+      messages = sessionData.messages_url || null;
+    }
+
+    if (!notifications) {
+      notifications = session.urlWebhook || null;
+    }
+
+    if (!messages && notifications) {
+      messages = String(notifications).replace(
+        "/webhooks/notifications",
+        "/webhooks/messages",
+      );
     }
 
     return {
-      notifications_url: session.urlWebhook || null,
-      messages_url: null,
+      notifications_url: notifications,
+      messages_url: messages,
     };
   }
 

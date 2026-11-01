@@ -8,6 +8,7 @@ use App\Http\Requests\Crm\UpdateConnectionSettingsRequest;
 use App\Services\Crm\ConnectWhatsappConnection;
 use App\Services\Crm\DisconnectWhatsappConnection;
 use App\Services\Crm\GetWhatsappConnectionStatus;
+use App\Services\Crm\RegisterWhatsappWebhooks;
 use App\Services\Crm\UpdateWhatsappConnectionCredentials;
 use App\Services\Crm\UpdateWhatsappConnectionSettings;
 use App\Services\Crm\UpsertClinicConnection;
@@ -18,9 +19,20 @@ use Throwable;
 
 class ConnectionController extends Controller
 {
-    public function show(Request $request, UpsertClinicConnection $upsert, GetWhatsappConnectionStatus $status): JsonResponse
-    {
+    public function show(
+        Request $request,
+        UpsertClinicConnection $upsert,
+        GetWhatsappConnectionStatus $status,
+        RegisterWhatsappWebhooks $registerWebhooks,
+    ): JsonResponse {
         $connection = $upsert->handle([], $request->user()?->id);
+        if ($connection->status === 'connected') {
+            try {
+                $registerWebhooks->handle($connection);
+            } catch (Throwable) {
+                // Sessão viva sem webhook: a tela de status tenta de novo.
+            }
+        }
 
         return response()->json(['data' => $status->publicState($connection)]);
     }

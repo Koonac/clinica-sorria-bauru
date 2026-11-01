@@ -11,6 +11,7 @@ class GetWhatsappConnectionStatus
     public function __construct(
         private UpsertClinicConnection $upsert,
         private SyncWhatsappLabels $labelSync,
+        private RegisterWhatsappWebhooks $registerWebhooks,
     ) {}
 
     /**
@@ -43,6 +44,14 @@ class GetWhatsappConnectionStatus
 
                     if (! $eraBusiness && $connection->is_business) {
                         $this->labelSync->ensurePipelineLabels($connection->fresh());
+                    }
+
+                    if ($connection->status === 'connected') {
+                        try {
+                            $this->registerWebhooks->handle($connection->fresh() ?? $connection);
+                        } catch (Throwable) {
+                            // Sessão viva sem webhook: a próxima consulta tenta de novo.
+                        }
                     }
                 }
             } catch (Throwable) {
