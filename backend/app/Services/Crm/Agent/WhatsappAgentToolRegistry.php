@@ -2,6 +2,7 @@
 
 namespace App\Services\Crm\Agent;
 
+use App\Services\Crm\Agent\Tools\ArmazenarInfoLeadTool;
 use App\Services\Crm\Agent\Tools\AtualizarConsultaTool;
 use App\Services\Crm\Agent\Tools\ConsultarServicosTool;
 use App\Services\Crm\Agent\Tools\CriarAgendamentoTool;
@@ -27,6 +28,7 @@ class WhatsappAgentToolRegistry
     public function __construct(
         EnviarRespostaTool $enviar,
         MoverLeadTool $mover,
+        ArmazenarInfoLeadTool $armazenarInfo,
         CriarAgendamentoTool $agendar,
         RegistrarPreAgendamentoTool $preAgendar,
         AtualizarConsultaTool $atualizarConsulta,
@@ -38,6 +40,7 @@ class WhatsappAgentToolRegistry
         $this->tools = [
             $enviar->name() => $enviar,
             $mover->name() => $mover,
+            $armazenarInfo->name() => $armazenarInfo,
             $agendar->name() => $agendar,
             $preAgendar->name() => $preAgendar,
             $atualizarConsulta->name() => $atualizarConsulta,

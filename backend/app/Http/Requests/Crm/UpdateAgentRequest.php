@@ -2,11 +2,13 @@
 
 namespace App\Http\Requests\Crm;
 
+use App\Http\Requests\Crm\Concerns\ValidatesAgentQualificationFields;
 use App\Http\Requests\Crm\Concerns\ValidatesAgentWorkingHours;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateAgentRequest extends FormRequest
 {
+    use ValidatesAgentQualificationFields;
     use ValidatesAgentWorkingHours;
 
     public function rules(): array
@@ -17,6 +19,7 @@ class UpdateAgentRequest extends FormRequest
             'debounce_seconds' => ['sometimes', 'integer', 'min:3', 'max:60'],
             'is_active' => ['sometimes', 'boolean'],
             ...$this->workingHoursRules(),
+            ...$this->qualificationFieldsRules(),
         ];
     }
 }

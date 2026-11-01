@@ -219,6 +219,7 @@ class WhatsappAgentRunner
         $schedulingRules = $this->schedulingRules($context);
         $appointmentsBlock = $this->appointmentsBlock($context);
         $knowledgeBlock = $this->knowledgeBlock();
+        $qualificationBlock = $this->qualificationBlock($context);
         $signalsBlock = $context->handoffSignals !== []
             ? "\nAtenção: a mensagem atual do paciente tem sinais de ".implode(', ', $context->handoffSignals)
                 .'. Avalie com cuidado se é caso de escalar_humano (com a categoria certa) antes de responder.'."\n"
@@ -237,6 +238,7 @@ Regras de operação (obrigatórias):
 - enviar_resposta deve conter apenas mensagem natural ao cliente (tom humano). Proibido: resumo interno, status de CRM, "mensagem enviada", "aguardar resposta do lead", "o lead já está no estágio…", checklists de qualificação, narrar tools usadas.
 - Não inclua seu nome, assinatura ou prefixo no início da mensagem — o sistema adiciona automaticamente.
 - Depois de mover_lead / criar_agendamento / escalar_humano / finalizar_atendimento, se precisar avisar o cliente, chame enviar_resposta com uma confirmação curta e humana — não mande relatório operacional.
+- Quando o lead informar um dado da lista "Informações a descobrir", chame armazenar_info_lead imediatamente (não só mencione no chat).
 - Use as tools para agir; não invente stage_id fora da lista abaixo.
 - Antes de oferecer horários ao lead, chame listar_horarios_disponiveis e ofereça só o que ela retornar (sem inventar).
 - Nunca cite nome, título ou descrição de outros compromissos da agenda — só horários livres.
@@ -259,10 +261,44 @@ Contexto CRM:
 - Fuso horário: America/Sao_Paulo
 - Agora: {$this->nowIso()}
 {$this->calendarBlock($context->connection->clinic_id)}
-{$appointmentsBlock}{$priorSummaries}{$signalsBlock}{$knowledgeBlock}
+{$appointmentsBlock}{$priorSummaries}{$signalsBlock}{$knowledgeBlock}{$qualificationBlock}
 Regras do agent (system prompt do cliente):
 {$rules}
 PROMPT;
+    }
+
+    private function qualificationBlock(AgentContext $context): string
+    {
+        $fields = $context->agent->normalizedQualificationFields();
+        if ($fields === []) {
+            return '';
+        }
+
+        $collected = is_array($context->lead?->qualification_data)
+            ? $context->lead->qualification_data
+            : [];
+
+        $lines = [];
+        foreach ($fields as $field) {
+            $existing = $collected[$field['key']]['value'] ?? null;
+            $status = is_string($existing) && trim($existing) !== ''
+                ? 'já coletado: '.$existing
+                : 'pendente';
+            $lines[] = '- '.$field['key'].' ('.$field['label'].'): '.$field['instruction'].' ['.$status.']';
+        }
+
+        if ($lines === []) {
+            return '';
+        }
+
+        $list = implode("\n", $lines);
+
+        return <<<BLOCK
+
+Informações a descobrir no lead (grave com armazenar_info_lead assim que souber; não só mencione no chat):
+{$list}
+
+BLOCK;
     }
 
     private function clinicName(?int $clinicId): string

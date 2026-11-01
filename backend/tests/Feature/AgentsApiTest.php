@@ -289,4 +289,39 @@ class AgentsApiTest extends TestCase
         $this->getJson('/api/v1/crm/agents')->assertOk()->assertJsonCount(0, 'data');
         $this->getJson("/api/v1/crm/agents/{$agent->id}")->assertNotFound();
     }
+
+    public function test_aceita_e_rejeita_qualification_fields(): void
+    {
+        $this->autenticar();
+
+        $this->postJson('/api/v1/crm/agents', [
+            'name' => 'Qualificador',
+            'system_prompt' => 'Qualifique.',
+            'qualification_fields' => [
+                [
+                    'key' => 'funcionarios',
+                    'label' => 'Funcionários',
+                    'instruction' => 'Descubra quantos funcionários o lead tem',
+                ],
+            ],
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.qualification_fields.0.key', 'funcionarios')
+            ->assertJsonPath('data.qualification_fields.0.label', 'Funcionários');
+
+        $this->postJson('/api/v1/crm/agents', [
+            'name' => 'Inválido chave',
+            'qualification_fields' => [
+                ['key' => 'Funcionarios', 'label' => 'X', 'instruction' => 'Y'],
+            ],
+        ])->assertUnprocessable();
+
+        $this->postJson('/api/v1/crm/agents', [
+            'name' => 'Inválido duplicado',
+            'qualification_fields' => [
+                ['key' => 'aa', 'label' => 'A', 'instruction' => 'A'],
+                ['key' => 'aa', 'label' => 'B', 'instruction' => 'B'],
+            ],
+        ])->assertUnprocessable();
+    }
 }

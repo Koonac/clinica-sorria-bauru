@@ -7,11 +7,13 @@ import {
   getAgent,
   updateAgent,
   type Agent,
+  type AgentQualificationField,
 } from '@/api/crm/agents'
 import type { BusinessHours } from '@/api/clinics'
 import Button from '@/components/Buttons/Button.vue'
 import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
 import WeeklyHoursEditor from '@/components/Forms/WeeklyHoursEditor.vue'
+import AgentQualificationFieldsEditor from '@/components/crm/AgentQualificationFieldsEditor.vue'
 import AgentToolsReference from '@/components/crm/AgentToolsReference.vue'
 import PageView from '@/components/Layout/PageView.vue'
 import { WEEK_DAYS, isValidWeek, type WeekDayKey } from '@/utils/weeklyHours'
@@ -49,6 +51,7 @@ const form = reactive({
   is_active: false,
   limit_hours: false,
   working_hours: { ...WEEKDAYS_DEFAULT } as BusinessHours,
+  qualification_fields: [] as AgentQualificationField[],
 })
 
 const fieldErrors = reactive({
@@ -57,6 +60,7 @@ const fieldErrors = reactive({
   debounce_seconds: '',
   is_active: '',
   working_hours: '',
+  qualification_fields: '',
 })
 const workingDayErrors = ref<Partial<Record<WeekDayKey, string>>>({})
 
@@ -76,8 +80,21 @@ const canSubmit = computed(() => {
     if (Object.keys(form.working_hours).length === 0) return false
     if (!isValidWeek(form.working_hours, true)) return false
   }
+  if (form.qualification_fields.some((field) => !isCompleteQualificationField(field))) {
+    return false
+  }
   return true
 })
+
+function isCompleteQualificationField(field: AgentQualificationField): boolean {
+  const empty = !field.key.trim() && !field.label.trim() && !field.instruction.trim()
+  if (empty) return true
+  return (
+    /^[a-z][a-z0-9_]{1,39}$/.test(field.key.trim()) &&
+    field.label.trim() !== '' &&
+    field.instruction.trim() !== ''
+  )
+}
 
 function clearFieldErrors() {
   fieldErrors.name = ''
@@ -85,6 +102,7 @@ function clearFieldErrors() {
   fieldErrors.debounce_seconds = ''
   fieldErrors.is_active = ''
   fieldErrors.working_hours = ''
+  fieldErrors.qualification_fields = ''
   workingDayErrors.value = {}
 }
 
@@ -95,6 +113,11 @@ function fillForm(source: Agent | null) {
   form.is_active = source?.is_active ?? false
   form.limit_hours = Boolean(source?.working_hours)
   form.working_hours = source?.working_hours ?? { ...WEEKDAYS_DEFAULT }
+  form.qualification_fields = (source?.qualification_fields ?? []).map((field) => ({
+    key: field.key,
+    label: field.label,
+    instruction: field.instruction,
+  }))
   clearFieldErrors()
   formError.value = ''
 }
@@ -106,6 +129,12 @@ function applyApiFieldErrors(details?: Record<string, string[]>) {
   fieldErrors.debounce_seconds = details.debounce_seconds?.[0] || ''
   fieldErrors.is_active = details.is_active?.[0] || ''
   fieldErrors.working_hours = details.working_hours?.[0] || ''
+  fieldErrors.qualification_fields =
+    details.qualification_fields?.[0] ||
+    details['qualification_fields.0.key']?.[0] ||
+    details['qualification_fields.0.label']?.[0] ||
+    details['qualification_fields.0.instruction']?.[0] ||
+    ''
   for (const day of WEEK_DAYS) {
     const message = details[`working_hours.${day.key}.end`]?.[0]
     if (message) workingDayErrors.value[day.key] = message
@@ -155,6 +184,12 @@ async function onSubmit() {
     return
   }
 
+  if (form.qualification_fields.some((field) => !isCompleteQualificationField(field))) {
+    fieldErrors.qualification_fields =
+      'Cada campo precisa de rótulo, chave válida (snake_case) e instrução.'
+    return
+  }
+
   loading.value = true
 
   try {
@@ -164,6 +199,13 @@ async function onSubmit() {
       debounce_seconds: Number(form.debounce_seconds),
       is_active: form.is_active,
       working_hours: form.limit_hours ? form.working_hours : null,
+      qualification_fields: form.qualification_fields
+        .map((field) => ({
+          key: field.key.trim(),
+          label: field.label.trim(),
+          instruction: field.instruction.trim(),
+        }))
+        .filter((field) => field.key || field.label || field.instruction),
     }
 
     const saved =
@@ -260,6 +302,15 @@ onMounted(() => {
               {{ fieldErrors.system_prompt }}
             </span>
           </label>
+
+          <AgentQualificationFieldsEditor v-model="form.qualification_fields" />
+          <p
+            v-if="fieldErrors.qualification_fields"
+            class="text-sm text-brand-ink/70"
+            role="alert"
+          >
+            {{ fieldErrors.qualification_fields }}
+          </p>
 
           <AgentToolsReference />
         </div>

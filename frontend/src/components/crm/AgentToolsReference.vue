@@ -42,6 +42,12 @@ const TOOLS: { name: string; description: string; mode: ToolMode }[] = [
     mode: 'sempre',
   },
   {
+    name: 'armazenar_info_lead',
+    description:
+      'Grava no cartão do lead um dado da lista “Informações a descobrir” assim que a IA obtém o valor.',
+    mode: 'sempre',
+  },
+  {
     name: 'escalar_humano',
     description:
       'Pausa a IA, transfere para um atendente e avisa a recepção (urgência, reclamação, pedido de atendente).',

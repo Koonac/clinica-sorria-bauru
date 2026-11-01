@@ -3,6 +3,7 @@ import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { ApiError } from '@/api/client'
 import { createActivity } from '@/api/crm/activities'
+import { listAgents, type AgentQualificationField } from '@/api/crm/agents'
 import { convertLead, deleteLead, getLead, updateLead } from '@/api/crm/leads'
 import { deleteDeal, getDeal, updateDeal } from '@/api/crm/deals'
 import { createTask, deleteTask, updateTask } from '@/api/crm/tasks'
@@ -77,6 +78,8 @@ const leadForm = reactive({
   lost_reason: '',
   attendance_status: 'novo' as LeadAttendanceStatus,
 })
+const qualificationForm = reactive<Record<string, string>>({})
+const agentQualificationFields = ref<AgentQualificationField[]>([])
 
 const attendanceOptions = LEAD_ATTENDANCE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))
 
@@ -130,6 +133,44 @@ const tabs = computed(() => {
   return base
 })
 
+const collectedQualification = computed(() => {
+  const data = lead.value?.qualification_data ?? {}
+  return Object.entries(data)
+    .filter(([, entry]) => entry?.value)
+    .map(([key, entry]) => ({
+      key,
+      label: entry.label || key,
+      value: entry.value,
+    }))
+})
+
+const pendingQualification = computed(() => {
+  const collected = new Set(collectedQualification.value.map((item) => item.key))
+  return agentQualificationFields.value.filter((field) => !collected.has(field.key))
+})
+
+const showQualification = computed(
+  () => collectedQualification.value.length > 0 || pendingQualification.value.length > 0,
+)
+
+function resetQualificationForm() {
+  for (const key of Object.keys(qualificationForm)) {
+    delete qualificationForm[key]
+  }
+  for (const item of collectedQualification.value) {
+    qualificationForm[item.key] = item.value
+  }
+}
+
+function qualificationPatch(): Record<string, string | null> {
+  const patch: Record<string, string | null> = {}
+  for (const item of collectedQualification.value) {
+    const current = (qualificationForm[item.key] ?? '').trim()
+    patch[item.key] = current === '' ? null : current
+  }
+  return patch
+}
+
 function aiNoteMeta(seg: WhatsappAttendanceSegment): string {
   const when = formatDateTime(seg.ai_summary_at || seg.ended_at || seg.started_at)
   const mode = seg.mode === 'ai' ? 'Agent IA' : seg.user?.name || 'Humano'
@@ -178,6 +219,14 @@ async function load() {
       leadForm.value = lead.value.value != null ? String(lead.value.value) : ''
       leadForm.lost_reason = lead.value.lost_reason || ''
       leadForm.attendance_status = lead.value.attendance_status || 'novo'
+      try {
+        const agents = await listAgents()
+        agentQualificationFields.value =
+          agents.find((agent) => agent.is_active)?.qualification_fields ?? []
+      } catch {
+        agentQualificationFields.value = []
+      }
+      resetQualificationForm()
     } else {
       deal.value = await getDeal(props.recordId)
       lead.value = null
@@ -235,6 +284,7 @@ async function saveDados() {
         value: leadForm.value === '' ? null : Number(leadForm.value),
         lost_reason: leadForm.lost_reason.trim() || null,
         attendance_status: leadForm.attendance_status,
+        qualification_data: qualificationPatch(),
       })
     } else {
       deal.value = await updateDeal(props.recordId, {
@@ -458,6 +508,31 @@ function activityLabel(a: Activity): string {
                     <Select v-model="leadForm.attendance_status" :options="attendanceOptions" />
                   </div>
                 </div>
+
+                <section v-if="showQualification" class="space-y-3 pt-2">
+                  <div>
+                    <h3 class="text-sm font-medium text-brand-ink">Informações coletadas</h3>
+                    <p class="mt-0.5 text-xs text-brand-ink/50">
+                      Dados que a IA gravou no cartão. Você pode editar os valores já salvos.
+                    </p>
+                  </div>
+                  <div
+                    v-for="item in collectedQualification"
+                    :key="item.key"
+                    class="grid gap-1"
+                  >
+                    <label :class="labelClass">{{ item.label }}</label>
+                    <input v-model="qualificationForm[item.key]" :class="inputClass" />
+                  </div>
+                  <div
+                    v-for="field in pendingQualification"
+                    :key="field.key"
+                    class="rounded-xl border border-dashed border-brand-ink/15 bg-[#f8fafb] px-3 py-2"
+                  >
+                    <p class="text-xs font-medium text-brand-ink/70">{{ field.label }}</p>
+                    <p class="mt-0.5 text-xs text-brand-ink/45">Aguardando IA · {{ field.instruction }}</p>
+                  </div>
+                </section>
               </template>
               <template v-else>
                 <div class="grid gap-3 sm:grid-cols-2">

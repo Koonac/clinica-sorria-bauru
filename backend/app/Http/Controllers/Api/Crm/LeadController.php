@@ -9,10 +9,12 @@ use App\Http\Requests\Crm\StoreLeadRequest;
 use App\Http\Requests\Crm\UpdateLeadRequest;
 use App\Models\Crm\Lead;
 use App\Models\Crm\PipelineStage;
+use App\Models\Crm\Agent;
 use App\Services\Crm\ConvertLead;
 use App\Services\Crm\EnsureContactForLead;
 use App\Services\Crm\FinalizeWhatsappConversationForLead;
 use App\Services\Crm\MoveLead;
+use App\Services\Crm\StoreLeadQualificationData;
 use App\Services\Crm\PauseWhatsappAgentIndefinitelyForLead;
 use App\Services\Crm\PauseWhatsappAgentWithAutoResumeForLead;
 use App\Services\Crm\ResumeWhatsappAgentForLead;
@@ -109,11 +111,18 @@ class LeadController extends Controller
         PauseWhatsappAgentWithAutoResumeForLead $pauseWithResume,
         UpsertClinicConnection $upsertConnection,
         TrackWhatsappAttendanceSegment $attendance,
+        StoreLeadQualificationData $storeQualification,
     ): JsonResponse {
         $data = $request->validated();
+        $qualificationPatch = array_key_exists('qualification_data', $data)
+            ? $data['qualification_data']
+            : null;
+        unset($data['qualification_data']);
         $previousOwnerId = $lead->owner_id;
 
-        $lead->update($data);
+        if ($data !== []) {
+            $lead->update($data);
+        }
 
         $ownerChanged = array_key_exists('owner_id', $data)
             && $data['owner_id'] !== null
@@ -144,6 +153,14 @@ class LeadController extends Controller
                 (int) $data['owner_id'],
                 $previousOwnerId ? 'transfer' : 'assume',
             );
+        }
+
+        if (is_array($qualificationPatch)) {
+            $clinicId = (int) ($lead->clinic_id ?? 0);
+            $agent = $clinicId > 0
+                ? Agent::activeForClinic($clinicId)
+                : null;
+            $lead = $storeQualification->applyMap($lead->fresh() ?? $lead, $qualificationPatch, $agent);
         }
 
         return response()->json(['data' => $lead->fresh(['contact', 'organization', 'owner', 'source', 'stage'])]);

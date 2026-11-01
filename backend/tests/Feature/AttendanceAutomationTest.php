@@ -176,6 +176,75 @@ class AttendanceAutomationTest extends TestCase
         $this->assertStringNotContainsString('Pix escondido', $system);
     }
 
+    public function test_tool_armazenar_info_lead_grava_qualification_data(): void
+    {
+        Http::fake([
+            'openrouter.ai/*' => Http::sequence()
+                ->push($this->toolCallsResponse([
+                    ['name' => 'armazenar_info_lead', 'arguments' => ['campo' => 'funcionarios', 'valor' => '50']],
+                    ['name' => 'enviar_resposta', 'arguments' => ['texto' => 'Anotado, obrigado!']],
+                ]))
+                ->push(['choices' => [['message' => ['role' => 'assistant', 'content' => null, 'tool_calls' => []]]]]),
+            'whatsapp.test/*' => Http::response(['success' => true, 'to' => '5511999990000@c.us', 'messageId' => 'out-1']),
+        ]);
+
+        [$user, $connection] = $this->userWithWhatsappConnection();
+        $this->agentAtivo($user)->update([
+            'qualification_fields' => [
+                [
+                    'key' => 'funcionarios',
+                    'label' => 'Funcionários',
+                    'instruction' => 'Descubra quantos funcionários o lead tem',
+                ],
+            ],
+        ]);
+        $lead = $this->lead($user);
+        $this->message($user, $connection, $lead, 'inbound', 'Somos em 50 pessoas.');
+
+        $this->runAiJob($connection, $lead);
+
+        $fresh = $lead->fresh();
+        $this->assertSame('50', $fresh->qualification_data['funcionarios']['value'] ?? null);
+        $this->assertSame('Funcionários', $fresh->qualification_data['funcionarios']['label'] ?? null);
+
+        $system = $this->openRouterRequests()[0]['messages'][0]['content'];
+        $this->assertStringContainsString('Informações a descobrir no lead', $system);
+        $this->assertStringContainsString('funcionarios', $system);
+        $this->assertContains(
+            'armazenar_info_lead',
+            array_map(fn ($t) => $t['function']['name'], $this->openRouterRequests()[0]['tools']),
+        );
+    }
+
+    public function test_tool_armazenar_info_lead_rejeita_key_fora_da_lista(): void
+    {
+        Http::fake([
+            'openrouter.ai/*' => Http::sequence()
+                ->push($this->toolCallsResponse([
+                    ['name' => 'armazenar_info_lead', 'arguments' => ['campo' => 'cnpj', 'valor' => '00.000.000/0001-00']],
+                ]))
+                ->push(['choices' => [['message' => ['role' => 'assistant', 'content' => null, 'tool_calls' => []]]]]),
+            'whatsapp.test/*' => Http::response(['success' => true, 'to' => '5511999990000@c.us', 'messageId' => 'out-1']),
+        ]);
+
+        [$user, $connection] = $this->userWithWhatsappConnection();
+        $this->agentAtivo($user)->update([
+            'qualification_fields' => [
+                [
+                    'key' => 'funcionarios',
+                    'label' => 'Funcionários',
+                    'instruction' => 'Descubra quantos funcionários o lead tem',
+                ],
+            ],
+        ]);
+        $lead = $this->lead($user);
+        $this->message($user, $connection, $lead, 'inbound', 'Meu CNPJ é 00.000.000/0001-00');
+
+        $this->runAiJob($connection, $lead);
+
+        $this->assertArrayNotHasKey('cnpj', $lead->fresh()->qualification_data ?? []);
+    }
+
     // --- Status de atendimento ---
 
     public function test_inbound_e_resposta_da_ia_atualizam_status_de_atendimento(): void

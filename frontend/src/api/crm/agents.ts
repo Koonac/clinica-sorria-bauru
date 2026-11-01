@@ -2,6 +2,12 @@ import { api, toApiError } from '@/api/client'
 import type { BusinessHours } from '@/api/clinics'
 import type { DataResponse } from '@/api/crm/types'
 
+export type AgentQualificationField = {
+  key: string
+  label: string
+  instruction: string
+}
+
 export type Agent = {
   id: number
   clinic_id: number | null
@@ -12,6 +18,7 @@ export type Agent = {
   is_active: boolean
   /** Null = atende 24 horas. */
   working_hours: BusinessHours | null
+  qualification_fields?: AgentQualificationField[] | null
   created_at: string
   updated_at: string
 }
@@ -22,6 +29,7 @@ export type CreateAgentPayload = {
   debounce_seconds?: number
   is_active?: boolean
   working_hours?: BusinessHours | null
+  qualification_fields?: AgentQualificationField[] | null
 }
 
 export type UpdateAgentPayload = {
@@ -30,6 +38,7 @@ export type UpdateAgentPayload = {
   debounce_seconds?: number
   is_active?: boolean
   working_hours?: BusinessHours | null
+  qualification_fields?: AgentQualificationField[] | null
 }
 
 type AgentsListResponse = {

@@ -21,6 +21,7 @@ class Agent extends Model
         'debounce_seconds',
         'is_active',
         'working_hours',
+        'qualification_fields',
     ];
 
     protected function casts(): array
@@ -29,7 +30,50 @@ class Agent extends Model
             'is_active' => 'boolean',
             'debounce_seconds' => 'integer',
             'working_hours' => 'array',
+            'qualification_fields' => 'array',
         ];
+    }
+
+    /**
+     * @return list<array{key: string, label: string, instruction: string}>
+     */
+    public function normalizedQualificationFields(): array
+    {
+        if (! is_array($this->qualification_fields)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($this->qualification_fields as $field) {
+            if (! is_array($field)) {
+                continue;
+            }
+            $key = trim((string) ($field['key'] ?? ''));
+            if ($key === '') {
+                continue;
+            }
+            $out[] = [
+                'key' => $key,
+                'label' => trim((string) ($field['label'] ?? $key)) ?: $key,
+                'instruction' => trim((string) ($field['instruction'] ?? '')),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{key: string, label: string, instruction: string}|null
+     */
+    public function findQualificationField(string $key): ?array
+    {
+        foreach ($this->normalizedQualificationFields() as $field) {
+            if ($field['key'] === $key) {
+                return $field;
+            }
+        }
+
+        return null;
     }
 
     public function user(): BelongsTo

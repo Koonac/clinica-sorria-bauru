@@ -66,6 +66,7 @@ class Lead extends Model
         'attendance_status',
         'whatsapp_follow_up_step',
         'whatsapp_follow_up_due_at',
+        'qualification_data',
     ];
 
     protected $attributes = [
@@ -84,6 +85,7 @@ class Lead extends Model
             'whatsapp_agent_resume_at' => 'datetime',
             'whatsapp_conversation_closed_at' => 'datetime',
             'whatsapp_auto_close_at' => 'datetime',
+            'qualification_data' => 'array',
         ];
     }
 

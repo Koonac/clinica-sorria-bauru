@@ -3,7 +3,14 @@ import { computed, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import LeadAttendanceBadge from '@/components/crm/LeadAttendanceBadge.vue'
 import draggable from 'vuedraggable'
-import type { Deal, Lead, LeadAttendanceStatus, PipelineKind, PipelineStage } from '@/api/crm/types'
+import type {
+  Deal,
+  Lead,
+  LeadAttendanceStatus,
+  LeadQualificationEntry,
+  PipelineKind,
+  PipelineStage,
+} from '@/api/crm/types'
 import { formatMoney } from '@/api/crm/types'
 import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
 import { daysSince, formatDateTime } from '@/utils/crmFormat'
@@ -80,6 +87,24 @@ function cardValue(card: Lead | Deal): string | number | null | undefined {
 
 function isLead(card: Lead | Deal): card is Lead {
   return props.kind === 'lead'
+}
+
+const QUALIFICATION_CHIP_LIMIT = 3
+
+function qualificationEntries(card: Lead): Array<LeadQualificationEntry & { key: string }> {
+  const data = card.qualification_data
+  if (!data) return []
+  return Object.entries(data)
+    .filter(([, entry]) => entry?.value)
+    .map(([key, entry]) => ({ key, ...entry }))
+}
+
+function visibleQualification(card: Lead): Array<LeadQualificationEntry & { key: string }> {
+  return qualificationEntries(card).slice(0, QUALIFICATION_CHIP_LIMIT)
+}
+
+function extraQualificationCount(card: Lead): number {
+  return Math.max(0, qualificationEntries(card).length - QUALIFICATION_CHIP_LIMIT)
 }
 
 function onCardChange(stage: PipelineStage, evt: { added?: { element: Lead | Deal } }) {
@@ -249,6 +274,26 @@ function stageSum(stage: PipelineStage): number {
                         <Icon icon="lucide:sticky-note" class="size-3.5" />
                       </button>
                     </div>
+                  </div>
+
+                  <div
+                    v-if="isLead(card) && visibleQualification(card).length"
+                    class="mt-2 flex flex-wrap gap-1"
+                  >
+                    <span
+                      v-for="entry in visibleQualification(card)"
+                      :key="entry.key"
+                      class="inline-flex max-w-full items-center rounded-md bg-brand-cyan/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-cyan-ink"
+                      :title="`${entry.label}: ${entry.value}`"
+                    >
+                      <span class="truncate">{{ entry.label }}: {{ entry.value }}</span>
+                    </span>
+                    <span
+                      v-if="extraQualificationCount(card)"
+                      class="inline-flex items-center rounded-md bg-brand-ink/5 px-1.5 py-0.5 text-[10px] font-medium text-brand-ink/55"
+                    >
+                      +{{ extraQualificationCount(card) }}
+                    </span>
                   </div>
 
                   <div class="mt-2 flex flex-wrap gap-1.5">

@@ -97,6 +97,14 @@ export type WhatsappAttendanceSegment = {
   user?: CrmUserRef | null
 }
 
+export type LeadQualificationEntry = {
+  label: string
+  value: string
+  updated_at?: string
+}
+
+export type LeadQualificationData = Record<string, LeadQualificationEntry>
+
 export type Lead = {
   id: number
   title: string
@@ -121,6 +129,7 @@ export type Lead = {
   whatsapp_conversation_closed_by?: number | null
   whatsapp_auto_close_at?: string | null
   attendance_status?: LeadAttendanceStatus
+  qualification_data?: LeadQualificationData | null
   whatsapp_follow_up_step?: number
   whatsapp_follow_up_due_at?: string | null
   converted_deal_id?: number | null
@@ -264,6 +273,7 @@ export type UpdateLeadPayload = Partial<
     lost_reason?: string | null
     owner_id?: number | null
     attendance_status?: LeadAttendanceStatus
+    qualification_data?: Record<string, string | null>
   }
 >
 
