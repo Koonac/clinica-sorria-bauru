@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Auth\UserController;
 use App\Http\Controllers\Api\Crm\ActivityController;
 use App\Http\Controllers\Api\Crm\AgentController;
 use App\Http\Controllers\Api\Crm\AppointmentController;
+use App\Http\Controllers\Api\Crm\CalendarController;
 use App\Http\Controllers\Api\Crm\AttendantController;
 use App\Http\Controllers\Api\Crm\ClinicController;
 use App\Http\Controllers\Api\Crm\ClinicKnowledgeController;
@@ -117,6 +118,12 @@ Route::prefix('v1/crm')->middleware(['auth:sanctum', 'clinic'])->group(function 
     Route::post('appointments/{appointment}/confirm', [AppointmentController::class, 'confirm']);
     Route::post('appointments/{appointment}/cancel', [AppointmentController::class, 'cancel']);
     Route::post('appointments/{appointment}/outcome', [AppointmentController::class, 'outcome']);
+
+    Route::get('calendar/status', [CalendarController::class, 'status']);
+    Route::get('calendar/events', [CalendarController::class, 'events']);
+    Route::post('calendar/events', [CalendarController::class, 'store']);
+    Route::patch('calendar/events/{eventId}', [CalendarController::class, 'update']);
+    Route::delete('calendar/events/{eventId}', [CalendarController::class, 'destroy']);
 
     Route::get('stats/leads-por-dia', [StatsController::class, 'leadsPorDia'])->middleware('role:admin,developer');
     Route::get('stats/attendance', [StatsController::class, 'attendance'])->middleware('role:admin,developer');

@@ -76,7 +76,7 @@ class GoogleCalendarClient
 
     /**
      * @param  array{summary: string, description?: string|null, location?: string|null, start: string, end: string, allDay?: bool}  $payload
-     * @return array{id: string, summary: string, description: string, htmlLink: string|null, start: string|null, end: string|null}
+     * @return array{id: string, summary: string, description: string, location: string, htmlLink: string|null, allDay: bool, start: string|null, end: string|null}
      */
     public function createEvent(array $payload): array
     {
@@ -113,29 +113,89 @@ class GoogleCalendarClient
         }
 
         $ev = $response->json();
-        if (! is_array($ev) || empty($ev['id'])) {
+        $normalized = is_array($ev) ? $this->normalizeEvent($ev) : null;
+        if ($normalized === null) {
             throw new RuntimeException('Google Calendar não retornou o evento criado.');
         }
 
-        $isAllDay = ! empty($ev['start']['date']) && empty($ev['start']['dateTime']);
+        if ($normalized['summary'] === '(Sem título)') {
+            $normalized['summary'] = $body['summary'];
+        }
 
-        return [
-            'id' => (string) $ev['id'],
-            'summary' => (string) ($ev['summary'] ?? $body['summary']),
-            'description' => (string) ($ev['description'] ?? ''),
-            'htmlLink' => isset($ev['htmlLink']) ? (string) $ev['htmlLink'] : null,
-            'start' => $isAllDay
-                ? ($ev['start']['date'] ?? null)
-                : ($ev['start']['dateTime'] ?? null),
-            'end' => $isAllDay
-                ? ($ev['end']['date'] ?? null)
-                : ($ev['end']['dateTime'] ?? null),
-        ];
+        return $normalized;
+    }
+
+    /**
+     * @return list<array{id: string, summary: string, description: string, location: string, htmlLink: string|null, allDay: bool, start: string|null, end: string|null}>
+     */
+    public function listEvents(string $timeMinIso, string $timeMaxIso): array
+    {
+        if (! $this->configured()) {
+            throw new RuntimeException('Google Calendar não configurado. Defina GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET e o refresh token da clínica.');
+        }
+
+        try {
+            $min = new \DateTimeImmutable($timeMinIso);
+            $max = new \DateTimeImmutable($timeMaxIso);
+        } catch (\Exception) {
+            throw new RuntimeException('timeMin/timeMax inválidos.');
+        }
+        if ($max <= $min) {
+            throw new RuntimeException('timeMax deve ser posterior a timeMin.');
+        }
+
+        $token = $this->accessToken();
+        $calendarId = rawurlencode($this->calendarId());
+        $events = [];
+        $pageToken = null;
+
+        do {
+            $query = [
+                'timeMin' => $min->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z'),
+                'timeMax' => $max->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z'),
+                'singleEvents' => 'true',
+                'orderBy' => 'startTime',
+                'maxResults' => 250,
+            ];
+            if (is_string($pageToken) && $pageToken !== '') {
+                $query['pageToken'] = $pageToken;
+            }
+
+            $response = Http::withToken($token)
+                ->acceptJson()
+                ->timeout(30)
+                ->get(self::API_BASE.'/calendars/'.$calendarId.'/events', $query);
+
+            if ($response->failed()) {
+                $detail = $response->json('error.message')
+                    ?? $response->json('error_description')
+                    ?? mb_substr($response->body(), 0, 300);
+                throw new RuntimeException('Google Calendar erro ao listar ('.$response->status().'): '.$detail);
+            }
+
+            $items = $response->json('items');
+            if (is_array($items)) {
+                foreach ($items as $item) {
+                    if (! is_array($item)) {
+                        continue;
+                    }
+                    $normalized = $this->normalizeEvent($item);
+                    if ($normalized !== null) {
+                        $events[] = $normalized;
+                    }
+                }
+            }
+
+            $next = $response->json('nextPageToken');
+            $pageToken = is_string($next) && $next !== '' ? $next : null;
+        } while ($pageToken !== null);
+
+        return $events;
     }
 
     /**
      * @param  array{summary?: string, description?: string|null, location?: string|null, start?: string, end?: string, allDay?: bool}  $payload
-     * @return array{id: string, summary: string, description: string, htmlLink: string|null, start: string|null, end: string|null}
+     * @return array{id: string, summary: string, description: string, location: string, htmlLink: string|null, allDay: bool, start: string|null, end: string|null}
      */
     public function updateEvent(string $eventId, array $payload): array
     {
@@ -185,24 +245,12 @@ class GoogleCalendarClient
         }
 
         $ev = $response->json();
-        if (! is_array($ev) || empty($ev['id'])) {
+        $normalized = is_array($ev) ? $this->normalizeEvent($ev) : null;
+        if ($normalized === null) {
             throw new RuntimeException('Google Calendar não retornou o evento atualizado.');
         }
 
-        $isAllDay = ! empty($ev['start']['date']) && empty($ev['start']['dateTime']);
-
-        return [
-            'id' => (string) $ev['id'],
-            'summary' => (string) ($ev['summary'] ?? ''),
-            'description' => (string) ($ev['description'] ?? ''),
-            'htmlLink' => isset($ev['htmlLink']) ? (string) $ev['htmlLink'] : null,
-            'start' => $isAllDay
-                ? ($ev['start']['date'] ?? null)
-                : ($ev['start']['dateTime'] ?? null),
-            'end' => $isAllDay
-                ? ($ev['end']['date'] ?? null)
-                : ($ev['end']['dateTime'] ?? null),
-        ];
+        return $normalized;
     }
 
     public function deleteEvent(string $eventId): void
@@ -339,6 +387,34 @@ class GoogleCalendarClient
         }
 
         return (string) $response->json('access_token');
+    }
+
+    /**
+     * @param  array<string, mixed>  $ev
+     * @return array{id: string, summary: string, description: string, location: string, htmlLink: string|null, allDay: bool, start: string|null, end: string|null}|null
+     */
+    private function normalizeEvent(array $ev): ?array
+    {
+        if (empty($ev['id']) || ($ev['status'] ?? null) === 'cancelled') {
+            return null;
+        }
+
+        $isAllDay = ! empty($ev['start']['date']) && empty($ev['start']['dateTime']);
+
+        return [
+            'id' => (string) $ev['id'],
+            'summary' => (string) ($ev['summary'] ?? '(Sem título)'),
+            'description' => (string) ($ev['description'] ?? ''),
+            'location' => (string) ($ev['location'] ?? ''),
+            'htmlLink' => isset($ev['htmlLink']) ? (string) $ev['htmlLink'] : null,
+            'allDay' => $isAllDay,
+            'start' => $isAllDay
+                ? ($ev['start']['date'] ?? null)
+                : ($ev['start']['dateTime'] ?? null),
+            'end' => $isAllDay
+                ? ($ev['end']['date'] ?? null)
+                : ($ev['end']['dateTime'] ?? null),
+        ];
     }
 
     /**

@@ -2,25 +2,41 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { ApiError } from '@/api/client'
+import {
+  getCalendarStatus,
+  listCalendarEvents,
+  type CalendarEvent,
+  type CalendarStatus,
+} from '@/api/crm/calendar'
 import { getPipeline } from '@/api/crm/pipeline'
 import { listTasks } from '@/api/crm/tasks'
 import type { CrmTask } from '@/api/crm/types'
+import GoogleEventModal from '@/components/Modals/GoogleEventModal.vue'
 import TaskEventModal from '@/components/Modals/TaskEventModal.vue'
 import Button from '@/components/Buttons/Button.vue'
 import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
 import PageView from '@/components/Layout/PageView.vue'
+import { useClinicsStore } from '@/stores/clinics'
 import { endOfMonth, monthGrid, startOfMonth, ymd } from '@/utils/crmFormat'
 
+const clinics = useClinicsStore()
 const visibleMonth = ref(startOfMonth(new Date()))
 const tasks = ref<CrmTask[]>([])
+const events = ref<CalendarEvent[]>([])
+const calendarStatus = ref<CalendarStatus | null>(null)
 const loading = ref(true)
 const error = ref('')
 const pendingOnly = ref(false)
 const modalOpen = ref(false)
+const googleModalOpen = ref(false)
 const editingTask = ref<CrmTask | null>(null)
+const editingEvent = ref<CalendarEvent | null>(null)
 const defaultDueAt = ref<string | null>(null)
+const defaultEventDay = ref<string | null>(null)
 const leadOptions = ref<Array<{ id: number; label: string }>>([])
 const dealOptions = ref<Array<{ id: number; label: string }>>([])
+
+const isGoogle = computed(() => calendarStatus.value?.provedor === 'google')
 
 const monthLabel = computed(() =>
   new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(visibleMonth.value),
@@ -36,6 +52,56 @@ const tasksByDay = computed(() => {
     const list = map.get(key) || []
     list.push(task)
     map.set(key, list)
+  }
+  return map
+})
+
+function addDaysYmd(isoDate: string, days: number): string {
+  const parts = isoDate.split('-').map((part) => Number(part))
+  const year = parts[0] ?? 1970
+  const month = parts[1] ?? 1
+  const day = parts[2] ?? 1
+  const date = new Date(year, month - 1, day)
+  date.setDate(date.getDate() + days)
+  return ymd(date)
+}
+
+function eventCoversDay(event: CalendarEvent, dayIso: string): boolean {
+  if (event.allDay) {
+    const start = String(event.start || '').slice(0, 10)
+    let endExclusive = String(event.end || '').slice(0, 10)
+    if (!start) return false
+    if (!endExclusive || endExclusive <= start) {
+      endExclusive = addDaysYmd(start, 1)
+    }
+    return dayIso >= start && dayIso < endExclusive
+  }
+
+  const start = event.start ? new Date(event.start) : null
+  if (!start || Number.isNaN(start.getTime())) return false
+  const end = event.end ? new Date(event.end) : start
+  const startDay = ymd(start)
+  const endDay = Number.isNaN(end.getTime()) ? startDay : ymd(end)
+  if (
+    !Number.isNaN(end.getTime()) &&
+    end.getHours() === 0 &&
+    end.getMinutes() === 0 &&
+    end.getSeconds() === 0 &&
+    endDay > startDay
+  ) {
+    return dayIso >= startDay && dayIso < endDay
+  }
+  return dayIso >= startDay && dayIso <= endDay
+}
+
+const eventsByDay = computed(() => {
+  const map = new Map<string, CalendarEvent[]>()
+  for (const day of cells.value) {
+    const key = ymd(day)
+    map.set(
+      key,
+      events.value.filter((event) => eventCoversDay(event, key)),
+    )
   }
   return map
 })
@@ -61,16 +127,41 @@ async function loadOptions() {
 }
 
 async function loadTasks() {
+  const from = startOfMonth(visibleMonth.value)
+  const to = endOfMonth(visibleMonth.value)
+  tasks.value = await listTasks({
+    due_from: ymd(from),
+    due_to: ymd(to),
+    pending: pendingOnly.value || undefined,
+  })
+}
+
+async function loadGoogleEvents() {
+  const grid = cells.value
+  const first = grid[0]
+  const last = grid[grid.length - 1]
+  if (!first || !last) {
+    events.value = []
+    return
+  }
+  const timeMin = new Date(first.getFullYear(), first.getMonth(), first.getDate()).toISOString()
+  const timeMax = new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1).toISOString()
+  events.value = await listCalendarEvents({ timeMin, timeMax })
+}
+
+async function loadAgenda() {
   loading.value = true
   error.value = ''
   try {
-    const from = startOfMonth(visibleMonth.value)
-    const to = endOfMonth(visibleMonth.value)
-    tasks.value = await listTasks({
-      due_from: ymd(from),
-      due_to: ymd(to),
-      pending: pendingOnly.value || undefined,
-    })
+    calendarStatus.value = await getCalendarStatus()
+    if (calendarStatus.value.provedor === 'google') {
+      events.value = []
+      await loadGoogleEvents()
+      tasks.value = []
+    } else {
+      events.value = []
+      await loadTasks()
+    }
   } catch (e) {
     error.value = e instanceof ApiError ? e.message : 'Não foi possível carregar a agenda.'
   } finally {
@@ -95,6 +186,12 @@ function goToday() {
 }
 
 function openNew(day?: Date) {
+  if (isGoogle.value) {
+    editingEvent.value = null
+    defaultEventDay.value = day ? ymd(day) : ymd(new Date())
+    googleModalOpen.value = true
+    return
+  }
   editingTask.value = null
   if (day) {
     const d = new Date(day)
@@ -112,8 +209,27 @@ function openTask(task: CrmTask) {
   modalOpen.value = true
 }
 
+function openEvent(event: CalendarEvent) {
+  editingEvent.value = event
+  defaultEventDay.value = null
+  googleModalOpen.value = true
+}
+
 function dayTasks(day: Date): CrmTask[] {
   return tasksByDay.value.get(ymd(day)) || []
+}
+
+function dayEvents(day: Date): CalendarEvent[] {
+  return eventsByDay.value.get(ymd(day)) || []
+}
+
+function eventLabel(event: CalendarEvent): string {
+  if (event.allDay) return event.summary
+  if (!event.start) return event.summary
+  const date = new Date(event.start)
+  if (Number.isNaN(date.getTime())) return event.summary
+  const time = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  return `${time} ${event.summary}`
 }
 
 function isSameMonth(day: Date): boolean {
@@ -123,21 +239,23 @@ function isSameMonth(day: Date): boolean {
   )
 }
 
-watch([visibleMonth, pendingOnly], () => {
-  void loadTasks()
+watch([visibleMonth, pendingOnly, () => clinics.activeClinicId], () => {
+  void loadAgenda()
 })
 
 onMounted(() => {
   void loadOptions()
-  void loadTasks()
+  void loadAgenda()
 })
 </script>
 
 <template>
   <PageView title="Agenda">
     <template #actions>
-      <Button variant="secondary" icon="lucide:refresh-cw" @click="loadTasks">Atualizar</Button>
-      <Button icon="lucide:plus" @click="openNew()">Nova tarefa</Button>
+      <Button variant="secondary" icon="lucide:refresh-cw" @click="loadAgenda">Atualizar</Button>
+      <Button :icon="isGoogle ? 'lucide:calendar-plus' : 'lucide:plus'" @click="openNew()">
+        {{ isGoogle ? 'Novo evento' : 'Nova tarefa' }}
+      </Button>
     </template>
 
     <div class="flex min-h-0 flex-1 flex-col gap-4">
@@ -169,10 +287,13 @@ onMounted(() => {
           <span
             class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink/55"
           >
-            <Icon icon="lucide:check-square" class="size-3.5 text-brand-cyan-ink" />
-            Tarefas do CRM
+            <Icon
+              :icon="isGoogle ? 'lucide:calendar-days' : 'lucide:check-square'"
+              class="size-3.5 text-brand-cyan-ink"
+            />
+            {{ isGoogle ? 'Google Agenda' : 'Tarefas do CRM' }}
           </span>
-          <label class="inline-flex items-center gap-2 text-sm text-brand-ink/65">
+          <label v-if="!isGoogle" class="inline-flex items-center gap-2 text-sm text-brand-ink/65">
             <input
               v-model="pendingOnly"
               type="checkbox"
@@ -223,7 +344,25 @@ onMounted(() => {
               {{ day.getDate() }}
             </span>
 
-            <div class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
+            <div v-if="isGoogle" class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
+              <button
+                v-for="event in dayEvents(day).slice(0, 3)"
+                :key="event.id"
+                type="button"
+                class="truncate rounded-md bg-brand-blue/10 px-1.5 py-0.5 text-left text-[11px] font-medium text-brand-ink"
+                @click.stop="openEvent(event)"
+              >
+                {{ eventLabel(event) }}
+              </button>
+              <span
+                v-if="dayEvents(day).length > 3"
+                class="px-1 text-[10px] font-medium text-brand-ink/45"
+              >
+                +{{ dayEvents(day).length - 3 }} mais
+              </span>
+            </div>
+
+            <div v-else class="flex min-h-0 flex-1 flex-col gap-0.5 overflow-hidden">
               <button
                 v-for="task in dayTasks(day).slice(0, 3)"
                 :key="task.id"
@@ -256,8 +395,15 @@ onMounted(() => {
       :default-due-at="defaultDueAt"
       :lead-options="leadOptions"
       :deal-options="dealOptions"
-      @saved="loadTasks"
-      @deleted="loadTasks"
+      @saved="loadAgenda"
+      @deleted="loadAgenda"
+    />
+    <GoogleEventModal
+      v-model:open="googleModalOpen"
+      :event="editingEvent"
+      :default-day="defaultEventDay"
+      @saved="loadAgenda"
+      @deleted="loadAgenda"
     />
   </PageView>
 </template>
