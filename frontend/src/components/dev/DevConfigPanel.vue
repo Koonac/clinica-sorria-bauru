@@ -24,14 +24,36 @@ const clinics = useClinicsStore()
 
 const loading = ref(true)
 const saving = ref(false)
+const savingAgent = ref(false)
 const savingMedia = ref(false)
 const savingRetention = ref(false)
 const error = ref('')
 const success = ref('')
+const agentSuccess = ref('')
 const mediaSuccess = ref('')
 const retentionSuccess = ref('')
 const prompt = ref('')
+const agentPrompt = ref('')
 const fieldError = ref('')
+const agentFieldError = ref('')
+
+const agentPlaceholders = [
+  '{agent_name}',
+  '{clinic_name}',
+  '{clinic_intro}',
+  '{scheduling_rules}',
+  '{lead_block}',
+  '{stages_json}',
+  '{timezone}',
+  '{now}',
+  '{calendar_block}',
+  '{appointments_block}',
+  '{prior_summaries}',
+  '{signals_block}',
+  '{knowledge_block}',
+  '{qualification_block}',
+  '{agent_rules}',
+]
 
 const credentialsLoading = ref(true)
 const credentialsSaving = ref(false)
@@ -99,6 +121,7 @@ const languageSelectOptions = computed(() =>
 
 function applySettings(settings: SystemSettings) {
   prompt.value = settings.ai_attendance_summary_system_prompt || ''
+  agentPrompt.value = settings.whatsapp_agent_system_prompt || ''
   media.value.openrouter_transcription_model = settings.openrouter_transcription_model || ''
   media.value.openrouter_transcription_language = settings.openrouter_transcription_language || ''
   media.value.openrouter_vision_model = settings.openrouter_vision_model || ''
@@ -184,8 +207,10 @@ async function load() {
   loading.value = true
   error.value = ''
   success.value = ''
+  agentSuccess.value = ''
   mediaSuccess.value = ''
   retentionSuccess.value = ''
+  agentFieldError.value = ''
   mediaErrors.value = {}
   retentionErrors.value = {}
   try {
@@ -228,6 +253,35 @@ async function save() {
     }
   } finally {
     saving.value = false
+  }
+}
+
+async function saveAgent() {
+  if (savingAgent.value) return
+  agentFieldError.value = ''
+  agentSuccess.value = ''
+  error.value = ''
+
+  if (agentPrompt.value.trim().length < 20) {
+    agentFieldError.value = 'Informe um prompt com pelo menos 20 caracteres.'
+    return
+  }
+
+  savingAgent.value = true
+  try {
+    const settings = await updateSystemSettings({
+      whatsapp_agent_system_prompt: agentPrompt.value,
+    })
+    agentPrompt.value = settings.whatsapp_agent_system_prompt
+    agentSuccess.value = 'Configuração salva.'
+  } catch (e) {
+    if (e instanceof ApiError) {
+      agentFieldError.value = e.details?.whatsapp_agent_system_prompt?.[0] || e.message
+    } else {
+      error.value = 'Não foi possível salvar.'
+    }
+  } finally {
+    savingAgent.value = false
   }
 }
 
@@ -431,6 +485,48 @@ onMounted(() => {
         <div class="mt-4 flex flex-wrap gap-2">
           <Button :loading="saving" icon="lucide:save" @click="save">Salvar</Button>
           <Button variant="secondary" :disabled="saving" icon="lucide:refresh-cw" @click="load">
+            Recarregar
+          </Button>
+        </div>
+      </div>
+
+      <div class="rounded-2xl border border-brand-ink/10 bg-white p-5">
+        <h2 class="text-base font-semibold text-brand-ink">Agent WhatsApp</h2>
+        <p class="mt-1 text-sm text-brand-ink/60">
+          Wrapper global injetado em toda resposta do agent (todas as clínicas). O system prompt
+          cadastrado no agent entra em
+          <code class="text-brand-ink/80">{agent_rules}</code>
+          — não substitui este texto.
+        </p>
+
+        <label class="mt-5 flex flex-col gap-1.5">
+          <span class="text-sm font-medium text-brand-ink/80">System prompt do runner</span>
+          <textarea
+            v-model="agentPrompt"
+            rows="18"
+            class="w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 font-mono text-sm text-brand-ink outline-none transition focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
+          />
+          <span class="text-xs leading-5 text-brand-ink/50">
+            Placeholders preenchidos na hora:
+            <span class="font-mono">{{ agentPlaceholders.join(' ') }}</span>
+          </span>
+          <span v-if="agentFieldError" class="text-sm text-brand-ink/70" role="alert">
+            {{ agentFieldError }}
+          </span>
+        </label>
+
+        <p v-if="agentSuccess" class="mt-3 text-sm text-brand-cyan-ink" role="status">
+          {{ agentSuccess }}
+        </p>
+
+        <div class="mt-4 flex flex-wrap gap-2">
+          <Button :loading="savingAgent" icon="lucide:save" @click="saveAgent">Salvar</Button>
+          <Button
+            variant="secondary"
+            :disabled="savingAgent"
+            icon="lucide:refresh-cw"
+            @click="load"
+          >
             Recarregar
           </Button>
         </div>

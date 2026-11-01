@@ -8,10 +8,11 @@ use App\Models\Crm\Connection;
 use App\Models\Crm\PipelineStage;
 use App\Models\Crm\WhatsappAttendanceSegment;
 use App\Models\Crm\WhatsappMessage;
+use App\Models\LlmTokenUsage;
+use App\Models\SystemSetting;
 use App\Services\Crm\Agent\Tools\EscalarHumanoTool;
 use App\Services\Crm\FinalizeWhatsappConversationForLead;
 use App\Services\Crm\Knowledge\BuildClinicKnowledgePrompt;
-use App\Models\LlmTokenUsage;
 use App\Services\Crm\OpenRouterAgentClient;
 use App\Services\Crm\WhatsappChatHistory;
 use Illuminate\Support\Facades\Log;
@@ -230,41 +231,34 @@ class WhatsappAgentRunner
             ? " da clínica \"{$clinicName}\". Você trabalha exclusivamente para essa clínica e fala em nome dela"
             : '';
 
-        return <<<PROMPT
-Você é o agent de atendimento WhatsApp "{$context->agent->name}"{$clinicIntro}.
+        $template = trim((string) SystemSetting::resolve(SystemSetting::KEY_WHATSAPP_AGENT_SYSTEM_PROMPT));
+        if ($template === '') {
+            $template = SystemSetting::DEFAULT_WHATSAPP_AGENT_SYSTEM_PROMPT;
+        }
 
-Regras de operação (obrigatórias):
-- Fale com o lead SOMENTE pela tool enviar_resposta. Texto livre / comentários NÃO são enviados ao WhatsApp.
-- enviar_resposta deve conter apenas mensagem natural ao cliente (tom humano). Proibido: resumo interno, status de CRM, "mensagem enviada", "aguardar resposta do lead", "o lead já está no estágio…", checklists de qualificação, narrar tools usadas.
-- Não inclua seu nome, assinatura ou prefixo no início da mensagem — o sistema adiciona automaticamente.
-- Depois de mover_lead / criar_agendamento / escalar_humano / finalizar_atendimento, se precisar avisar o cliente, chame enviar_resposta com uma confirmação curta e humana — não mande relatório operacional.
-- Quando o lead informar um dado da lista "Informações a descobrir", chame armazenar_info_lead imediatamente (não só mencione no chat).
-- Use as tools para agir; não invente stage_id fora da lista abaixo.
-- Antes de oferecer horários ao lead, chame listar_horarios_disponiveis e ofereça só o que ela retornar (sem inventar).
-- Nunca cite nome, título ou descrição de outros compromissos da agenda — só horários livres.
-- Antes de confirmar procedimentos, preços ou cobertura por convênio, chame consultar_servicos e use apenas o retorno. A clínica já é a deste atendimento.
-{$schedulingRules}
-- Se o lead responder a um lembrete de consulta (confirmar presença ou desmarcar), use atualizar_consulta com o id do bloco "Consultas do lead".
-- Use escalar_humano (sempre com categoria) quando:
-  • urgencia_dor: dor forte, sangramento, inchaço, dente quebrado/trauma, febre ou complicação após procedimento. Antes, mande uma mensagem curta e acolhedora dizendo que a equipe vai falar com ele agora; se houver inchaço que dificulte respirar/engolir ou sangramento intenso, oriente procurar um pronto-atendimento imediatamente.
-  • reclamacao: insatisfação, cobrança indevida, problema com tratamento ou atendimento.
-  • pedido_humano: o lead pede para falar com atendente, pessoa, recepção ou dentista.
-  • fora_escopo / outro: o caso sai do que você pode resolver.
-- Quando o pedido estiver resolvido (confirmação do cliente, informação entregue, agendamento feito sem pendência), chame finalizar_atendimento após a última enviar_resposta.
-- Responda em português brasileiro, de forma objetiva.
-- Não invente preços, prazos, endereço, horários, convênios ou políticas que não estejam nas Informações da clínica, no retorno das tools ou nas regras do agent. Se não souber, diga que vai verificar e use escalar_humano(categoria=outro).
-- Aja com base nas mensagens do atendimento ATUAL. Resumos de atendimentos anteriores são só contexto — não escale nem finalize só porque o histórico antigo menciona handoff ou encerramento.
+        $prompt = strtr($template, [
+            '{agent_name}' => (string) $context->agent->name,
+            '{clinic_name}' => $clinicName,
+            '{clinic_intro}' => $clinicIntro,
+            '{scheduling_rules}' => $schedulingRules,
+            '{lead_block}' => $leadBlock,
+            '{stages_json}' => $stagesJson ?: '[]',
+            '{timezone}' => (string) config('app.timezone', 'America/Sao_Paulo'),
+            '{now}' => $this->nowIso(),
+            '{calendar_block}' => $this->calendarBlock($context->connection->clinic_id),
+            '{appointments_block}' => $appointmentsBlock,
+            '{prior_summaries}' => $priorSummaries,
+            '{signals_block}' => $signalsBlock,
+            '{knowledge_block}' => $knowledgeBlock,
+            '{qualification_block}' => $qualificationBlock,
+            '{agent_rules}' => $rules,
+        ]);
 
-Contexto CRM:
-- {$leadBlock}
-- Estágios de lead disponíveis: {$stagesJson}
-- Fuso horário: America/Sao_Paulo
-- Agora: {$this->nowIso()}
-{$this->calendarBlock($context->connection->clinic_id)}
-{$appointmentsBlock}{$priorSummaries}{$signalsBlock}{$knowledgeBlock}{$qualificationBlock}
-Regras do agent (system prompt do cliente):
-{$rules}
-PROMPT;
+        if (! str_contains($template, '{agent_rules}') && $rules !== '') {
+            $prompt .= "\nRegras do agent (system prompt do cliente):\n{$rules}";
+        }
+
+        return $prompt;
     }
 
     private function qualificationBlock(AgentContext $context): string
@@ -444,7 +438,7 @@ BLOCK;
     private function calendarBlock(?int $clinicId): string
     {
         $today = now(config('app.timezone'))->locale('pt_BR');
-        $clinic = $clinicId ? Clinic::query()->find($clinicId) : null;
+        $clinic = $clinicId ? Clinic::findForContext($clinicId) : null;
         $hours = $clinic?->resolvedBusinessHours() ?? [];
 
         $lines = [

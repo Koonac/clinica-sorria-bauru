@@ -13,6 +13,7 @@ use App\Models\Crm\CrmNotification;
 use App\Models\Crm\Lead;
 use App\Models\Crm\Task;
 use App\Models\Crm\WhatsappMessage;
+use App\Models\SystemSetting;
 use App\Models\User;
 use App\Services\Crm\Agent\DetectHandoffSignals;
 use Database\Seeders\CrmSeeder;
@@ -174,6 +175,32 @@ class AttendanceAutomationTest extends TestCase
         $this->assertStringContainsString('Rua das Flores, 100 - Centro', $system);
         $this->assertStringContainsString('Odontoprev e Amil Dental', $system);
         $this->assertStringNotContainsString('Pix escondido', $system);
+    }
+
+    public function test_system_prompt_do_runner_usa_template_do_painel_dev(): void
+    {
+        Http::fake([
+            'openrouter.ai/*' => Http::response($this->toolCallsResponse([
+                ['name' => 'enviar_resposta', 'arguments' => ['texto' => 'Oi!']],
+            ])),
+            'whatsapp.test/*' => Http::response(['success' => true, 'to' => '5511999990000@c.us', 'messageId' => 'out-1']),
+        ]);
+
+        SystemSetting::query()->updateOrCreate(
+            ['key' => SystemSetting::KEY_WHATSAPP_AGENT_SYSTEM_PROMPT],
+            ['value' => 'WRAPPER DEV da clínica {clinic_name}. Regras:\n{agent_rules}'],
+        );
+
+        [$user, $connection] = $this->userWithWhatsappConnection();
+        $this->agentAtivo($user);
+        $lead = $this->lead($user);
+        $this->message($user, $connection, $lead, 'inbound', 'Oi');
+
+        $this->runAiJob($connection, $lead);
+
+        $system = $this->openRouterRequests()[0]['messages'][0]['content'];
+        $this->assertStringContainsString('WRAPPER DEV da clínica '.$this->defaultClinic()->name, $system);
+        $this->assertStringContainsString('Atenda com educação.', $system);
     }
 
     public function test_tool_armazenar_info_lead_grava_qualification_data(): void

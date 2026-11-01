@@ -64,6 +64,7 @@ class DevApiTest extends TestCase
             ->assertJsonStructure([
                 'data' => [
                     SystemSetting::KEY_AI_ATTENDANCE_SUMMARY_SYSTEM_PROMPT,
+                    SystemSetting::KEY_WHATSAPP_AGENT_SYSTEM_PROMPT,
                     SystemSetting::KEY_OPENROUTER_TRANSCRIPTION_MODEL,
                     SystemSetting::KEY_OPENROUTER_TRANSCRIPTION_LANGUAGE,
                     SystemSetting::KEY_OPENROUTER_VISION_MODEL,
@@ -255,6 +256,34 @@ class DevApiTest extends TestCase
 
         $this->assertDatabaseHas('system_settings', [
             'key' => SystemSetting::KEY_AI_ATTENDANCE_SUMMARY_SYSTEM_PROMPT,
+            'value' => $prompt,
+        ]);
+    }
+
+    public function test_developer_atualiza_prompt_do_agent_whatsapp(): void
+    {
+        Sanctum::actingAs(User::factory()->developer()->create());
+
+        $this->getJson('/api/v1/dev/settings')
+            ->assertOk()
+            ->assertJsonPath(
+                'data.'.SystemSetting::KEY_WHATSAPP_AGENT_SYSTEM_PROMPT,
+                SystemSetting::DEFAULT_WHATSAPP_AGENT_SYSTEM_PROMPT,
+            );
+
+        $prompt = "Você é o agent \"{agent_name}\"{clinic_intro}.\n{agent_rules}";
+
+        $this->putJson('/api/v1/dev/settings', [
+            SystemSetting::KEY_WHATSAPP_AGENT_SYSTEM_PROMPT => $prompt,
+        ])
+            ->assertOk()
+            ->assertJsonPath(
+                'data.'.SystemSetting::KEY_WHATSAPP_AGENT_SYSTEM_PROMPT,
+                $prompt,
+            );
+
+        $this->assertDatabaseHas('system_settings', [
+            'key' => SystemSetting::KEY_WHATSAPP_AGENT_SYSTEM_PROMPT,
             'value' => $prompt,
         ]);
     }

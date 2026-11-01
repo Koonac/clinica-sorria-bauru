@@ -61,6 +61,7 @@ export type PaginatedOutboundHttpLogs = {
 
 export type SystemSettings = {
   ai_attendance_summary_system_prompt: string
+  whatsapp_agent_system_prompt: string
   openrouter_transcription_model: string
   openrouter_transcription_language: string
   openrouter_vision_model: string

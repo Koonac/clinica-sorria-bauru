@@ -22,6 +22,13 @@ class UpdateSystemSettingsRequest extends FormRequest
                 'min:20',
                 'max:20000',
             ],
+            SystemSetting::KEY_WHATSAPP_AGENT_SYSTEM_PROMPT => [
+                'sometimes',
+                'required',
+                'string',
+                'min:20',
+                'max:40000',
+            ],
             SystemSetting::KEY_OPENROUTER_TRANSCRIPTION_MODEL => [
                 'sometimes',
                 'required',
