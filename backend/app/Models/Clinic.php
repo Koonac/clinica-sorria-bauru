@@ -131,6 +131,38 @@ class Clinic extends Model
         return is_string($value) && preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $value) === 1;
     }
 
+    /**
+     * Colunas suficientes para ClinicContext — sem o refresh token do Calendar.
+     * Carregar o token `encrypted` inválido (texto puro / APP_KEY antiga) quebra
+     * webhooks e jobs que só precisam do id da clínica.
+     *
+     * @return list<string>
+     */
+    public static function contextColumns(): array
+    {
+        return [
+            'id',
+            'name',
+            'slug',
+            'is_active',
+            'business_hours',
+            'google_calendar_id',
+            'google_calendar_timezone',
+            'google_calendar_business_start',
+            'google_calendar_business_end',
+            'google_calendar_slot_minutes',
+        ];
+    }
+
+    public static function findForContext(?int $id): ?self
+    {
+        if (! $id) {
+            return null;
+        }
+
+        return static::query()->select(self::contextColumns())->find($id);
+    }
+
     public function users(): HasMany
     {
         return $this->hasMany(User::class);

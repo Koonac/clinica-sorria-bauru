@@ -8,6 +8,8 @@ use App\Models\User;
 use App\Services\Crm\PauseWhatsappAgentForLead;
 use App\Services\Crm\ProcessInboundWhatsappMessage;
 use App\Services\Crm\ScheduleWhatsappAttendanceAutoClose;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class PersistInboundWhatsappMessage
 {
@@ -53,6 +55,15 @@ class PersistInboundWhatsappMessage
             }
         }
 
-        WhatsappMessageStored::dispatch($message);
+        try {
+            WhatsappMessageStored::dispatch($message);
+        } catch (Throwable $e) {
+            Log::error('Falha ao enfileirar resposta da IA após persistir WhatsApp.', [
+                'message_id' => $message->id,
+                'clinic_id' => $message->clinic_id,
+                'exception' => $e::class,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

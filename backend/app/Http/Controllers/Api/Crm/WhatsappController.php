@@ -33,9 +33,11 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Throwable;
 
 class WhatsappController extends Controller
 {
@@ -766,7 +768,19 @@ class WhatsappController extends Controller
 
         $sessionId = (string) ($request->input('session_id') ?: $connection->session_id);
 
-        WhatsappInboundMessageReceived::dispatch($connection, $sessionId, $data);
+        try {
+            WhatsappInboundMessageReceived::dispatch($connection, $sessionId, $data);
+        } catch (Throwable $e) {
+            Log::error('Webhook WhatsApp inbound falhou.', [
+                'clinic_id' => $connection->clinic_id,
+                'session_id' => $sessionId,
+                'jid' => $jid,
+                'exception' => $e::class,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json(['success' => false], 500);
+        }
 
         return response()->json(['success' => true]);
     }
@@ -824,9 +838,7 @@ class WhatsappController extends Controller
 
     private function bindClinicFromConnection(Connection $connection): void
     {
-        $clinic = $connection->relationLoaded('clinic')
-            ? $connection->clinic
-            : Clinic::query()->find($connection->clinic_id);
+        $clinic = Clinic::findForContext((int) $connection->clinic_id);
 
         if ($clinic) {
             $this->clinicContext->set($clinic);

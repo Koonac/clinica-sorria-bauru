@@ -6,6 +6,7 @@ use App\Models\Clinic;
 use App\Models\Crm\Connection;
 use App\Models\Crm\Lead;
 use App\Models\Crm\WhatsappMessage;
+use App\Models\User;
 use App\Support\ClinicContext;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Carbon;
@@ -30,9 +31,7 @@ class ProcessInboundWhatsappMessage
      */
     public function handle(Connection $connection, string $sessionId, array $payload): ?WhatsappMessage
     {
-        $clinic = $connection->relationLoaded('clinic')
-            ? $connection->clinic
-            : Clinic::query()->find($connection->clinic_id);
+        $clinic = Clinic::findForContext((int) $connection->clinic_id);
 
         if ($clinic) {
             $this->clinicContext->set($clinic);
@@ -120,7 +119,7 @@ class ProcessInboundWhatsappMessage
             $message = WhatsappMessage::create([
                 'clinic_id' => $connection->clinic_id,
                 'connection_id' => $connection->id,
-                'user_id' => $connection->created_by,
+                'user_id' => $this->resolveActorUserId($connection),
                 'session_id' => $sessionId,
                 'whatsapp_jid' => $jid,
                 'whatsapp_lid' => filled($payload['lid'] ?? null) ? (string) $payload['lid'] : null,
@@ -244,5 +243,24 @@ class ProcessInboundWhatsappMessage
         }
 
         return $query->latest('id')->first();
+    }
+
+    private function resolveActorUserId(Connection $connection): ?int
+    {
+        if ($connection->created_by) {
+            return (int) $connection->created_by;
+        }
+
+        $clinicId = (int) $connection->clinic_id;
+        if ($clinicId > 0) {
+            $fromClinic = User::query()->where('clinic_id', $clinicId)->orderBy('id')->value('id');
+            if ($fromClinic) {
+                return (int) $fromClinic;
+            }
+        }
+
+        $any = User::query()->orderBy('id')->value('id');
+
+        return $any ? (int) $any : null;
     }
 }

@@ -25,7 +25,7 @@ class DispatchWhatsappAiReplyJob
             return;
         }
 
-        $clinic = Clinic::query()->find($clinicId);
+        $clinic = Clinic::findForContext((int) $clinicId);
         if (! $clinic) {
             return;
         }
