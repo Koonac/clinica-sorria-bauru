@@ -4,7 +4,6 @@ namespace App\Models\Crm;
 
 use App\Models\Concerns\BelongsToClinic;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage;
 
 class ClinicProperty extends Model
 {
@@ -41,7 +40,7 @@ class ClinicProperty extends Model
             return null;
         }
 
-        return Storage::disk(self::IMAGE_DISK)->url($this->image_path);
+        return '/media/'.$this->image_path;
     }
 
     /**

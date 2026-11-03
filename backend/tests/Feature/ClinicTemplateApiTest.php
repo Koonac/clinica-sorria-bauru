@@ -101,8 +101,11 @@ class ClinicTemplateApiTest extends TestCase
             ->assertCreated();
 
         $id = $create->json('data.id');
+        $imagePath = $create->json('data.image_path');
         $this->assertNotEmpty($create->json('data.image_url'));
+        $this->assertSame('/media/'.$imagePath, $create->json('data.image_url'));
         $this->assertSame('compra', $create->json('data.deal_type'));
+        $this->get('/media/'.$imagePath)->assertOk();
 
         $this->withHeader('X-Clinic-Id', (string) $imob->id)
             ->getJson('/api/v1/crm/properties?q=flores')

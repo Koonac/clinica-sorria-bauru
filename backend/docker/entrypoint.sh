@@ -54,6 +54,10 @@ fi
 
 echo "==> [backend] migrate + cache"
 php artisan migrate --force
+if [ ! -L public/storage ]; then
+  rm -rf public/storage
+  php artisan storage:link --force || ln -sfn /var/www/html/storage/app/public /var/www/html/public/storage
+fi
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache 2>/dev/null || true

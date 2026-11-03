@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\PublicStorageController;
 use App\Http\Controllers\SwaggerController;
 use Illuminate\Support\Facades\Route;
 
@@ -19,3 +20,6 @@ Route::get('/', function () {
 
 Route::get('/docs', [SwaggerController::class, 'ui']);
 Route::get('/docs/swagger.json', [SwaggerController::class, 'json']);
+
+Route::get('/media/{path}', [PublicStorageController::class, 'show'])
+    ->where('path', '.*');
