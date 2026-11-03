@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Crm\CalendarController;
 use App\Http\Controllers\Api\Crm\AttendantController;
 use App\Http\Controllers\Api\Crm\ClinicController;
 use App\Http\Controllers\Api\Crm\ClinicKnowledgeController;
+use App\Http\Controllers\Api\Crm\ClinicPropertyController;
 use App\Http\Controllers\Api\Crm\ClinicServiceController;
 use App\Http\Controllers\Api\Crm\ConnectionController;
 use App\Http\Controllers\Api\Crm\ContactController;
@@ -56,6 +57,7 @@ Route::prefix('v1/clinics')->middleware(['auth:sanctum'])->group(function () {
     Route::post('/', [ClinicController::class, 'store'])->middleware('role:developer');
     Route::get('{clinic}', [ClinicController::class, 'show']);
     Route::patch('{clinic}', [ClinicController::class, 'update'])->middleware('role:admin,developer');
+    Route::delete('{clinic}', [ClinicController::class, 'destroy'])->middleware('role:developer');
 });
 
 Route::prefix('v1/crm')->group(function () {
@@ -102,6 +104,12 @@ Route::prefix('v1/crm')->middleware(['auth:sanctum', 'clinic'])->group(function 
     Route::get('services/{service}', [ClinicServiceController::class, 'show']);
     Route::patch('services/{service}', [ClinicServiceController::class, 'update']);
     Route::delete('services/{service}', [ClinicServiceController::class, 'destroy']);
+
+    Route::get('properties', [ClinicPropertyController::class, 'index']);
+    Route::post('properties', [ClinicPropertyController::class, 'store'])->middleware('role:admin,developer');
+    Route::get('properties/{property}', [ClinicPropertyController::class, 'show']);
+    Route::match(['patch', 'post'], 'properties/{property}', [ClinicPropertyController::class, 'update'])->middleware('role:admin,developer');
+    Route::delete('properties/{property}', [ClinicPropertyController::class, 'destroy'])->middleware('role:admin,developer');
 
     Route::get('knowledge', [ClinicKnowledgeController::class, 'index']);
     Route::post('knowledge', [ClinicKnowledgeController::class, 'store'])->middleware('role:admin,developer');

@@ -1,4 +1,5 @@
 import { api, toApiError } from '@/api/client'
+import type { BusinessTemplate } from '@/utils/businessTemplate'
 
 /** Dia ISO ('1' = segunda … '7' = domingo) → horário "HH:MM". Dias ausentes = fechado. */
 export type BusinessHours = Partial<Record<'1' | '2' | '3' | '4' | '5' | '6' | '7', { start: string; end: string }>>
@@ -7,6 +8,7 @@ export type Clinic = {
   id: number
   name: string
   slug: string
+  template: BusinessTemplate
   is_active: boolean
   business_hours?: BusinessHours
   appointment_slot_minutes?: number
@@ -33,6 +35,7 @@ export async function listClinics(params?: { active?: boolean }): Promise<Clinic
 
 export async function createClinic(payload: {
   name: string
+  template: BusinessTemplate
   slug?: string
   is_active?: boolean
 }): Promise<Clinic> {
@@ -66,6 +69,14 @@ export async function updateClinic(
   try {
     const { data } = await api.patch<ClinicResponse>(`/v1/clinics/${id}`, payload)
     return data.data
+  } catch (error) {
+    throw toApiError(error)
+  }
+}
+
+export async function deleteClinic(id: number): Promise<void> {
+  try {
+    await api.delete(`/v1/clinics/${id}`)
   } catch (error) {
     throw toApiError(error)
   }

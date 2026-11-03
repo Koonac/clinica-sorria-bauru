@@ -36,9 +36,11 @@ class ClinicScopeApiTest extends TestCase
         $this->postJson('/api/v1/clinics', [
             'name' => 'Nova Clínica',
             'slug' => 'nova-clinica',
+            'template' => 'clinica',
         ])
             ->assertCreated()
-            ->assertJsonPath('data.slug', 'nova-clinica');
+            ->assertJsonPath('data.slug', 'nova-clinica')
+            ->assertJsonPath('data.template', 'clinica');
     }
 
     public function test_admin_nao_pode_criar_clinica(): void

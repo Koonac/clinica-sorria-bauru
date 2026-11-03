@@ -1,4 +1,5 @@
 import type { AuthUser } from '@/stores/auth'
+import type { BusinessTemplate } from '@/utils/businessTemplate'
 
 export type AppRole = AuthUser['role']
 
@@ -8,6 +9,7 @@ export type NavItem = {
   icon: string
   to: { name: string }
   roles?: AppRole[]
+  templates?: BusinessTemplate[]
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -54,6 +56,15 @@ export const NAV_ITEMS: NavItem[] = [
     icon: 'lucide:stethoscope',
     to: { name: 'services' },
     roles: ['admin', 'developer'],
+    templates: ['clinica'],
+  },
+  {
+    name: 'properties',
+    label: 'Imóveis',
+    icon: 'lucide:building-2',
+    to: { name: 'properties' },
+    roles: ['admin', 'developer'],
+    templates: ['imobiliaria'],
   },
   {
     name: 'knowledge',

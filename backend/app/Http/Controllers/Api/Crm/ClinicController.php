@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api\Crm;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Crm\DestroyClinicRequest;
 use App\Http\Requests\Crm\StoreClinicRequest;
 use App\Http\Requests\Crm\UpdateClinicRequest;
 use App\Models\Clinic;
 use App\Services\Crm\CreateClinic;
+use App\Services\Crm\DeleteClinic;
 use App\Services\Crm\ListClinics;
 use App\Services\Crm\UpdateClinic;
 use Illuminate\Http\JsonResponse;
@@ -48,5 +50,10 @@ class ClinicController extends Controller
         $clinic = $update->handle($clinic, $request->validated());
 
         return response()->json(['data' => $clinic->toPublicArray()]);
+    }
+
+    public function destroy(DestroyClinicRequest $request, Clinic $clinic, DeleteClinic $delete): JsonResponse
+    {
+        return response()->json(['data' => ['id' => $delete->handle($clinic)]]);
     }
 }

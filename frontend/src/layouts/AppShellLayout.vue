@@ -9,6 +9,11 @@ import { NAV_ITEMS, type AppRole, type NavItem } from '@/navigation/nav'
 import { useAuthStore } from '@/stores/auth'
 import { useClinicsStore } from '@/stores/clinics'
 import { useNotificationsStore } from '@/stores/notifications'
+import {
+  appointmentsNavLabel,
+  isImobiliariaTemplate,
+  resolveBusinessTemplate,
+} from '@/utils/businessTemplate'
 
 const SIDEBAR_KEY = 'sorria.sidebar.collapsed'
 
@@ -31,6 +36,20 @@ function canSeeNavItem(item: NavItem, role: AppRole | undefined) {
   return role ? item.roles.includes(role) : false
 }
 
+function matchesTemplate(item: NavItem) {
+  if (!item.templates?.length) return true
+  return item.templates.includes(resolveBusinessTemplate(clinics.activeTemplate))
+}
+
+function labeledNavItem(item: NavItem): NavItem {
+  if (item.name !== 'appointments') return item
+  return {
+    ...item,
+    label: appointmentsNavLabel(clinics.activeTemplate),
+    icon: isImobiliariaTemplate(clinics.activeTemplate) ? 'lucide:key-round' : item.icon,
+  }
+}
+
 function isAdminOnlyNavItem(item: NavItem) {
   const roles = item.roles
   if (!roles?.length) return false
@@ -45,17 +64,15 @@ function isDeveloperOnlyNavItem(item: NavItem) {
 
 const navGroups = computed(() => {
   const role = auth.user?.role
-  const clinicItems = NAV_ITEMS.filter(
-    (item) =>
-      canSeeNavItem(item, role) &&
-      !isAdminOnlyNavItem(item) &&
-      !isDeveloperOnlyNavItem(item),
+  const visible = NAV_ITEMS.filter((item) => canSeeNavItem(item, role) && matchesTemplate(item)).map(
+    labeledNavItem,
   )
-  const adminItems = auth.isAdmin
-    ? NAV_ITEMS.filter((item) => isAdminOnlyNavItem(item) && canSeeNavItem(item, role))
-    : []
+  const clinicItems = visible.filter(
+    (item) => !isAdminOnlyNavItem(item) && !isDeveloperOnlyNavItem(item),
+  )
+  const adminItems = auth.isAdmin ? visible.filter((item) => isAdminOnlyNavItem(item)) : []
   const developerItems = auth.isDeveloper
-    ? NAV_ITEMS.filter((item) => isDeveloperOnlyNavItem(item) && canSeeNavItem(item, role))
+    ? visible.filter((item) => isDeveloperOnlyNavItem(item))
     : []
 
   const groups: { key: string; label?: string; items: NavItem[] }[] = [
@@ -100,6 +117,20 @@ watch(
   () => {
     notifications.stop()
     notifications.start()
+  },
+)
+
+watch(
+  () => [route.name, clinics.activeTemplate, clinics.loaded] as const,
+  () => {
+    if (!clinics.loaded) return
+    const imobiliaria = isImobiliariaTemplate(clinics.activeTemplate)
+    if (route.name === 'services' && imobiliaria) {
+      void router.replace({ name: 'properties' })
+    }
+    if (route.name === 'properties' && !imobiliaria) {
+      void router.replace({ name: 'services' })
+    }
   },
 )
 
@@ -238,11 +269,11 @@ function isActive(name: string) {
             class="group/clinic flex w-full min-w-0 cursor-pointer items-center gap-1 rounded-md text-left outline-none transition hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-blue"
             :aria-expanded="clinicMenuOpen"
             aria-haspopup="listbox"
-            aria-label="Selecionar clínica"
+            aria-label="Selecionar modelo"
             @click="toggleClinicMenu"
           >
             <span class="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
-              {{ clinics.activeClinic?.name || 'Selecionar clínica' }}
+              {{ clinics.activeClinic?.name || 'Selecionar modelo' }}
             </span>
             <Icon
               icon="lucide:chevron-down"
@@ -254,13 +285,13 @@ function isActive(name: string) {
           <strong v-else class="truncate text-lg font-semibold tracking-tight">
             {{ clinics.activeClinic?.name || 'Sorria Bauru' }}
           </strong>
-          <span class="mt-1 truncate text-xs text-brand-cyan-ink">Painel da clínica</span>
+          <span class="mt-1 truncate text-xs text-brand-cyan-ink">Painel</span>
 
           <div
             v-if="clinicMenuOpen"
             class="absolute top-[calc(100%+0.5rem)] left-0 z-30 w-[min(16rem,calc(100vw-5rem))] overflow-hidden rounded-xl border border-brand-ink/10 bg-white py-1 shadow-lg"
             role="listbox"
-            aria-label="Clínicas"
+            aria-label="Modelos"
           >
             <button
               v-for="clinic in clinics.clinics"
@@ -291,7 +322,7 @@ function isActive(name: string) {
               @click="openCreateClinic"
             >
               <Icon icon="lucide:plus" class="size-4 shrink-0" aria-hidden="true" />
-              Nova clínica
+              Novo modelo
             </button>
           </div>
         </div>

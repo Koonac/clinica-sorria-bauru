@@ -27,7 +27,7 @@ class BuildClinicKnowledgePrompt
 
         $byCategory = $entries->groupBy('category');
         $sections = [];
-        foreach (ClinicKnowledgeEntry::CATEGORIES as $category) {
+        foreach (ClinicKnowledgeEntry::categoriesFor() as $category) {
             $items = $byCategory->get($category);
             if (! $items || $items->isEmpty()) {
                 continue;

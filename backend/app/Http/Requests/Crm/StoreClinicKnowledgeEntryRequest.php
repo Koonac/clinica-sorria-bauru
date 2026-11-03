@@ -11,7 +11,7 @@ class StoreClinicKnowledgeEntryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'category' => ['required', Rule::in(ClinicKnowledgeEntry::CATEGORIES)],
+            'category' => ['required', Rule::in(ClinicKnowledgeEntry::categoriesFor())],
             'title' => ['nullable', 'string', 'max:190'],
             'content' => ['required', 'string', 'max:4000'],
             'position' => ['sometimes', 'nullable', 'integer', 'min:0'],

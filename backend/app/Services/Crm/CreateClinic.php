@@ -15,6 +15,7 @@ class CreateClinic
      * @param  array{
      *   name: string,
      *   slug?: string|null,
+     *   template?: string|null,
      *   is_active?: bool,
      *   google_calendar_refresh_token?: string|null,
      *   google_calendar_id?: string|null,
@@ -29,7 +30,14 @@ class CreateClinic
         $name = trim((string) ($attrs['name'] ?? ''));
         if ($name === '') {
             throw ValidationException::withMessages([
-                'name' => 'O nome da clínica é obrigatório.',
+                'name' => 'O nome do modelo é obrigatório.',
+            ]);
+        }
+
+        $template = trim((string) ($attrs['template'] ?? Clinic::TEMPLATE_CLINICA));
+        if (! in_array($template, Clinic::TEMPLATES, true)) {
+            throw ValidationException::withMessages([
+                'template' => 'Template inválido. Use clinica ou imobiliaria.',
             ]);
         }
 
@@ -50,6 +58,7 @@ class CreateClinic
         $clinic = Clinic::create([
             'name' => $name,
             'slug' => $slug,
+            'template' => $template,
             'is_active' => (bool) ($attrs['is_active'] ?? true),
             'google_calendar_refresh_token' => $attrs['google_calendar_refresh_token'] ?? null,
             'google_calendar_id' => $attrs['google_calendar_id'] ?? null,

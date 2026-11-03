@@ -7,9 +7,10 @@ import Button from '@/components/Buttons/Button.vue'
 import PageView from '@/components/Layout/PageView.vue'
 import DevConfigPanel from '@/components/dev/DevConfigPanel.vue'
 import DevLogsPanel from '@/components/dev/DevLogsPanel.vue'
+import DevModelsPanel from '@/components/dev/DevModelsPanel.vue'
 import DevTokensPanel from '@/components/dev/DevTokensPanel.vue'
 
-type DevTab = 'tokens' | 'logs' | 'config'
+type DevTab = 'tokens' | 'logs' | 'config' | 'modelos'
 
 const route = useRoute()
 const router = useRouter()
@@ -18,12 +19,13 @@ const tabs: { id: DevTab; label: string; icon: string }[] = [
   { id: 'tokens', label: 'Tokens', icon: 'lucide:gauge' },
   { id: 'logs', label: 'Logs', icon: 'lucide:scroll-text' },
   { id: 'config', label: 'Configuração', icon: 'lucide:sliders-horizontal' },
+  { id: 'modelos', label: 'Modelos', icon: 'lucide:layers' },
 ]
 
 const tab = computed<DevTab>({
   get() {
     const q = String(route.query.tab || 'tokens')
-    if (q === 'tokens' || q === 'logs' || q === 'config') return q
+    if (q === 'tokens' || q === 'logs' || q === 'config' || q === 'modelos') return q
     return 'tokens'
   },
   set(value) {
@@ -93,7 +95,8 @@ onMounted(() => {
         :stats="tokenStats"
       />
       <DevLogsPanel v-else-if="tab === 'logs'" />
-      <DevConfigPanel v-else />
+      <DevConfigPanel v-else-if="tab === 'config'" />
+      <DevModelsPanel v-else />
     </div>
   </PageView>
 </template>

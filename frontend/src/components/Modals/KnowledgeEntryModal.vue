@@ -9,7 +9,9 @@ import {
   type KnowledgeEntry,
 } from '@/api/crm/knowledge'
 import Button from '@/components/Buttons/Button.vue'
-import { KNOWLEDGE_CATEGORIES } from '@/utils/knowledgeCategories'
+import { knowledgeCategoriesFor } from '@/utils/knowledgeCategories'
+import { useClinicsStore } from '@/stores/clinics'
+import { personLabel } from '@/utils/businessTemplate'
 
 const open = defineModel<boolean>('open', { default: false })
 
@@ -25,9 +27,13 @@ const emit = defineEmits<{
 const inputClass =
   'w-full rounded-xl border border-brand-ink/15 bg-white px-4 py-3 text-base text-brand-ink outline-none transition placeholder:text-brand-ink/35 focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25'
 
+const clinics = useClinicsStore()
+const categories = computed(() => knowledgeCategoriesFor(clinics.activeTemplate))
+const audienceLabel = computed(() => personLabel(clinics.activeTemplate).toLowerCase())
+
 const isEdit = computed(() => Boolean(props.entry))
 const categoryMeta = computed(
-  () => KNOWLEDGE_CATEGORIES.find((c) => c.value === form.category) ?? KNOWLEDGE_CATEGORIES[0]!,
+  () => categories.value.find((c) => c.value === form.category) ?? categories.value[0]!,
 )
 
 const form = reactive({
@@ -167,7 +173,7 @@ async function onSubmit() {
           <label class="flex flex-col gap-1.5">
             <span class="text-sm font-medium text-brand-ink/80">Categoria</span>
             <select v-model="form.category" name="category" :class="inputClass">
-              <option v-for="c in KNOWLEDGE_CATEGORIES" :key="c.value" :value="c.value">
+              <option v-for="c in categories" :key="c.value" :value="c.value">
                 {{ c.label }}
               </option>
             </select>
@@ -202,7 +208,8 @@ async function onSubmit() {
               :class="[inputClass, 'resize-y leading-relaxed']"
             />
             <span class="text-xs text-brand-ink/45">
-              A IA usa este texto como fonte oficial. Escreva como você responderia ao paciente.
+              A IA usa este texto como fonte oficial. Escreva como você responderia ao
+              {{ audienceLabel }}.
             </span>
             <span v-if="fieldErrors.content" class="text-sm text-brand-ink/70" role="alert">
               {{ fieldErrors.content }}

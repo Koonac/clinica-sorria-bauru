@@ -9,9 +9,28 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Clinic extends Model
 {
+    public const TEMPLATE_CLINICA = 'clinica';
+
+    public const TEMPLATE_IMOBILIARIA = 'imobiliaria';
+
+    public const TEMPLATES = [
+        self::TEMPLATE_CLINICA,
+        self::TEMPLATE_IMOBILIARIA,
+    ];
+
+    public const TEMPLATE_LABELS = [
+        self::TEMPLATE_CLINICA => 'Clínica',
+        self::TEMPLATE_IMOBILIARIA => 'Imobiliária',
+    ];
+
+    protected $attributes = [
+        'template' => self::TEMPLATE_CLINICA,
+    ];
+
     protected $fillable = [
         'name',
         'slug',
+        'template',
         'is_active',
         'google_calendar_refresh_token',
         'google_calendar_id',
@@ -144,6 +163,7 @@ class Clinic extends Model
             'id',
             'name',
             'slug',
+            'template',
             'is_active',
             'business_hours',
             'google_calendar_id',
@@ -178,14 +198,31 @@ class Clinic extends Model
      */
     public function toPublicArray(): array
     {
+        $template = in_array($this->template, self::TEMPLATES, true)
+            ? $this->template
+            : self::TEMPLATE_CLINICA;
+
         return [
             'id' => $this->id,
             'name' => $this->name,
             'slug' => $this->slug,
+            'template' => $template,
             'is_active' => (bool) $this->is_active,
             'business_hours' => (object) $this->resolvedBusinessHours(),
             'appointment_slot_minutes' => max(5, (int) ($this->google_calendar_slot_minutes
                 ?? config('services.google_calendar.slot_minutes', 60))),
         ];
+    }
+
+    public function isImobiliaria(): bool
+    {
+        return $this->resolvedTemplate() === self::TEMPLATE_IMOBILIARIA;
+    }
+
+    public function resolvedTemplate(): string
+    {
+        return in_array($this->template, self::TEMPLATES, true)
+            ? $this->template
+            : self::TEMPLATE_CLINICA;
     }
 }

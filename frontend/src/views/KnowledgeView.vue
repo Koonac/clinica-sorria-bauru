@@ -14,7 +14,13 @@ import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
 import PageView from '@/components/Layout/PageView.vue'
 import ConfirmModal from '@/components/Modals/ConfirmModal.vue'
 import KnowledgeEntryModal from '@/components/Modals/KnowledgeEntryModal.vue'
-import { KNOWLEDGE_CATEGORIES } from '@/utils/knowledgeCategories'
+import { knowledgeCategoriesFor } from '@/utils/knowledgeCategories'
+import { useClinicsStore } from '@/stores/clinics'
+import { personLabel } from '@/utils/businessTemplate'
+
+const clinics = useClinicsStore()
+const categories = computed(() => knowledgeCategoriesFor(clinics.activeTemplate))
+const audienceLabel = computed(() => personLabel(clinics.activeTemplate).toLowerCase())
 
 const entries = ref<KnowledgeEntry[]>([])
 const loading = ref(true)
@@ -42,7 +48,7 @@ const byCategory = computed(() => {
 
 const filledCategories = computed(
   () =>
-    KNOWLEDGE_CATEGORIES.filter((c) => (byCategory.value.get(c.value) ?? []).some((e) => e.active))
+    categories.value.filter((c) => (byCategory.value.get(c.value) ?? []).some((e) => e.active))
       .length,
 )
 
@@ -118,10 +124,10 @@ onMounted(load)
 <template>
   <PageView title="Base de conhecimento">
     <p class="shrink-0 text-sm text-brand-ink/55">
-      Respostas prontas que a IA consulta para responder pacientes no WhatsApp. Dias e horários de
-      funcionamento ficam em Configurações › Horário de atendimento.
+      Respostas prontas que a IA consulta para responder {{ audienceLabel }}s no WhatsApp. Dias e
+      horários de funcionamento ficam em Configurações › Horário de atendimento.
       <span class="text-brand-ink/40"
-        >· {{ filledCategories }}/{{ KNOWLEDGE_CATEGORIES.length }} categorias preenchidas</span
+        >· {{ filledCategories }}/{{ categories.length }} categorias preenchidas</span
       >
     </p>
 
@@ -146,7 +152,7 @@ onMounted(load)
     <div v-else class="min-h-0 flex-1 overflow-y-auto">
       <div class="grid gap-4 pb-4 lg:grid-cols-2">
         <section
-          v-for="category in KNOWLEDGE_CATEGORIES"
+          v-for="category in categories"
           :key="category.value"
           class="flex flex-col rounded-2xl border border-brand-ink/10 bg-white p-4"
         >

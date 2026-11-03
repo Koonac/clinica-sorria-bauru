@@ -1,4 +1,5 @@
 import type { KnowledgeCategory } from '@/api/crm/knowledge'
+import { isImobiliariaTemplate, type BusinessTemplate } from '@/utils/businessTemplate'
 
 export type KnowledgeCategoryMeta = {
   value: KnowledgeCategory
@@ -51,3 +52,31 @@ export const KNOWLEDGE_CATEGORIES: KnowledgeCategoryMeta[] = [
     contentPlaceholder: 'Ex.: Sim, temos odontopediatria a partir dos 3 anos.',
   },
 ]
+
+const IMOBILIARIA_OVERRIDES: Partial<
+  Record<KnowledgeCategory, Partial<KnowledgeCategoryMeta>>
+> = {
+  outros: {
+    hint: 'Qualquer dúvida recorrente dos clientes.',
+    titlePlaceholder: 'Ex.: Aceitam pets?',
+    contentPlaceholder: 'Ex.: Sim, a maioria dos imóveis aceita pets de pequeno porte.',
+  },
+  pagamento: {
+    hint: 'Entrada, financiamento, aluguel, caução, IPTU.',
+    titlePlaceholder: 'Ex.: Financiamento',
+    contentPlaceholder: 'Ex.: Aceitamos financiamento bancário e parcelamento da entrada.',
+  },
+}
+
+export function knowledgeCategoriesFor(
+  template: BusinessTemplate | string | null | undefined,
+): KnowledgeCategoryMeta[] {
+  const imobiliaria = isImobiliariaTemplate(template)
+  return KNOWLEDGE_CATEGORIES.filter((category) => {
+    if (!imobiliaria) return true
+    return category.value === 'endereco' || category.value === 'pagamento' || category.value === 'outros'
+  }).map((category) => {
+    if (!imobiliaria) return category
+    return { ...category, ...IMOBILIARIA_OVERRIDES[category.value] }
+  })
+}

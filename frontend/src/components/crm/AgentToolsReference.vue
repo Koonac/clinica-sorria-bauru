@@ -1,10 +1,18 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
+import { useClinicsStore } from '@/stores/clinics'
+import { isImobiliariaTemplate, type BusinessTemplate } from '@/utils/businessTemplate'
 
 type ToolMode = 'sempre' | 'direto' | 'pre'
 
 /** Espelha WhatsappAgentToolRegistry (backend). Apenas informativo para quem escreve o prompt. */
-const TOOLS: { name: string; description: string; mode: ToolMode }[] = [
+const TOOLS: {
+  name: string
+  description: string
+  mode: ToolMode
+  templates?: BusinessTemplate[]
+}[] = [
   {
     name: 'enviar_resposta',
     description: 'Envia a mensagem ao paciente no WhatsApp. É o único jeito de a IA falar com ele.',
@@ -14,6 +22,13 @@ const TOOLS: { name: string; description: string; mode: ToolMode }[] = [
     name: 'consultar_servicos',
     description: 'Busca procedimentos, preços e cobertura por convênio cadastrados em Serviços.',
     mode: 'sempre',
+    templates: ['clinica'],
+  },
+  {
+    name: 'consultar_imoveis',
+    description: 'Busca imóveis cadastrados (endereço, valor, aluguel/compra e tipo).',
+    mode: 'sempre',
+    templates: ['imobiliaria'],
   },
   {
     name: 'listar_horarios_disponiveis',
@@ -71,6 +86,15 @@ const MODE_TONE: Record<ToolMode, string> = {
   direto: 'bg-brand-cyan/15 text-brand-cyan-ink',
   pre: 'bg-violet-500/15 text-violet-700',
 }
+
+const clinics = useClinicsStore()
+const visibleTools = computed(() => {
+  const imobiliaria = isImobiliariaTemplate(clinics.activeTemplate)
+  return TOOLS.filter((tool) => {
+    if (!tool.templates?.length) return true
+    return imobiliaria ? tool.templates.includes('imobiliaria') : tool.templates.includes('clinica')
+  })
+})
 </script>
 
 <template>
@@ -105,7 +129,7 @@ const MODE_TONE: Record<ToolMode, string> = {
           </thead>
           <tbody>
             <tr
-              v-for="tool in TOOLS"
+              v-for="tool in visibleTools"
               :key="tool.name"
               class="border-b border-brand-ink/5 align-top"
             >

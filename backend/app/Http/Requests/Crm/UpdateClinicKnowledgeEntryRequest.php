@@ -11,7 +11,7 @@ class UpdateClinicKnowledgeEntryRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'category' => ['sometimes', Rule::in(ClinicKnowledgeEntry::CATEGORIES)],
+            'category' => ['sometimes', Rule::in(ClinicKnowledgeEntry::categoriesFor())],
             'title' => ['sometimes', 'nullable', 'string', 'max:190'],
             'content' => ['sometimes', 'string', 'max:4000'],
             'position' => ['sometimes', 'integer', 'min:0'],

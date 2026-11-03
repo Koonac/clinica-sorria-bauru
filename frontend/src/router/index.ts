@@ -103,6 +103,17 @@ const router = createRouter({
           },
         },
         {
+          path: 'imoveis',
+          name: 'properties',
+          component: () => import('@/views/PropertiesView.vue'),
+          meta: {
+            requiresAuth: true,
+            roles: elevatedRoles,
+            title: 'Imóveis',
+            icon: 'lucide:building-2',
+          },
+        },
+        {
           path: 'base-conhecimento',
           name: 'knowledge',
           component: () => import('@/views/KnowledgeView.vue'),

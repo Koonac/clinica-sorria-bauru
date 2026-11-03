@@ -16,6 +16,8 @@ import ContentSkeleton from '@/components/Feedback/ContentSkeleton.vue'
 import PageView from '@/components/Layout/PageView.vue'
 import ConfirmModal from '@/components/Modals/ConfirmModal.vue'
 import ConfirmPreBookingModal from '@/components/Modals/ConfirmPreBookingModal.vue'
+import { useClinicsStore } from '@/stores/clinics'
+import { appointmentsNavLabel, personLabel } from '@/utils/businessTemplate'
 import { formatDateTime } from '@/utils/crmFormat'
 import { APPOINTMENT_STATUS_LABELS, APPOINTMENT_STATUS_TONE } from '@/utils/leadAttendance'
 
@@ -27,6 +29,12 @@ const TABS: { value: AppointmentView; label: string; icon: string }[] = [
 
 const route = useRoute()
 const router = useRouter()
+const clinics = useClinicsStore()
+const pageTitle = computed(() => appointmentsNavLabel(clinics.activeTemplate))
+const subjectLabel = computed(() => personLabel(clinics.activeTemplate))
+const eventLabel = computed(() =>
+  pageTitle.value === 'Visitas' ? 'visita' : 'consulta',
+)
 
 const tab = ref<AppointmentView>(
   TABS.some((t) => t.value === route.query.tab)
@@ -47,7 +55,9 @@ const cancelOpen = ref(false)
 const cancelling = ref<Appointment | null>(null)
 
 const cancelTitle = computed(() =>
-  cancelling.value?.status === 'pre_agendado' ? 'Recusar pré-agendamento' : 'Cancelar consulta',
+  cancelling.value?.status === 'pre_agendado'
+    ? 'Recusar pré-agendamento'
+    : `Cancelar ${eventLabel.value}`,
 )
 
 async function load() {
@@ -61,7 +71,8 @@ async function load() {
     items.value = page.data
     total.value = page.total
   } catch (error) {
-    listError.value = toApiError(error).message || 'Não foi possível carregar as consultas.'
+    listError.value =
+      toApiError(error).message || `Não foi possível carregar as ${pageTitle.value.toLowerCase()}.`
   } finally {
     loading.value = false
   }
@@ -77,7 +88,7 @@ function whenLabel(a: Appointment): string {
 }
 
 function confirmationHint(a: Appointment): string | null {
-  if (a.status === 'confirmado') return 'Paciente confirmou presença'
+  if (a.status === 'confirmado') return `${subjectLabel.value} confirmou presença`
   if (a.status === 'agendado' && a.reminder_sent_at)
     return 'Lembrete enviado · aguardando confirmação'
   if (a.status === 'agendado') return 'Lembrete ainda não enviado'
@@ -90,10 +101,11 @@ function openConfirm(a: Appointment) {
 }
 
 function onConfirmed(_a: Appointment, meta: AppointmentScheduleMeta) {
-  const parts = ['Consulta agendada.']
+  const parts = [`${pageTitle.value.slice(0, -1)} agendada.`]
   if (meta.calendar_error) parts.push(`Google Agenda: ${meta.calendar_error}`)
-  if (meta.patient_notified) parts.push('Paciente avisado pelo WhatsApp.')
-  else if (meta.notify_error) parts.push(`Não foi possível avisar o paciente: ${meta.notify_error}`)
+  if (meta.patient_notified) parts.push(`${subjectLabel.value} avisado pelo WhatsApp.`)
+  else if (meta.notify_error)
+    parts.push(`Não foi possível avisar o ${subjectLabel.value.toLowerCase()}: ${meta.notify_error}`)
   flash.value = parts.join(' ')
   void load()
 }
@@ -110,7 +122,9 @@ async function doCancel() {
   try {
     await cancelAppointment(target.id)
     flash.value =
-      target.status === 'pre_agendado' ? 'Pré-agendamento recusado.' : 'Consulta cancelada.'
+      target.status === 'pre_agendado'
+        ? 'Pré-agendamento recusado.'
+        : `${pageTitle.value.slice(0, -1)} cancelada.`
     cancelOpen.value = false
     await load()
   } catch (error) {
@@ -129,7 +143,7 @@ async function setOutcome(a: Appointment, outcome: 'confirmado' | 'realizado' | 
       outcome === 'confirmado'
         ? 'Presença confirmada.'
         : outcome === 'realizado'
-          ? 'Consulta marcada como realizada.'
+          ? `${pageTitle.value.slice(0, -1)} marcada como realizada.`
           : 'Falta registrada.'
     await load()
   } catch (error) {
@@ -147,7 +161,7 @@ onMounted(load)
 </script>
 
 <template>
-  <PageView title="Consultas">
+  <PageView :title="pageTitle">
     <div class="flex shrink-0 flex-wrap items-center gap-2">
       <div class="inline-flex rounded-full border border-brand-ink/10 bg-white p-1" role="tablist">
         <button
@@ -170,7 +184,7 @@ onMounted(load)
       </div>
       <form class="ml-auto flex min-w-0 items-center gap-2" @submit.prevent="load">
         <label class="relative min-w-0">
-          <span class="sr-only">Buscar paciente</span>
+          <span class="sr-only">Buscar {{ subjectLabel.toLowerCase() }}</span>
           <Icon
             icon="lucide:search"
             class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-brand-ink/40"
@@ -179,7 +193,7 @@ onMounted(load)
           <input
             v-model="search"
             type="search"
-            placeholder="Paciente ou telefone"
+            :placeholder="`${subjectLabel} ou telefone`"
             class="w-56 max-w-full rounded-full border border-brand-ink/15 bg-white py-2 pr-4 pl-9 text-sm text-brand-ink outline-none focus:border-brand-cyan focus:ring-2 focus:ring-brand-cyan/25"
           />
         </label>
@@ -209,7 +223,7 @@ onMounted(load)
         tab === 'pre_booking'
           ? 'Nenhum pré-agendamento aguardando a recepção.'
           : tab === 'upcoming'
-            ? 'Nenhuma consulta marcada.'
+            ? `Nenhuma ${eventLabel} marcada.`
             : 'Nada no histórico.'
       }}
     </p>
@@ -223,7 +237,7 @@ onMounted(load)
         <div class="min-w-0 flex-1">
           <div class="flex flex-wrap items-center gap-2">
             <strong class="truncate text-sm font-semibold text-brand-ink">{{
-              a.lead?.name || 'Paciente'
+              a.lead?.name || subjectLabel
             }}</strong>
             <span
               class="rounded-full px-2 py-0.5 text-[11px] font-medium"
@@ -349,7 +363,7 @@ onMounted(load)
     <ConfirmModal
       v-model:open="cancelOpen"
       :title="cancelTitle"
-      message="O horário será liberado na agenda. O paciente não é avisado automaticamente."
+      :message="`O horário será liberado na agenda. O ${subjectLabel.toLowerCase()} não é avisado automaticamente.`"
       confirm-label="Confirmar"
       confirm-variant="danger"
       :busy="busyId !== null"

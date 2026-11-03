@@ -13,6 +13,7 @@ class ClinicSeeder extends Seeder
             ['slug' => 'sorria-bauru'],
             [
                 'name' => 'Clínica Sorria Bauru',
+                'template' => Clinic::TEMPLATE_CLINICA,
                 'is_active' => true,
                 'google_calendar_id' => config('services.google_calendar.calendar_id'),
                 'google_calendar_timezone' => config('services.google_calendar.timezone'),

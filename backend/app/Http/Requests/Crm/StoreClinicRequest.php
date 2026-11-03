@@ -16,6 +16,7 @@ class StoreClinicRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:190'],
             'slug' => ['nullable', 'string', 'max:190', 'alpha_dash:ascii'],
+            'template' => ['required', 'string', 'in:clinica,imobiliaria'],
             'is_active' => ['sometimes', 'boolean'],
             'google_calendar_refresh_token' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'google_calendar_id' => ['sometimes', 'nullable', 'string', 'max:190'],
@@ -23,6 +24,18 @@ class StoreClinicRequest extends FormRequest
             'google_calendar_business_start' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:23'],
             'google_calendar_business_end' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:24'],
             'google_calendar_slot_minutes' => ['sometimes', 'nullable', 'integer', 'min:5', 'max:240'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'O nome do modelo é obrigatório.',
+            'template.required' => 'Escolha um template.',
+            'template.in' => 'Template inválido. Use clinica ou imobiliaria.',
         ];
     }
 }

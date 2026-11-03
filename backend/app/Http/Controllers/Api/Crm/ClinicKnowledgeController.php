@@ -19,12 +19,12 @@ class ClinicKnowledgeController extends Controller
     public function index(Request $request, ListClinicKnowledgeEntries $list): JsonResponse
     {
         $filters = $request->validate([
-            'category' => ['sometimes', 'nullable', Rule::in(ClinicKnowledgeEntry::CATEGORIES)],
+            'category' => ['sometimes', 'nullable', Rule::in(ClinicKnowledgeEntry::categoriesFor())],
         ]);
 
         return response()->json([
             'data' => $list->handle($filters),
-            'meta' => ['categories' => ClinicKnowledgeEntry::CATEGORY_LABELS],
+            'meta' => ['categories' => ClinicKnowledgeEntry::labelsFor()],
         ]);
     }
 

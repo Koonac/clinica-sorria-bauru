@@ -33,6 +33,15 @@ api.interceptors.request.use((config) => {
     config.headers['X-Clinic-Id'] = clinicId
   }
 
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    const headers = config.headers
+    if (headers && typeof headers.delete === 'function') {
+      headers.delete('Content-Type')
+    } else {
+      delete config.headers['Content-Type']
+    }
+  }
+
   return config
 })
 

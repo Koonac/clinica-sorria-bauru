@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { createClinic, listClinics, type Clinic } from '@/api/clinics'
+import { createClinic, deleteClinic, listClinics, type Clinic } from '@/api/clinics'
+import { resolveBusinessTemplate, type BusinessTemplate } from '@/utils/businessTemplate'
 import { useAuthStore } from '@/stores/auth'
 
 const CLINIC_KEY = 'sorria.activeClinicId'
@@ -14,6 +15,10 @@ export const useClinicsStore = defineStore('clinics', () => {
 
   const activeClinic = computed(
     () => clinics.value.find((c) => c.id === activeClinicId.value) ?? null,
+  )
+
+  const activeTemplate = computed<BusinessTemplate>(() =>
+    resolveBusinessTemplate(activeClinic.value?.template),
   )
 
   function persistActive(id: number | null) {
@@ -83,11 +88,24 @@ export const useClinicsStore = defineStore('clinics', () => {
     persistActive(id)
   }
 
-  async function createClinicAndSelect(payload: { name: string; slug?: string }) {
+  async function createClinicAndSelect(payload: {
+    name: string
+    template: BusinessTemplate
+    slug?: string
+  }) {
     const clinic = await createClinic(payload)
     clinics.value = [...clinics.value, clinic].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
     persistActive(clinic.id)
     return clinic
+  }
+
+  async function removeClinic(id: number) {
+    await deleteClinic(id)
+    const remaining = clinics.value.filter((c) => c.id !== id)
+    clinics.value = remaining
+    if (activeClinicId.value === id) {
+      persistActive(remaining[0]?.id ?? null)
+    }
   }
 
   function clear() {
@@ -101,12 +119,14 @@ export const useClinicsStore = defineStore('clinics', () => {
     clinics,
     activeClinicId,
     activeClinic,
+    activeTemplate,
     loading,
     loaded,
     error,
     bootstrap,
     setActiveClinic,
     createClinic: createClinicAndSelect,
+    removeClinic,
     clear,
   }
 })
