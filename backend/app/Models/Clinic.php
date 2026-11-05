@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Crm\Connection;
+use App\Support\ClinicContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -13,14 +14,18 @@ class Clinic extends Model
 
     public const TEMPLATE_IMOBILIARIA = 'imobiliaria';
 
+    public const TEMPLATE_LOJA_ROUPAS = 'loja_roupas';
+
     public const TEMPLATES = [
         self::TEMPLATE_CLINICA,
         self::TEMPLATE_IMOBILIARIA,
+        self::TEMPLATE_LOJA_ROUPAS,
     ];
 
     public const TEMPLATE_LABELS = [
         self::TEMPLATE_CLINICA => 'Clínica',
         self::TEMPLATE_IMOBILIARIA => 'Imobiliária',
+        self::TEMPLATE_LOJA_ROUPAS => 'Loja de roupas',
     ];
 
     protected $attributes = [
@@ -198,15 +203,11 @@ class Clinic extends Model
      */
     public function toPublicArray(): array
     {
-        $template = in_array($this->template, self::TEMPLATES, true)
-            ? $this->template
-            : self::TEMPLATE_CLINICA;
-
         return [
             'id' => $this->id,
             'name' => $this->name,
             'slug' => $this->slug,
-            'template' => $template,
+            'template' => $this->resolvedTemplate(),
             'is_active' => (bool) $this->is_active,
             'business_hours' => (object) $this->resolvedBusinessHours(),
             'appointment_slot_minutes' => max(5, (int) ($this->google_calendar_slot_minutes
@@ -217,6 +218,41 @@ class Clinic extends Model
     public function isImobiliaria(): bool
     {
         return $this->resolvedTemplate() === self::TEMPLATE_IMOBILIARIA;
+    }
+
+    public function isLojaRoupas(): bool
+    {
+        return $this->resolvedTemplate() === self::TEMPLATE_LOJA_ROUPAS;
+    }
+
+    /** Loja de roupas não usa agenda (Agenda/Consultas e tools de agendamento ficam desligadas). */
+    public function usesScheduling(): bool
+    {
+        return self::templateUsesScheduling($this->resolvedTemplate());
+    }
+
+    public static function templateUsesScheduling(string $template): bool
+    {
+        return $template !== self::TEMPLATE_LOJA_ROUPAS;
+    }
+
+    /**
+     * Template da clínica do contexto atual (ClinicContext) ou, sem contexto, da clínica informada.
+     */
+    public static function templateForId(?int $clinicId): string
+    {
+        $current = app(ClinicContext::class)->clinic();
+        if ($current) {
+            return $current->resolvedTemplate();
+        }
+
+        if (! $clinicId) {
+            return self::TEMPLATE_CLINICA;
+        }
+
+        $template = static::query()->whereKey($clinicId)->value('template');
+
+        return in_array($template, self::TEMPLATES, true) ? $template : self::TEMPLATE_CLINICA;
     }
 
     public function resolvedTemplate(): string

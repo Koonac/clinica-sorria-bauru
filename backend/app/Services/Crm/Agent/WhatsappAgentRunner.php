@@ -227,8 +227,9 @@ class WhatsappAgentRunner
             : '';
 
         $clinicName = $this->clinicName($context->connection->clinic_id);
+        $businessNoun = $this->usesScheduling($context) ? 'clínica' : 'loja';
         $clinicIntro = $clinicName !== ''
-            ? " da clínica \"{$clinicName}\". Você trabalha exclusivamente para essa clínica e fala em nome dela"
+            ? " da {$businessNoun} \"{$clinicName}\". Você trabalha exclusivamente para essa {$businessNoun} e fala em nome dela"
             : '';
 
         $template = trim((string) SystemSetting::resolve(SystemSetting::KEY_WHATSAPP_AGENT_SYSTEM_PROMPT));
@@ -306,6 +307,14 @@ BLOCK;
 
     private function schedulingRules(AgentContext $context): string
     {
+        if (! $this->usesScheduling($context)) {
+            return implode("\n", [
+                '- Esta loja NÃO faz agendamento pelo WhatsApp: ignore qualquer instrução sobre horários, consultas, agenda ou lembretes, e não ofereça horários.',
+                '- Antes de confirmar peça, preço, tamanho ou cor, chame consultar_produtos e use apenas o retorno. Se a peça ou o tamanho não aparecer, diga que vai verificar com a equipe.',
+                '- Para reservar uma peça, fechar pedido, combinar entrega/retirada ou quando o cliente pedir um atendente, use escalar_humano.',
+            ]);
+        }
+
         if ($context->connection->isPreBookingMode()) {
             return implode("\n", [
                 '- Agendamento nesta clínica é por PRÉ-AGENDAMENTO: você não marca na agenda. Colete o dia/horário preferido (e o procedimento, se souber) e chame registrar_pre_agendamento.',
@@ -320,9 +329,14 @@ BLOCK;
         ]);
     }
 
+    private function usesScheduling(AgentContext $context): bool
+    {
+        return Clinic::templateUsesScheduling(Clinic::templateForId($context->connection->clinic_id));
+    }
+
     private function appointmentsBlock(AgentContext $context): string
     {
-        if (! $context->lead) {
+        if (! $context->lead || ! $this->usesScheduling($context)) {
             return '';
         }
 
@@ -444,8 +458,11 @@ BLOCK;
         $lines = [
             '- HOJE é '.$today->translatedFormat('l, d/m/Y').', '.$today->format('H:i').' (horário de Brasília).',
         ];
-        if ($clinic) {
+        $scheduling = ! $clinic || $clinic->usesScheduling();
+        if ($clinic && $scheduling) {
             $lines[] = '- Horário de atendimento da clínica: '.$clinic->businessHoursSummary().'. Nunca ofereça horário fora disso.';
+        } elseif ($clinic) {
+            $lines[] = '- Horário de funcionamento da loja: '.$clinic->businessHoursSummary().'.';
         }
         $lines[] = '- Calendário dos próximos dias (use SEMPRE esta lista para saber o dia da semana de uma data; nunca calcule de cabeça):';
         for ($i = 0; $i < 14; $i++) {
@@ -459,7 +476,9 @@ BLOCK;
             $status = ! $clinic ? '' : ($range ? " — aberto {$range['start']}–{$range['end']}" : ' — FECHADO');
             $lines[] = '  • '.$prefix.$day->translatedFormat('l, d/m/Y').' ('.$day->toDateString().')'.$status;
         }
-        $lines[] = '- Ao chamar listar_horarios_disponiveis, passe sempre o parâmetro data (YYYY-MM-DD) do dia que o paciente pediu.';
+        if ($scheduling) {
+            $lines[] = '- Ao chamar listar_horarios_disponiveis, passe sempre o parâmetro data (YYYY-MM-DD) do dia que o paciente pediu.';
+        }
 
         return implode("\n", $lines);
     }

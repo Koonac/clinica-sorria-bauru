@@ -11,6 +11,7 @@ import { useClinicsStore } from '@/stores/clinics'
 import { useNotificationsStore } from '@/stores/notifications'
 import {
   appointmentsNavLabel,
+  catalogRouteFor,
   isImobiliariaTemplate,
   resolveBusinessTemplate,
 } from '@/utils/businessTemplate'
@@ -124,13 +125,14 @@ watch(
   () => [route.name, clinics.activeTemplate, clinics.loaded] as const,
   () => {
     if (!clinics.loaded) return
-    const imobiliaria = isImobiliariaTemplate(clinics.activeTemplate)
-    if (route.name === 'services' && imobiliaria) {
-      void router.replace({ name: 'properties' })
-    }
-    if (route.name === 'properties' && !imobiliaria) {
-      void router.replace({ name: 'services' })
-    }
+    // Rota de outro template (ex.: Imóveis numa loja): manda para o catálogo do template ativo.
+    const item = NAV_ITEMS.find((nav) => nav.to.name === route.name)
+    if (!item || matchesTemplate(item)) return
+    const catalogRoutes = ['services', 'properties', 'products']
+    const target = catalogRoutes.includes(item.name)
+      ? catalogRouteFor(clinics.activeTemplate)
+      : 'crm'
+    void router.replace({ name: target })
   },
 )
 

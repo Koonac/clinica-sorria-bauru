@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Crm\CalendarController;
 use App\Http\Controllers\Api\Crm\AttendantController;
 use App\Http\Controllers\Api\Crm\ClinicController;
 use App\Http\Controllers\Api\Crm\ClinicKnowledgeController;
+use App\Http\Controllers\Api\Crm\ClinicProductController;
 use App\Http\Controllers\Api\Crm\ClinicPropertyController;
 use App\Http\Controllers\Api\Crm\ClinicServiceController;
 use App\Http\Controllers\Api\Crm\ConnectionController;
@@ -110,6 +111,12 @@ Route::prefix('v1/crm')->middleware(['auth:sanctum', 'clinic'])->group(function 
     Route::get('properties/{property}', [ClinicPropertyController::class, 'show']);
     Route::match(['patch', 'post'], 'properties/{property}', [ClinicPropertyController::class, 'update'])->middleware('role:admin,developer');
     Route::delete('properties/{property}', [ClinicPropertyController::class, 'destroy'])->middleware('role:admin,developer');
+
+    Route::get('products', [ClinicProductController::class, 'index']);
+    Route::post('products', [ClinicProductController::class, 'store'])->middleware('role:admin,developer');
+    Route::get('products/{product}', [ClinicProductController::class, 'show']);
+    Route::match(['patch', 'post'], 'products/{product}', [ClinicProductController::class, 'update'])->middleware('role:admin,developer');
+    Route::delete('products/{product}', [ClinicProductController::class, 'destroy'])->middleware('role:admin,developer');
 
     Route::get('knowledge', [ClinicKnowledgeController::class, 'index']);
     Route::post('knowledge', [ClinicKnowledgeController::class, 'store'])->middleware('role:admin,developer');

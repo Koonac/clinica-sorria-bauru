@@ -31,7 +31,7 @@ const totalLabel = computed(() => {
 
 const confirmMessage = computed(() => {
   const name = deleting.value?.name || 'este modelo'
-  return `Isso apaga ${name} e toda a base: CRM, WhatsApp, serviços/imóveis, knowledge, agents e agendamentos. Os usuários vinculados ficam sem modelo. Esta ação não pode ser desfeita.`
+  return `Isso apaga ${name} e toda a base: CRM, WhatsApp, serviços/imóveis/produtos, knowledge, agents e agendamentos. Os usuários vinculados ficam sem modelo. Esta ação não pode ser desfeita.`
 })
 
 async function load() {

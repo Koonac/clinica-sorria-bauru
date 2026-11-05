@@ -2,9 +2,12 @@
 import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useClinicsStore } from '@/stores/clinics'
-import { isImobiliariaTemplate, type BusinessTemplate } from '@/utils/businessTemplate'
+import type { BusinessTemplate } from '@/utils/businessTemplate'
 
 type ToolMode = 'sempre' | 'direto' | 'pre'
+
+/** Tools de agenda não existem na loja de roupas. */
+const SCHEDULING_TEMPLATES: BusinessTemplate[] = ['clinica', 'imobiliaria']
 
 /** Espelha WhatsappAgentToolRegistry (backend). Apenas informativo para quem escreve o prompt. */
 const TOOLS: {
@@ -31,25 +34,35 @@ const TOOLS: {
     templates: ['imobiliaria'],
   },
   {
+    name: 'consultar_produtos',
+    description: 'Busca peças cadastradas em Produtos (preço, categoria, tamanhos, cores e descrição).',
+    mode: 'sempre',
+    templates: ['loja_roupas'],
+  },
+  {
     name: 'listar_horarios_disponiveis',
     description:
       'Consulta os horários livres no expediente: agenda do painel e, se conectado, Google Agenda.',
     mode: 'sempre',
+    templates: SCHEDULING_TEMPLATES,
   },
   {
     name: 'criar_agendamento',
     description: 'Marca (ou remarca) a consulta direto na agenda e no CRM.',
     mode: 'direto',
+    templates: SCHEDULING_TEMPLATES,
   },
   {
     name: 'registrar_pre_agendamento',
     description: 'Anota o dia/horário preferido e avisa a recepção, que confirma em Consultas.',
     mode: 'pre',
+    templates: SCHEDULING_TEMPLATES,
   },
   {
     name: 'atualizar_consulta',
     description: 'Confirma presença ou cancela uma consulta já marcada (resposta ao lembrete).',
     mode: 'sempre',
+    templates: SCHEDULING_TEMPLATES,
   },
   {
     name: 'mover_lead',
@@ -89,11 +102,8 @@ const MODE_TONE: Record<ToolMode, string> = {
 
 const clinics = useClinicsStore()
 const visibleTools = computed(() => {
-  const imobiliaria = isImobiliariaTemplate(clinics.activeTemplate)
-  return TOOLS.filter((tool) => {
-    if (!tool.templates?.length) return true
-    return imobiliaria ? tool.templates.includes('imobiliaria') : tool.templates.includes('clinica')
-  })
+  const template = clinics.activeTemplate
+  return TOOLS.filter((tool) => !tool.templates?.length || tool.templates.includes(template))
 })
 </script>
 

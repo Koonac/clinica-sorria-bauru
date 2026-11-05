@@ -29,11 +29,13 @@ const canSubmit = computed(
   () => name.value.trim().length > 0 && template.value != null && !loading.value,
 )
 
-const namePlaceholder = computed(() =>
-  template.value === 'imobiliaria'
-    ? 'Ex.: Imobiliária Centro Bauru'
-    : 'Ex.: Clínica Sorria Marília',
-)
+const NAME_PLACEHOLDERS: Record<BusinessTemplate, string> = {
+  clinica: 'Ex.: Clínica Sorria Marília',
+  imobiliaria: 'Ex.: Imobiliária Centro Bauru',
+  loja_roupas: 'Ex.: Loja Estilo Bauru',
+}
+
+const namePlaceholder = computed(() => NAME_PLACEHOLDERS[template.value ?? 'clinica'])
 
 function resetForm() {
   name.value = ''
@@ -139,7 +141,7 @@ async function onSubmit() {
         <form class="flex flex-col gap-4 p-5" @submit.prevent="onSubmit">
           <fieldset class="flex flex-col gap-2">
             <legend class="text-sm font-medium text-brand-ink/80">Template</legend>
-            <div class="grid gap-2 sm:grid-cols-2">
+            <div class="grid gap-2 sm:grid-cols-3">
               <button
                 v-for="option in BUSINESS_TEMPLATES"
                 :key="option.value"

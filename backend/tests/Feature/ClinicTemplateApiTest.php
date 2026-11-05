@@ -178,4 +178,168 @@ class ClinicTemplateApiTest extends TestCase
         $this->assertContains('consultar_imoveis', $names);
         $this->assertNotContains('consultar_servicos', $names);
     }
+
+    public function test_developer_cria_modelo_loja_de_roupas(): void
+    {
+        Sanctum::actingAs(User::factory()->developer()->create());
+
+        $this->postJson('/api/v1/clinics', [
+            'name' => 'Loja Estilo',
+            'template' => Clinic::TEMPLATE_LOJA_ROUPAS,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.template', 'loja_roupas');
+    }
+
+    public function test_crud_produtos_com_imagem_e_tamanhos(): void
+    {
+        $loja = $this->createLoja('loja-crud');
+
+        Sanctum::actingAs(User::factory()->developer()->create());
+
+        $create = $this->withHeader('X-Clinic-Id', (string) $loja->id)
+            ->post('/api/v1/crm/products', [
+                'name' => 'Vestido Floral Midi',
+                'description' => 'Viscose, caimento leve.',
+                'price' => 189.9,
+                'category' => 'vestido',
+                'audience' => 'feminino',
+                'sizes' => ['G', 'P', 'M'],
+                'colors' => 'Azul, rosa',
+                'image' => UploadedFile::fake()->image('vestido.jpg', 400, 600),
+            ], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonPath('data.sizes', ['P', 'M', 'G'])
+            ->assertJsonPath('data.category', 'vestido');
+
+        $id = $create->json('data.id');
+        $imagePath = $create->json('data.image_path');
+        $this->assertStringStartsWith('products/'.$loja->id.'/', $imagePath);
+        $this->assertSame('/media/'.$imagePath, $create->json('data.image_url'));
+        Storage::disk('public')->assertExists($imagePath);
+
+        $this->withHeader('X-Clinic-Id', (string) $loja->id)
+            ->getJson('/api/v1/crm/products?q=floral')
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+
+        $this->withHeader('X-Clinic-Id', (string) $loja->id)
+            ->getJson('/api/v1/crm/products?category=calca')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
+        $this->withHeader('X-Clinic-Id', (string) $loja->id)
+            ->post('/api/v1/crm/products/'.$id, [
+                '_method' => 'PATCH',
+                'sizes' => '',
+                'price' => 159.9,
+            ], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('data.sizes', [])
+            ->assertJsonPath('data.price', '159.90');
+
+        $this->withHeader('X-Clinic-Id', (string) $loja->id)
+            ->postJson('/api/v1/crm/products', [
+                'name' => 'Tamanho errado',
+                'price' => 10,
+                'category' => 'camiseta',
+                'audience' => 'unissex',
+                'sizes' => ['XXXL'],
+            ])
+            ->assertUnprocessable();
+
+        $this->withHeader('X-Clinic-Id', (string) $loja->id)
+            ->deleteJson('/api/v1/crm/products/'.$id)
+            ->assertOk();
+
+        $this->assertDatabaseMissing('clinic_products', ['id' => $id]);
+        Storage::disk('public')->assertMissing($imagePath);
+    }
+
+    public function test_knowledge_categorias_por_template_loja(): void
+    {
+        $loja = $this->createLoja('loja-knowledge');
+
+        Sanctum::actingAs(User::factory()->developer()->create());
+
+        $this->withHeader('X-Clinic-Id', (string) $loja->id)
+            ->postJson('/api/v1/crm/knowledge', [
+                'category' => 'trocas',
+                'content' => 'Trocas em até 30 dias com etiqueta.',
+            ])
+            ->assertCreated();
+
+        $this->withHeader('X-Clinic-Id', (string) $loja->id)
+            ->postJson('/api/v1/crm/knowledge', [
+                'category' => 'convenios',
+                'content' => 'Não deveria existir.',
+            ])
+            ->assertUnprocessable();
+
+        $this->withHeader('X-Clinic-Id', (string) $this->clinic->id)
+            ->postJson('/api/v1/crm/knowledge', [
+                'category' => 'trocas',
+                'content' => 'Clínica não tem trocas.',
+            ])
+            ->assertUnprocessable();
+    }
+
+    public function test_agent_tools_da_loja_sem_agenda(): void
+    {
+        $this->clinic->update(['template' => Clinic::TEMPLATE_LOJA_ROUPAS]);
+        app(ClinicContext::class)->set($this->clinic->fresh());
+
+        [$user, $connection] = $this->userWithWhatsappConnection();
+        $agent = Agent::create([
+            'user_id' => $user->id,
+            'clinic_id' => $this->clinic->id,
+            'name' => 'Agent loja',
+            'is_active' => true,
+        ]);
+
+        $context = new AgentContext(
+            user: $user,
+            connection: $connection->fresh(),
+            agent: $agent,
+            chatKey: 'chat',
+            jid: 'jid',
+            sessionId: 'sess',
+            lead: null,
+            deal: null,
+            leadStages: [],
+        );
+
+        $registry = app(WhatsappAgentToolRegistry::class);
+        $names = array_map(
+            fn (array $tool) => $tool['function']['name'] ?? '',
+            $registry->openAiTools($context),
+        );
+
+        $this->assertContains('consultar_produtos', $names);
+        $this->assertContains('enviar_resposta', $names);
+        $this->assertContains('escalar_humano', $names);
+        foreach ([
+            'consultar_servicos',
+            'consultar_imoveis',
+            'listar_horarios_disponiveis',
+            'criar_agendamento',
+            'registrar_pre_agendamento',
+            'atualizar_consulta',
+        ] as $hidden) {
+            $this->assertNotContains($hidden, $names);
+        }
+
+        $result = $registry->execute('criar_agendamento', [], $context);
+        $this->assertFalse($result['ok']);
+    }
+
+    private function createLoja(string $slug): Clinic
+    {
+        return Clinic::query()->create([
+            'name' => 'Loja '.$slug,
+            'slug' => $slug,
+            'template' => Clinic::TEMPLATE_LOJA_ROUPAS,
+            'is_active' => true,
+        ]);
+    }
 }

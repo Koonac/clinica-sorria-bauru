@@ -114,6 +114,17 @@ const router = createRouter({
           },
         },
         {
+          path: 'produtos',
+          name: 'products',
+          component: () => import('@/views/ProductsView.vue'),
+          meta: {
+            requiresAuth: true,
+            roles: elevatedRoles,
+            title: 'Produtos',
+            icon: 'lucide:shirt',
+          },
+        },
+        {
           path: 'base-conhecimento',
           name: 'knowledge',
           component: () => import('@/views/KnowledgeView.vue'),

@@ -6,6 +6,7 @@ use App\Models\Clinic;
 use App\Services\Crm\Agent\Tools\ArmazenarInfoLeadTool;
 use App\Services\Crm\Agent\Tools\AtualizarConsultaTool;
 use App\Services\Crm\Agent\Tools\ConsultarImoveisTool;
+use App\Services\Crm\Agent\Tools\ConsultarProdutosTool;
 use App\Services\Crm\Agent\Tools\ConsultarServicosTool;
 use App\Services\Crm\Agent\Tools\CriarAgendamentoTool;
 use App\Services\Crm\Agent\Tools\EnviarRespostaTool;
@@ -14,7 +15,6 @@ use App\Services\Crm\Agent\Tools\FinalizarAtendimentoTool;
 use App\Services\Crm\Agent\Tools\ListarHorariosDisponiveisTool;
 use App\Services\Crm\Agent\Tools\MoverLeadTool;
 use App\Services\Crm\Agent\Tools\RegistrarPreAgendamentoTool;
-use App\Support\ClinicContext;
 use RuntimeException;
 use Throwable;
 
@@ -25,9 +25,20 @@ class WhatsappAgentToolRegistry
 
     private const PRE_BOOKING_ONLY = ['registrar_pre_agendamento'];
 
-    private const CLINICA_ONLY = ['consultar_servicos'];
+    /** Tools de catálogo: cada uma só existe nos templates listados. */
+    private const TEMPLATE_ONLY = [
+        'consultar_servicos' => [Clinic::TEMPLATE_CLINICA],
+        'consultar_imoveis' => [Clinic::TEMPLATE_IMOBILIARIA],
+        'consultar_produtos' => [Clinic::TEMPLATE_LOJA_ROUPAS],
+    ];
 
-    private const IMOBILIARIA_ONLY = ['consultar_imoveis'];
+    /** Tools de agenda: somem nos templates sem agendamento (ex.: loja de roupas). */
+    private const SCHEDULING_TOOLS = [
+        'listar_horarios_disponiveis',
+        'criar_agendamento',
+        'registrar_pre_agendamento',
+        'atualizar_consulta',
+    ];
 
     /** @var array<string, AgentTool> */
     private array $tools;
@@ -42,6 +53,7 @@ class WhatsappAgentToolRegistry
         ListarHorariosDisponiveisTool $horarios,
         ConsultarServicosTool $servicos,
         ConsultarImoveisTool $imoveis,
+        ConsultarProdutosTool $produtos,
         EscalarHumanoTool $escalar,
         FinalizarAtendimentoTool $finalizar,
     ) {
@@ -55,6 +67,7 @@ class WhatsappAgentToolRegistry
             $horarios->name() => $horarios,
             $servicos->name() => $servicos,
             $imoveis->name() => $imoveis,
+            $produtos->name() => $produtos,
             $escalar->name() => $escalar,
             $finalizar->name() => $finalizar,
         ];
@@ -93,7 +106,7 @@ class WhatsappAgentToolRegistry
         if (! $this->availableFor($name, $context)) {
             return [
                 'ok' => false,
-                'error' => "A tool {$name} não está disponível no modo de agendamento desta clínica.",
+                'error' => "A tool {$name} não está disponível neste modelo/modo de agendamento.",
             ];
         }
 
@@ -119,28 +132,17 @@ class WhatsappAgentToolRegistry
             return false;
         }
 
-        $imobiliaria = $this->isImobiliaria($context);
-        if ($imobiliaria && in_array($name, self::CLINICA_ONLY, true)) {
+        $template = Clinic::templateForId($context->connection->clinic_id);
+
+        $templates = self::TEMPLATE_ONLY[$name] ?? null;
+        if ($templates !== null && ! in_array($template, $templates, true)) {
             return false;
         }
-        if (! $imobiliaria && in_array($name, self::IMOBILIARIA_ONLY, true)) {
+
+        if (! Clinic::templateUsesScheduling($template) && in_array($name, self::SCHEDULING_TOOLS, true)) {
             return false;
         }
 
         return true;
-    }
-
-    private function isImobiliaria(AgentContext $context): bool
-    {
-        $clinic = app(ClinicContext::class)->clinic();
-        if ($clinic) {
-            return $clinic->isImobiliaria();
-        }
-
-        $template = Clinic::query()
-            ->whereKey($context->connection->clinic_id)
-            ->value('template');
-
-        return $template === Clinic::TEMPLATE_IMOBILIARIA;
     }
 }

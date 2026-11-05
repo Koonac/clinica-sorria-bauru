@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Crm;
 
+use App\Models\Clinic;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreClinicRequest extends FormRequest
 {
@@ -16,7 +18,7 @@ class StoreClinicRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:190'],
             'slug' => ['nullable', 'string', 'max:190', 'alpha_dash:ascii'],
-            'template' => ['required', 'string', 'in:clinica,imobiliaria'],
+            'template' => ['required', 'string', Rule::in(Clinic::TEMPLATES)],
             'is_active' => ['sometimes', 'boolean'],
             'google_calendar_refresh_token' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'google_calendar_id' => ['sometimes', 'nullable', 'string', 'max:190'],
@@ -35,7 +37,7 @@ class StoreClinicRequest extends FormRequest
         return [
             'name.required' => 'O nome do modelo é obrigatório.',
             'template.required' => 'Escolha um template.',
-            'template.in' => 'Template inválido. Use clinica ou imobiliaria.',
+            'template.in' => 'Template inválido. Use clinica, imobiliaria ou loja_roupas.',
         ];
     }
 }

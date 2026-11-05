@@ -9,7 +9,10 @@ use Illuminate\Validation\ValidationException;
 
 class DeleteClinic
 {
-    public function __construct(private PropertyImageStore $images) {}
+    public function __construct(
+        private PropertyImageStore $images,
+        private ProductImageStore $productImages,
+    ) {}
 
     public function handle(Clinic $clinic): int
     {
@@ -22,6 +25,7 @@ class DeleteClinic
 
         DB::transaction(function () use ($clinic, $id): void {
             $this->images->deleteForClinic($id);
+            $this->productImages->deleteForClinic($id);
             $clinic->delete();
         });
 

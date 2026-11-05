@@ -37,12 +37,14 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Agenda',
     icon: 'lucide:calendar',
     to: { name: 'agenda' },
+    templates: ['clinica', 'imobiliaria'],
   },
   {
     name: 'appointments',
     label: 'Consultas',
     icon: 'lucide:calendar-check',
     to: { name: 'appointments' },
+    templates: ['clinica', 'imobiliaria'],
   },
   {
     name: 'whatsapp',
@@ -65,6 +67,14 @@ export const NAV_ITEMS: NavItem[] = [
     to: { name: 'properties' },
     roles: ['admin', 'developer'],
     templates: ['imobiliaria'],
+  },
+  {
+    name: 'products',
+    label: 'Produtos',
+    icon: 'lucide:shirt',
+    to: { name: 'products' },
+    roles: ['admin', 'developer'],
+    templates: ['loja_roupas'],
   },
   {
     name: 'knowledge',

@@ -20,11 +20,15 @@ class ClinicKnowledgeEntry extends Model
 
     public const CATEGORIES_IMOBILIARIA = ['endereco', 'pagamento', 'outros'];
 
+    public const CATEGORIES_LOJA_ROUPAS = ['endereco', 'pagamento', 'trocas', 'entrega', 'outros'];
+
     public const CATEGORY_LABELS = [
         'endereco' => 'Endereço e como chegar',
         'convenios' => 'Convênios aceitos',
         'pagamento' => 'Formas de pagamento',
         'procedimentos' => 'Procedimentos',
+        'trocas' => 'Trocas e devoluções',
+        'entrega' => 'Entrega e frete',
         'outros' => 'Outras informações',
     ];
 
@@ -36,9 +40,11 @@ class ClinicKnowledgeEntry extends Model
         $clinic ??= app(ClinicContext::class)->clinic();
         $template = $clinic?->resolvedTemplate() ?? Clinic::TEMPLATE_CLINICA;
 
-        return $template === Clinic::TEMPLATE_IMOBILIARIA
-            ? self::CATEGORIES_IMOBILIARIA
-            : self::CATEGORIES;
+        return match ($template) {
+            Clinic::TEMPLATE_IMOBILIARIA => self::CATEGORIES_IMOBILIARIA,
+            Clinic::TEMPLATE_LOJA_ROUPAS => self::CATEGORIES_LOJA_ROUPAS,
+            default => self::CATEGORIES,
+        };
     }
 
     /**

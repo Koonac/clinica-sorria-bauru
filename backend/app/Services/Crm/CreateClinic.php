@@ -37,7 +37,7 @@ class CreateClinic
         $template = trim((string) ($attrs['template'] ?? Clinic::TEMPLATE_CLINICA));
         if (! in_array($template, Clinic::TEMPLATES, true)) {
             throw ValidationException::withMessages([
-                'template' => 'Template inválido. Use clinica ou imobiliaria.',
+                'template' => 'Template inválido. Use clinica, imobiliaria ou loja_roupas.',
             ]);
         }
 
